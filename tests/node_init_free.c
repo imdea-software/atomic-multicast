@@ -38,17 +38,17 @@ int main(int argc, char *argv[]) {
         if (nodes[i]->id != id[i])
 	    printf("Failed to set the id of the node %u\n", i);
 
-	if (nodes[i]->comm->c_size != NUMBER_OF_NODES)
+	if (nodes[i]->comm->cluster_size != NUMBER_OF_NODES)
 	    printf("Failed to set the cluster size for the node %u\n", i);
 
 	for(int j=0; j<NUMBER_OF_NODES; j++) {
 	    if (nodes[i]->comm->groups[j] != group_membership[j])
 	        printf("Failed to set the group membership of node %u for the node %u\n", j, i);
 
-	    if (ntohs(nodes[i]->comm->addr[j].sin_port) != ports[j])
+	    if (ntohs(nodes[i]->comm->addrs[j].sin_port) != ports[j])
 	        printf("Failed to set the port of node %u for the node %u\n", j, i);
 
-	    if (strcmp(inet_ntoa(nodes[i]->comm->addr[j].sin_addr), addresses[j]) != 0)
+	    if (strcmp(inet_ntoa(nodes[i]->comm->addrs[j].sin_addr), addresses[j]) != 0)
 	        printf("Failed to set the ip addr of node %u for the node %u\n", j, i);
 	}
     }

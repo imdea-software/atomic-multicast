@@ -5,9 +5,9 @@
 #include "cluster.h"
 
 struct node_comm {
-    unsigned int	c_size;
+    unsigned int	cluster_size;
     id_t 		*groups;
-    struct sockaddr_in	*addr;
+    struct sockaddr_in	*addrs;
 };
 
 struct node_events {

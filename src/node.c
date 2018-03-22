@@ -9,25 +9,22 @@ struct node_comm *init_node_comm(struct cluster_config *conf) {
     unsigned int size = conf->size;
 
     struct node_comm *comm = malloc(sizeof(struct node_comm));
-    struct sockaddr_in *addr = malloc(size * sizeof(struct sockaddr_in));
+    struct sockaddr_in *addrs = malloc(size * sizeof(struct sockaddr_in));
     id_t *groups = malloc(size * sizeof(id_t));
 
     for(int i=0; i<size; i++) {
-	id_t c_id = *(conf->id+i);
-	struct sockaddr_in *c_addr = addr+c_id;
-	address_t *conf_addr = conf->addresses+c_id;
-	port_t conf_port = *(conf->ports+c_id);
-
-	memset(c_addr, 0, sizeof(struct sockaddr_in));
-        c_addr->sin_family = AF_INET;
-        c_addr->sin_port = htons(conf_port);
-	inet_aton(*conf_addr, &(c_addr->sin_addr));
+	id_t c_id = conf->id[i];
+	//Prepare the sockaddr_in structs for each node
+	memset(addrs+c_id, 0, sizeof(struct sockaddr_in));
+        addrs[c_id].sin_family = AF_INET;
+        addrs[c_id].sin_port = htons(conf->ports[c_id]);
+	inet_aton(conf->addresses[c_id], &(addrs[c_id].sin_addr));
     }
     //TODO Create a dedicated group structure
     memcpy(groups, conf->group_membership, size * sizeof(id_t));
 
-    comm->c_size = size;
-    comm->addr = addr;
+    comm->cluster_size = size;
+    comm->addrs = addrs;
     comm->groups = groups;
 
     return comm;
@@ -35,7 +32,7 @@ struct node_comm *init_node_comm(struct cluster_config *conf) {
 
 int free_node_comm(struct node_comm *comm) {
     free(comm->groups);
-    free(comm->addr);
+    free(comm->addrs);
     free(comm);
     return 0;
 }
