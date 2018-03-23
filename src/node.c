@@ -6,6 +6,9 @@
 static void accept_conn_cb(struct evconnlistener *lev,
 		evutil_socket_t sock, struct sockaddr *addr, int len, void *ptr);
 static void accept_error_cb(struct evconnlistener *lev, void *ptr);
+static void read_cb(struct bufferevent *bev, void *ctx);
+static void event_cb(struct bufferevent *bev, short events, void *ctx);
+
 //TODO Do the proper security checks on system calls
 
 struct node_comm *init_node_comm(struct cluster_config *conf) {
@@ -13,7 +16,10 @@ struct node_comm *init_node_comm(struct cluster_config *conf) {
 
     struct node_comm *comm = malloc(sizeof(struct node_comm));
     struct sockaddr_in *addrs = malloc(size * sizeof(struct sockaddr_in));
+    id_t *ids = malloc(size * sizeof(id_t));
     id_t *groups = malloc(size * sizeof(id_t));
+    //TODO It might be better to realloc when connection is accepted/lost
+    struct bufferevent **bevs = malloc(size * sizeof(struct bufferevent *));
 
     for(int i=0; i<size; i++) {
 	id_t c_id = conf->id[i];
@@ -25,16 +31,21 @@ struct node_comm *init_node_comm(struct cluster_config *conf) {
     }
     //TODO Create a dedicated group structure
     memcpy(groups, conf->group_membership, size * sizeof(id_t));
+    memcpy(ids, conf->id, size * sizeof(id_t));
 
     comm->cluster_size = size;
     comm->accepted_count = 0;
     comm->addrs = addrs;
+    comm->ids = ids;
     comm->groups = groups;
+    comm->bevs = bevs;
 
     return comm;
 };
 
 int free_node_comm(struct node_comm *comm) {
+    //TODO Every bev should be freed manually with bufferevent_free()
+    free(comm->bevs);
     free(comm->groups);
     free(comm->addrs);
     free(comm);
@@ -50,6 +61,18 @@ struct node_events *init_node_events(struct node_comm *comm, id_t id) {
 		    LEV_OPT_CLOSE_ON_EXEC | LEV_OPT_CLOSE_ON_FREE | LEV_OPT_REUSEABLE,
 		    -1, (struct sockaddr*) comm->addrs+id, sizeof(comm->addrs[id]));
     evconnlistener_set_error_cb(events->lev, accept_error_cb);
+    //Connect to the other nodes of the cluster
+    //TODO Create an event that keeps retrying until it succeeds, otherwise, not reliable
+    for(int i=0; i<comm->cluster_size; i++) {
+        //Create bufferevents for each node
+        comm->bevs[i] = bufferevent_socket_new(events->base, -1, BEV_OPT_CLOSE_ON_FREE);
+        struct bufferevent *c_bev = comm->bevs[i];
+        //TODO Pass the node_id as a callback parameter to identify msg sender
+        bufferevent_setcb(c_bev, read_cb, NULL, event_cb, comm->ids+i);
+        bufferevent_enable(c_bev, EV_READ|EV_WRITE);
+        bufferevent_socket_connect(c_bev, (struct sockaddr *)comm->addrs+i,
+	    sizeof(comm->addrs[i]));
+    }
     return events;
 }
 
