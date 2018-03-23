@@ -98,6 +98,11 @@ int node_free(struct node *node) {
     return 0;
 }
 
+void node_start(struct node *node) {
+    //event_base_dump_events(node->events->base, stdout);
+    event_base_dispatch(node->events->base);
+}
+
 
 // STATIC FUNCTIONS
 
