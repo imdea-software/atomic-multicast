@@ -126,3 +126,21 @@ static void accept_error_cb(struct evconnlistener *lev, void *ptr) {
                 "Shutting down.\n", err, evutil_socket_error_to_string(err));
     event_base_loopexit(evconnlistener_get_base(lev), NULL);
 };
+
+//Called whenever data gets into the bufferevents
+static void read_cb(struct bufferevent *bev, void *ptr) {
+    //TODO Implement message reception
+    puts("We got mail!\n");
+}
+
+//Called when the status of a connection changes
+static void event_cb(struct bufferevent *bev, short events, void *ptr) {
+    int *id = (int *) ptr;
+    if (events & BEV_EVENT_CONNECTED) {
+        printf("Connection established to node %u\n", *id);
+    } else if (events & (BEV_EVENT_EOF|BEV_EVENT_ERROR)) {
+        printf("Connection lost to node %u\n", *id);
+    } else {
+        printf("Event %d not handled", events);
+    }
+}
