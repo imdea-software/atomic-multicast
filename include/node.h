@@ -1,4 +1,5 @@
 #include <event2/event.h>
+#include <event2/listener.h>
 #include <event2/bufferevent.h>
 
 #include "types.h"
@@ -11,8 +12,8 @@ struct node_comm {
 };
 
 struct node_events {
-    struct event_base 	*base;
-    struct bufferevent  *bev;
+    struct event_base	*base;
+    struct evconnlistener *lev;
 };
 
 struct node {

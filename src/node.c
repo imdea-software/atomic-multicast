@@ -3,6 +3,9 @@
 
 #include "node.h"
 
+static void accept_conn_cb(struct evconnlistener *lev,
+		evutil_socket_t sock, struct sockaddr *addr, int len, void *ptr);
+static void accept_error_cb(struct evconnlistener *lev, void *ptr);
 //TODO Do the proper security checks on system calls
 
 struct node_comm *init_node_comm(struct cluster_config *conf) {
@@ -37,27 +40,30 @@ int free_node_comm(struct node_comm *comm) {
     return 0;
 }
 
-struct node_events *init_node_events() {
+struct node_events *init_node_events(struct node_comm *comm, id_t id) {
     struct node_events *events = malloc(sizeof(struct node_events));
-    //TODO Actually init the structure
+    //Create a new event base
+    events->base = event_base_new();
+    //Listen for incomming connection
+    events->lev = evconnlistener_new_bind(events->base, accept_conn_cb, comm,
+		    LEV_OPT_CLOSE_ON_EXEC | LEV_OPT_CLOSE_ON_FREE | LEV_OPT_REUSEABLE,
+		    -1, (struct sockaddr*) comm->addrs+id, sizeof(comm->addrs[id]));
+    evconnlistener_set_error_cb(events->lev, accept_error_cb);
     return events;
 }
 
 int free_node_events(struct node_events *events) {
+    evconnlistener_free(events->lev);
+    event_base_free(events->base);
     free(events);
-    //TODO Update this once the structure is well intialized
     return 0;
 }
 
 struct node *node_init(struct cluster_config *conf, id_t id) {
     struct node *node = malloc(sizeof(struct node));
-    struct node_comm *comm = init_node_comm(conf);
-    struct node_events *events = init_node_events();
-
     node->id = id;
-    node->comm = comm;
-    node->events = events;
-
+    node->comm = init_node_comm(conf);
+    node->events = init_node_events(node->comm, id);
     return node;
 }
 
