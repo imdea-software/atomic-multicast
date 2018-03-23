@@ -7,6 +7,7 @@
 
 struct node_comm {
     unsigned int	cluster_size;
+    unsigned int	accepted_count;
     id_t 		*groups;
     struct sockaddr_in	*addrs;
 };

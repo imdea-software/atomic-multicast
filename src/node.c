@@ -27,6 +27,7 @@ struct node_comm *init_node_comm(struct cluster_config *conf) {
     memcpy(groups, conf->group_membership, size * sizeof(id_t));
 
     comm->cluster_size = size;
+    comm->accepted_count = 0;
     comm->addrs = addrs;
     comm->groups = groups;
 
@@ -73,3 +74,32 @@ int node_free(struct node *node) {
     free(node);
     return 0;
 }
+
+
+// STATIC FUNCTIONS
+
+// CALLBACKS IMPLEMENTATION
+
+//Called after accepting a connection, currently, get the bufferevent ready to talk
+//  Since there is no way to tell from whom the accepted connection comes,
+//  a protocol extension is needed
+//TODO Store accepted connections from socket & addr to keep track of the current cluster
+static void accept_conn_cb(struct evconnlistener *lev, evutil_socket_t sock,
+		struct sockaddr *addr, int len, void *ptr) {
+    //struct node_comm *comm = ptr;
+    //struct event_base *base = evconnlistener_get_base(lev);
+    //struct bufferevent *bev = comm->bevs[comm->accepted_count++ - 1];
+    //printf("Connection accepted %u\n", comm->accepted_count);
+    //Do not mess with the bevs, they already should be correctly set from the connect loop
+    //bufferevent_setfd(bev, sock);
+    //bufferevent_setcb(bev, read_cb, NULL, event_cb, NULL);
+    //bufferevent_enable(bev, EV_READ|EV_WRITE);
+}
+
+//Called if an accept() call fails, currently, just ends the event loop
+static void accept_error_cb(struct evconnlistener *lev, void *ptr) {
+    int err = EVUTIL_SOCKET_ERROR();
+    fprintf(stderr, "Got an error %d (%s) on the listener. "
+                "Shutting down.\n", err, evutil_socket_error_to_string(err));
+    event_base_loopexit(evconnlistener_get_base(lev), NULL);
+};
