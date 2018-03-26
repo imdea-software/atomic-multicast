@@ -8,7 +8,7 @@ LDFLAGS = -levent
 LDFLAGS_TEST = $(LDFLAGS) -lpthread -levent_pthreads
 VERBOSE =
 TARGET  = $(TEST_DIR)/node_init_free $(TEST_DIR)/node_connect
-OBJS    = $(SRC_DIR)/node.o
+OBJS    = $(SRC_DIR)/node.o $(SRC_DIR)/events.o
 
 all: $(TARGET)
 

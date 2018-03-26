@@ -2,12 +2,8 @@
 #include <string.h>
 
 #include "node.h"
+#include "events.h"
 
-static void accept_conn_cb(struct evconnlistener *lev,
-		evutil_socket_t sock, struct sockaddr *addr, int len, void *ptr);
-static void accept_error_cb(struct evconnlistener *lev, void *ptr);
-static void read_cb(struct bufferevent *bev, void *ctx);
-static void event_cb(struct bufferevent *bev, short events, void *ctx);
 
 //TODO Do the proper security checks on system calls
 
@@ -64,14 +60,7 @@ struct node_events *init_node_events(struct node_comm *comm, id_t id) {
     //Connect to the other nodes of the cluster
     //TODO Create an event that keeps retrying until it succeeds, otherwise, not reliable
     for(int i=0; i<comm->cluster_size; i++) {
-        //Create bufferevents for each node
-        comm->bevs[i] = bufferevent_socket_new(events->base, -1, BEV_OPT_CLOSE_ON_FREE);
-        struct bufferevent *c_bev = comm->bevs[i];
-        //TODO Pass the node_id as a callback parameter to identify msg sender
-        bufferevent_setcb(c_bev, read_cb, NULL, event_cb, comm->ids+i);
-        bufferevent_enable(c_bev, EV_READ|EV_WRITE);
-        bufferevent_socket_connect(c_bev, (struct sockaddr *)comm->addrs+i,
-	    sizeof(comm->addrs[i]));
+        connect_to_node(events->base, comm, i);
     }
     return events;
 }
@@ -112,7 +101,7 @@ void node_start(struct node *node) {
 //  Since there is no way to tell from whom the accepted connection comes,
 //  a protocol extension is needed
 //TODO Store accepted connections from socket & addr to keep track of the current cluster
-static void accept_conn_cb(struct evconnlistener *lev, evutil_socket_t sock,
+void accept_conn_cb(struct evconnlistener *lev, evutil_socket_t sock,
 		struct sockaddr *addr, int len, void *ptr) {
     //struct node_comm *comm = ptr;
     //struct event_base *base = evconnlistener_get_base(lev);
@@ -125,7 +114,7 @@ static void accept_conn_cb(struct evconnlistener *lev, evutil_socket_t sock,
 }
 
 //Called if an accept() call fails, currently, just ends the event loop
-static void accept_error_cb(struct evconnlistener *lev, void *ptr) {
+void accept_error_cb(struct evconnlistener *lev, void *ptr) {
     int err = EVUTIL_SOCKET_ERROR();
     fprintf(stderr, "Got an error %d (%s) on the listener. "
                 "Shutting down.\n", err, evutil_socket_error_to_string(err));
@@ -133,13 +122,13 @@ static void accept_error_cb(struct evconnlistener *lev, void *ptr) {
 };
 
 //Called whenever data gets into the bufferevents
-static void read_cb(struct bufferevent *bev, void *ptr) {
+void read_cb(struct bufferevent *bev, void *ptr) {
     //TODO Implement message reception
     puts("We got mail!\n");
 }
 
 //Called when the status of a connection changes
-static void event_cb(struct bufferevent *bev, short events, void *ptr) {
+void event_cb(struct bufferevent *bev, short events, void *ptr) {
     int *id = (int *) ptr;
     if (events & BEV_EVENT_CONNECTED) {
         printf("Connection established to node %u\n", *id);
