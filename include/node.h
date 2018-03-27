@@ -17,6 +17,7 @@ struct node_comm {
 struct node_events {
     struct event_base	*base;
     struct evconnlistener *lev;
+    struct event	**reconnect_evs;
 };
 
 struct node {

@@ -3,6 +3,8 @@
 #include "node.h"
 #include "events.h"
 
+static struct timeval reconnect_timeout = { 0, 0 };
+
 struct cb_arg *set_cb_arg(id_t peer_id, struct node *node) {
     struct cb_arg *arg = malloc(sizeof(struct cb_arg));
     arg->peer_id = peer_id;
@@ -16,15 +18,28 @@ int retrieve_cb_arg(id_t *peer_id, struct node **node, struct cb_arg *arg) {
     return 0;
 }
 
-int connect_to_node(struct event_base *base, struct node_comm *comm, id_t peer_id) {
+int connect_to_node(struct node *node, id_t peer_id) {
+    event_add(node->events->reconnect_evs[peer_id], &reconnect_timeout);
+    return 0;
+}
+
+// STATIC FUNCTIONS
+
+static int init_connection(struct node *node, id_t peer_id) {
     //Create a new bufferevent
-    comm->bevs[peer_id] = bufferevent_socket_new(base, -1, BEV_OPT_CLOSE_ON_FREE);
-    struct bufferevent *bev = comm->bevs[peer_id];
+    node->comm->bevs[peer_id] = bufferevent_socket_new(node->events->base,
+		   -1, BEV_OPT_CLOSE_ON_FREE);
+    struct bufferevent *bev = node->comm->bevs[peer_id];
     //TODO Pass the node_id as a callback parameter to identify msg sender
-    bufferevent_setcb(bev, read_cb, NULL, event_cb, set_cb_arg(peer_id, NULL));
+    bufferevent_setcb(bev, read_cb, NULL, event_cb, set_cb_arg(peer_id, node));
     bufferevent_enable(bev, EV_READ|EV_WRITE);
-    bufferevent_socket_connect(bev, (struct sockaddr *)comm->addrs+peer_id,
-        sizeof(comm->addrs[peer_id]));
+    bufferevent_socket_connect(bev, (struct sockaddr *)node->comm->addrs+peer_id,
+        sizeof(node->comm->addrs[peer_id]));
+    return 0;
+}
+
+static int close_connection(struct node *node, id_t peer_id) {
+    bufferevent_free(node->comm->bevs[peer_id]);
     return 0;
 }
 
@@ -66,17 +81,19 @@ void event_cb(struct bufferevent *bev, short events, void *ptr) {
     retrieve_cb_arg(&peer_id, &node, (struct cb_arg *) ptr);
 
     if (events & BEV_EVENT_CONNECTED) {
-        printf("Connection established to node %u\n", peer_id);
+        printf("[%u] Connection established to node %u\n", node->id, peer_id);
     } else if (events & (BEV_EVENT_EOF|BEV_EVENT_ERROR)) {
-        printf("Connection lost to node %u\n", peer_id);
+        printf("[%u] Connection lost to node %u\n", node->id, peer_id);
+        close_connection(node, peer_id);
+        connect_to_node(node, peer_id);
     } else {
-        printf("Event %d not handled", events);
+        printf("[%u] Event %d not handled", node->id, events);
     }
 }
 
-void reconnect_cb(evutil_socket_t sock, short events, void *ptr) {
+void reconnect_cb(evutil_socket_t sock, short flags, void *ptr) {
     struct node *node = NULL; id_t peer_id;
     retrieve_cb_arg(&peer_id, &node, (struct cb_arg *) ptr);
 
-    connect_to_node(node->events->base, node->comm, peer_id);
+    init_connection(node, peer_id);
 }

@@ -4,7 +4,6 @@
 #include "node.h"
 #include "events.h"
 
-static struct timeval reconnect_timeout = { 0, 0 };
 
 //TODO Do the proper security checks on system calls
 
@@ -57,19 +56,22 @@ static struct node_events *init_node_events(struct node_comm *comm, id_t id) {
     events->lev = evconnlistener_new_bind(events->base, NULL, NULL,
 		    LEV_OPT_CLOSE_ON_EXEC | LEV_OPT_CLOSE_ON_FREE | LEV_OPT_REUSEABLE,
 		    -1, (struct sockaddr*) comm->addrs+id, sizeof(comm->addrs[id]));
+    //Create an array of reconnection events
+    events->reconnect_evs = malloc(comm->cluster_size * sizeof(struct event *));
     return events;
 }
 
 static int configure_node_events(struct node *node) {
-    //Set the listener callbacks to activate it
+    //Set the listener callbacks to make it active
     evconnlistener_set_cb(node->events->lev, accept_conn_cb, NULL);
     evconnlistener_set_error_cb(node->events->lev, accept_error_cb);
     //Connect to the other nodes of the cluster
     //TODO Maybe re-add the event when BEV_EVENT_EOF|ERROR to reconnect when lost
     for(int i=0; i<node->comm->cluster_size; i++) {
-        struct event *ev = evtimer_new(node->events->base, reconnect_cb,
-			set_cb_arg(node->comm->ids[i], node));
-        event_add(ev, &reconnect_timeout);
+        id_t peer_id = node->comm->ids[i];
+        node->events->reconnect_evs[peer_id] = evtimer_new(node->events->base, reconnect_cb,
+			set_cb_arg(peer_id, node));
+        connect_to_node(node, peer_id);
     }
     return 0;
 }
