@@ -1,3 +1,11 @@
+struct cb_arg {
+    id_t	peer_id;
+    struct node	*node;
+};
+
+struct cb_arg *set_cb_arg(id_t peer_id, struct node *node);
+int retrieve_cb_arg(id_t *peer_id, struct node *node, struct cb_arg *arg);
+
 int connect_to_node(struct event_base *base, struct node_comm *comm, id_t peer_id);
 
 void accept_conn_cb(struct evconnlistener *lev,
