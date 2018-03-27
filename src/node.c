@@ -7,7 +7,7 @@
 
 //TODO Do the proper security checks on system calls
 
-struct node_comm *init_node_comm(struct cluster_config *conf) {
+static struct node_comm *init_node_comm(struct cluster_config *conf) {
     unsigned int size = conf->size;
 
     struct node_comm *comm = malloc(sizeof(struct node_comm));
@@ -39,7 +39,7 @@ struct node_comm *init_node_comm(struct cluster_config *conf) {
     return comm;
 };
 
-int free_node_comm(struct node_comm *comm) {
+static int free_node_comm(struct node_comm *comm) {
     //TODO Every bev should be freed manually with bufferevent_free()
     free(comm->bevs);
     free(comm->groups);
@@ -48,7 +48,7 @@ int free_node_comm(struct node_comm *comm) {
     return 0;
 }
 
-struct node_events *init_node_events(struct node_comm *comm, id_t id) {
+static struct node_events *init_node_events(struct node_comm *comm, id_t id) {
     struct node_events *events = malloc(sizeof(struct node_events));
     //Create a new event base
     events->base = event_base_new();
@@ -65,7 +65,7 @@ struct node_events *init_node_events(struct node_comm *comm, id_t id) {
     return events;
 }
 
-int free_node_events(struct node_events *events) {
+static int free_node_events(struct node_events *events) {
     evconnlistener_free(events->lev);
     event_base_free(events->base);
     free(events);
