@@ -21,7 +21,7 @@ int connect_to_node(struct event_base *base, struct node_comm *comm, id_t peer_i
     comm->bevs[peer_id] = bufferevent_socket_new(base, -1, BEV_OPT_CLOSE_ON_FREE);
     struct bufferevent *bev = comm->bevs[peer_id];
     //TODO Pass the node_id as a callback parameter to identify msg sender
-    bufferevent_setcb(bev, read_cb, NULL, event_cb, comm->ids+peer_id);
+    bufferevent_setcb(bev, read_cb, NULL, event_cb, set_cb_arg(peer_id, NULL));
     bufferevent_enable(bev, EV_READ|EV_WRITE);
     bufferevent_socket_connect(bev, (struct sockaddr *)comm->addrs+peer_id,
         sizeof(comm->addrs[peer_id]));
@@ -62,11 +62,13 @@ void read_cb(struct bufferevent *bev, void *ptr) {
 
 //Called when the status of a connection changes
 void event_cb(struct bufferevent *bev, short events, void *ptr) {
-    int *id = (int *) ptr;
+    struct node *node; id_t peer_id;
+    retrieve_cb_arg(&peer_id, node, (struct cb_arg *) ptr);
+
     if (events & BEV_EVENT_CONNECTED) {
-        printf("Connection established to node %u\n", *id);
+        printf("Connection established to node %u\n", peer_id);
     } else if (events & (BEV_EVENT_EOF|BEV_EVENT_ERROR)) {
-        printf("Connection lost to node %u\n", *id);
+        printf("Connection lost to node %u\n", peer_id);
     } else {
         printf("Event %d not handled", events);
     }
