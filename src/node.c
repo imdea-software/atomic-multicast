@@ -60,7 +60,7 @@ struct node_events *init_node_events(struct node_comm *comm, id_t id) {
     //Connect to the other nodes of the cluster
     //TODO Create an event that keeps retrying until it succeeds, otherwise, not reliable
     for(int i=0; i<comm->cluster_size; i++) {
-        connect_to_node(events->base, comm, i);
+        connect_to_node(events->base, comm, comm->ids[i]);
     }
     return events;
 }
