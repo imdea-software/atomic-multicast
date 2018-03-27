@@ -73,3 +73,10 @@ void event_cb(struct bufferevent *bev, short events, void *ptr) {
         printf("Event %d not handled", events);
     }
 }
+
+void reconnect_cb(evutil_socket_t sock, short events, void *ptr) {
+    struct node *node = NULL; id_t peer_id;
+    retrieve_cb_arg(&peer_id, &node, (struct cb_arg *) ptr);
+
+    connect_to_node(node->events->base, node->comm, peer_id);
+}

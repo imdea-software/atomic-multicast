@@ -4,6 +4,7 @@
 #include "node.h"
 #include "events.h"
 
+static struct timeval reconnect_timeout = { 0, 0 };
 
 //TODO Do the proper security checks on system calls
 
@@ -52,17 +53,25 @@ static struct node_events *init_node_events(struct node_comm *comm, id_t id) {
     struct node_events *events = malloc(sizeof(struct node_events));
     //Create a new event base
     events->base = event_base_new();
-    //Listen for incomming connection
-    events->lev = evconnlistener_new_bind(events->base, accept_conn_cb, comm,
+    //Create a listener for incomming connections
+    events->lev = evconnlistener_new_bind(events->base, NULL, NULL,
 		    LEV_OPT_CLOSE_ON_EXEC | LEV_OPT_CLOSE_ON_FREE | LEV_OPT_REUSEABLE,
 		    -1, (struct sockaddr*) comm->addrs+id, sizeof(comm->addrs[id]));
-    evconnlistener_set_error_cb(events->lev, accept_error_cb);
-    //Connect to the other nodes of the cluster
-    //TODO Create an event that keeps retrying until it succeeds, otherwise, not reliable
-    for(int i=0; i<comm->cluster_size; i++) {
-        connect_to_node(events->base, comm, comm->ids[i]);
-    }
     return events;
+}
+
+static int configure_node_events(struct node *node) {
+    //Set the listener callbacks to activate it
+    evconnlistener_set_cb(node->events->lev, accept_conn_cb, NULL);
+    evconnlistener_set_error_cb(node->events->lev, accept_error_cb);
+    //Connect to the other nodes of the cluster
+    //TODO Maybe re-add the event when BEV_EVENT_EOF|ERROR to reconnect when lost
+    for(int i=0; i<node->comm->cluster_size; i++) {
+        struct event *ev = evtimer_new(node->events->base, reconnect_cb,
+			set_cb_arg(node->comm->ids[i], node));
+        event_add(ev, &reconnect_timeout);
+    }
+    return 0;
 }
 
 static int free_node_events(struct node_events *events) {
@@ -88,6 +97,7 @@ int node_free(struct node *node) {
 }
 
 void node_start(struct node *node) {
+    configure_node_events(node);
     //event_base_dump_events(node->events->base, stdout);
     event_base_dispatch(node->events->base);
 }
