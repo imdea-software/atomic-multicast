@@ -101,3 +101,11 @@ void reconnect_cb(evutil_socket_t sock, short flags, void *ptr) {
 
     init_connection(node, peer_id);
 }
+
+void interrupt_cb(evutil_socket_t sock, short flags, void *ptr) {
+    struct event *interrupt_ev = (struct event *) ptr;
+    struct event_base *base = event_get_base(interrupt_ev);
+
+    event_del(interrupt_ev);
+    event_base_loopexit(base, NULL);
+}

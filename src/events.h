@@ -12,5 +12,6 @@ void accept_conn_cb(struct evconnlistener *lev,
 		evutil_socket_t sock, struct sockaddr *addr, int len, void *ptr);
 void accept_error_cb(struct evconnlistener *lev, void *ptr);
 void reconnect_cb(evutil_socket_t sock, short events, void *ptr);
+void interrupt_cb(evutil_socket_t sock, short events, void *ptr);
 void read_cb(struct bufferevent *bev, void *ptr);
 void event_cb(struct bufferevent *bev, short flags, void *ptr);

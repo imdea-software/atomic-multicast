@@ -1,5 +1,6 @@
 #include <arpa/inet.h>
 #include <string.h>
+#include <signal.h>
 
 #include "node.h"
 #include "events.h"
@@ -77,10 +78,16 @@ static int configure_node_events(struct node *node) {
 			set_cb_arg(peer_id, node));
         connect_to_node(node, peer_id);
     }
+    //Set-up a signal event to exit the event-loop
+    //TODO Add some protection to prevent use in case of multithreaded context
+    node->events->interrupt_ev = evsignal_new(node->events->base, SIGHUP, interrupt_cb,
+                    event_self_cbarg());
+    //event_add(interrupt_ev, NULL);
     return 0;
 }
 
 static int free_node_events(struct node_events *events) {
+    event_free(events->interrupt_ev);
     evconnlistener_free(events->lev);
     event_base_free(events->base);
     free(events->reconnect_evs);
