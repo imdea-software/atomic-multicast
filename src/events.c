@@ -14,7 +14,10 @@ struct cb_arg *set_cb_arg(id_t peer_id, struct node *node) {
 int retrieve_cb_arg(id_t *peer_id, struct node **node, struct cb_arg *arg) {
     *peer_id = arg->peer_id;
     *node = arg->node;
-    free(arg);
+    //TODO Change this broken design: either store all the cb_arg struct and
+    //     alloc/dealloc when a connection is established.
+    //     Or change how a peer is represented so this cb_arg struct is not needed.
+    //free(arg);
     return 0;
 }
 
