@@ -33,7 +33,6 @@ static int init_connection(struct node *node, id_t peer_id) {
     node->comm->bevs[peer_id] = bufferevent_socket_new(node->events->base,
 		   -1, BEV_OPT_CLOSE_ON_FREE);
     struct bufferevent *bev = node->comm->bevs[peer_id];
-    //TODO Pass the node_id as a callback parameter to identify msg sender
     bufferevent_setcb(bev, read_cb, NULL, event_cb, set_cb_arg(peer_id, node));
     bufferevent_enable(bev, EV_READ|EV_WRITE);
     bufferevent_socket_connect(bev, (struct sockaddr *)node->comm->addrs+peer_id,
