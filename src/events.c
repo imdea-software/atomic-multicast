@@ -46,22 +46,53 @@ static int close_connection(struct node *node, id_t peer_id) {
     return 0;
 }
 
+//Called when the status of a connection changes
+//TODO Find something useful to do in there
+static void event_a_cb(struct bufferevent *bev, short events, void *ptr) {
+    struct node *node = NULL; id_t a_id;
+    retrieve_cb_arg(&a_id, &node, (struct cb_arg *) ptr);
+
+    if (events & (BEV_EVENT_EOF|BEV_EVENT_ERROR)) {
+        printf("[%u] Connection lost to %u-th accepted\n", node->id, a_id);
+	/*
+	 *if (node->comm->a_bevs[a_id])
+	 *   bufferevent_free(node->comm->a_bevs[a_id]);
+         *node->comm->a_bevs[a_id] = NULL;
+	 */
+	//node->comm->a_size --;
+    } else {
+        printf("[%u] Event %d not handled", node->id, events);
+    }
+}
+
 // CALLBACKS IMPLEMENTATION
 
-//Called after accepting a connection, currently, get the bufferevent ready to talk
-//  Since there is no way to tell from whom the accepted connection comes,
-//  a protocol extension is needed
-//TODO Store accepted connections from socket & addr to keep track of the current cluster
+//Called after accepting a connection, currently, create and
+//store a separate bufferevent for the accepted connections
+//--> bad design, two TCP connections open for a p2p communication
+//--> but very simple and needed (closing the sock upon exit to generate EOF on the other end)
+//TODO Since there is no way to tell from whom the accepted connection comes,
+//     a protocol extension is needed.
+//TODO Instead of creating a new bufferevent, just replace its underlying socket with
+//     the one from the accepted connection.
 void accept_conn_cb(struct evconnlistener *lev, evutil_socket_t sock,
 		struct sockaddr *addr, int len, void *ptr) {
-    //struct node_comm *comm = ptr;
-    //struct event_base *base = evconnlistener_get_base(lev);
-    //struct bufferevent *bev = comm->bevs[comm->accepted_count++ - 1];
-    //printf("Connection accepted %u\n", comm->accepted_count);
-    //Do not mess with the bevs, they already should be correctly set from the connect loop
-    //bufferevent_setfd(bev, sock);
-    //bufferevent_setcb(bev, read_cb, NULL, event_cb, NULL);
-    //bufferevent_enable(bev, EV_READ|EV_WRITE);
+    struct node *node = (struct node *) ptr;
+    node->comm->a_size += 1;
+    //Dynamically adjust the storage for the buffervents
+    if (!node->comm->a_bevs)
+        node->comm->a_bevs = malloc(sizeof(struct bufferevent *));
+    else
+        node->comm->a_bevs =
+            realloc(node->comm->a_bevs, sizeof(struct bufferevent *) * node->comm->a_size);
+    //Create a new bev & adjust its socket
+    node->comm->a_bevs[node->comm->a_size - 1] = bufferevent_socket_new(node->events->base,
+		   -1, BEV_OPT_CLOSE_ON_FREE);
+    struct bufferevent *bev = node->comm->a_bevs[node->comm->a_size - 1];
+    bufferevent_setfd(bev, sock);
+    //TODO Do not mess further with the bevs, they already should be correctly set from the connect loop
+    bufferevent_setcb(bev, read_cb, NULL, event_a_cb, set_cb_arg(node->comm->a_size, node));
+    bufferevent_enable(bev, EV_READ|EV_WRITE);
 }
 
 //Called if an accept() call fails, currently, just ends the event loop

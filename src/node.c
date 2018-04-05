@@ -32,10 +32,12 @@ static struct node_comm *init_node_comm(struct cluster_config *conf) {
 
     comm->cluster_size = size;
     comm->accepted_count = 0;
+    comm->a_size = 0;
     comm->addrs = addrs;
     comm->ids = ids;
     comm->groups = groups;
     comm->bevs = bevs;
+    comm->a_bevs = NULL;
 
     return comm;
 };
@@ -46,6 +48,10 @@ static int free_node_comm(struct node_comm *comm) {
     for(struct bufferevent **bev = comm->bevs; bev< comm->bevs + comm->cluster_size; bev++)
 	if(*bev)
 	    bufferevent_free(*bev);
+    for(struct bufferevent **bev = comm->a_bevs; bev< comm->a_bevs + comm->a_size; bev++)
+	if(*bev)
+	    bufferevent_free(*bev);
+    free(comm->a_bevs);
     free(comm->bevs);
     free(comm->ids);
     free(comm->groups);
@@ -69,7 +75,7 @@ static struct node_events *init_node_events(struct node_comm *comm, id_t id) {
 
 static int configure_node_events(struct node *node) {
     //Set the listener callbacks to make it active
-    evconnlistener_set_cb(node->events->lev, accept_conn_cb, NULL);
+    evconnlistener_set_cb(node->events->lev, accept_conn_cb, node);
     evconnlistener_set_error_cb(node->events->lev, accept_error_cb);
     //Connect to the other nodes of the cluster
     //TODO Maybe re-add the event when BEV_EVENT_EOF|ERROR to reconnect when lost

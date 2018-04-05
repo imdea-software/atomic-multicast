@@ -8,10 +8,12 @@
 struct node_comm {
     unsigned int	cluster_size;
     unsigned int	accepted_count;
+    unsigned int	a_size;
     id_t		*ids;
     id_t 		*groups;
     struct sockaddr_in	*addrs;
     struct bufferevent  **bevs;
+    struct bufferevent	**a_bevs;
 };
 
 struct node_events {
