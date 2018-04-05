@@ -83,6 +83,7 @@ static int configure_node_events(struct node *node) {
 static int free_node_events(struct node_events *events) {
     evconnlistener_free(events->lev);
     event_base_free(events->base);
+    free(events->reconnect_evs);
     free(events);
     return 0;
 }
@@ -96,6 +97,9 @@ struct node *node_init(struct cluster_config *conf, id_t id) {
 }
 
 int node_free(struct node *node) {
+    //TODO Find a better place to free the events
+    for(int i=0; i<node->comm->cluster_size; i++)
+        event_free(node->events->reconnect_evs[i]);
     free_node_comm(node->comm);
     free_node_events(node->events);
     free(node);
