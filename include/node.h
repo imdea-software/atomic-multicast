@@ -30,3 +30,4 @@ struct node {
 struct 	node 	*node_init	(struct cluster_config *conf, id_t id);
 int 		node_free	(struct node *node);
 void		node_start	(struct node *node);
+void		node_stop	(struct node *node);

@@ -119,3 +119,7 @@ void node_start(struct node *node) {
     //event_base_dump_events(node->events->base, stdout);
     event_base_dispatch(node->events->base);
 }
+
+void node_stop(struct node *node) {
+    event_base_loopexit(node->events->base, NULL);
+}
