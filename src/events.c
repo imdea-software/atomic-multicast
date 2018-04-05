@@ -43,6 +43,7 @@ static int init_connection(struct node *node, id_t peer_id) {
 
 static int close_connection(struct node *node, id_t peer_id) {
     bufferevent_free(node->comm->bevs[peer_id]);
+    node->comm->bevs[peer_id] = NULL;
     return 0;
 }
 

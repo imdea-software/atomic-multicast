@@ -40,7 +40,11 @@ static struct node_comm *init_node_comm(struct cluster_config *conf) {
 };
 
 static int free_node_comm(struct node_comm *comm) {
-    //TODO Every bev should be freed manually with bufferevent_free()
+    //Every remaining bev have to be freed manually
+    //If already freed elsewhere, the pointer was set to NULL
+    for(struct bufferevent **bev = comm->bevs; bev< comm->bevs + comm->cluster_size; bev++)
+	if(*bev)
+	    bufferevent_free(*bev);
     free(comm->bevs);
     free(comm->groups);
     free(comm->addrs);
