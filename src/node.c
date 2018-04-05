@@ -47,6 +47,7 @@ static int free_node_comm(struct node_comm *comm) {
 	if(*bev)
 	    bufferevent_free(*bev);
     free(comm->bevs);
+    free(comm->ids);
     free(comm->groups);
     free(comm->addrs);
     free(comm);
