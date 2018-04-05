@@ -68,7 +68,7 @@ int main(int argc, char *argv[]) {
     srand((unsigned) time(&t));
 
     //TODO Create some better public config helper function to make it easier
-    fill_cluster_config(&conf, NUMBER_OF_NODES, id, group_membership, addresses, ports);
+    fill_cluster_config(&conf, NUMBER_OF_NODES, ids, group_memberships, addresses, ports);
 
     //The plan is to start each node in a separate thread, with an event_base loop in each
     pthread_barrier_t *start_pthb;

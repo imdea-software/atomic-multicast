@@ -10,8 +10,8 @@
 
 struct cluster_config conf;
 
-id_t id[NUMBER_OF_NODES] = CLUSTER_ID;
-id_t group_membership[NUMBER_OF_NODES] = CLUSTER_GRP;
+id_t ids[NUMBER_OF_NODES] = CLUSTER_ID;
+id_t group_memberships[NUMBER_OF_NODES] = CLUSTER_GRP;
 address_t addresses[NUMBER_OF_NODES] = CLUSTER_ADDR;
 port_t ports[NUMBER_OF_NODES] = CLUSTER_PORTS;
 
