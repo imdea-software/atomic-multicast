@@ -116,8 +116,11 @@ void event_cb(struct bufferevent *bev, short events, void *ptr) {
 
     if (events & BEV_EVENT_CONNECTED) {
         printf("[%u] Connection established to node %u\n", node->id, peer_id);
+        node->comm->accepted_count += 1;
     } else if (events & (BEV_EVENT_EOF|BEV_EVENT_ERROR)) {
         printf("[%u] Connection lost to node %u\n", node->id, peer_id);
+	if (events & BEV_EVENT_EOF)
+            node->comm->accepted_count -= 1;
         close_connection(node, peer_id);
         connect_to_node(node, peer_id);
     } else {
