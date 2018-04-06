@@ -89,7 +89,7 @@ static int configure_node_events(struct node *node) {
     //TODO Add some protection to prevent use in case of multithreaded context
     node->events->interrupt_ev = evsignal_new(node->events->base, SIGHUP, interrupt_cb,
                     event_self_cbarg());
-    //event_add(interrupt_ev, NULL);
+    event_add(node->events->interrupt_ev, NULL);
     return 0;
 }
 
