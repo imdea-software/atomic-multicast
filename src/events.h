@@ -1,6 +1,14 @@
 #ifndef _EVENTS_H_
 #define _EVENTS_H_
 
+#include <event2/event.h>
+#include <event2/bufferevent.h>
+#include <event2/listener.h>
+
+#include "types.h"
+#include "node.h"
+
+
 struct cb_arg {
     id_t	peer_id;
     struct node	*node;
