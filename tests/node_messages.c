@@ -90,8 +90,26 @@ int main(int argc, char *argv[]) {
         };
         connect(sock, (struct sockaddr *) &addr, sizeof(addr));
         //Let's send some messages
-        puts("Ready to do stuffs");
+        struct enveloppe env = {
+	    .sid = -1,
+	    .cmd_type = MULTICAST,
+	    .cmd.multicast = {
+	        .mid = 1,
+		.destgrps_count = 2,
+		.destgrps = {0, 1},
+		.value = {
+		    .len = sizeof("coucou"),
+		    .val = "coucou"
+		}
+	    },
+	};
+	struct enveloppe rep;
+	int ret;
+        send(sock, &env, sizeof(env), 0);
+        recv(sock, &rep, sizeof(rep), 0);
         //Let's check the integrity of delivered messages
+        if ((ret = envcmp(&env, &rep)) != 0)
+            printf("[%u] Failed : the copy received back from %u is different: %u errors\n", -1, peer_id, ret);
         //Close the connection
         close(sock);
         //Break the event loop for all nodes
