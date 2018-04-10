@@ -2,16 +2,14 @@
 
 #include "node.h"
 #include "message.h"
+#include "amcast.h"
 
 
 //TODO Add some non-multicast specific message types, e.g. discovery protocol
 void dispatch_message(struct node *node, struct enveloppe *env) {
     switch(env->cmd_type) {
-        case MULTICAST:
-            printf("[%u] We got MULTICAST command from %u!\n", node->id, env->sid);
-            break;
         default:
-            printf("[%u] Unhandled command received from %u\n", node->id, env->sid);
+            dispatch_amcast_command(node, env);
             break;
     }
 }
