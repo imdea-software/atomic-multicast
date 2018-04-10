@@ -80,10 +80,20 @@ int main(int argc, char *argv[]) {
     else {
         //Let's wait until connections are successful
         sleep(2); //No longer possible to inspect nodes, memory is not shared
+        //Connect as a client
+        id_t peer_id = 0;
+        int sock = socket(AF_INET, SOCK_STREAM, 0);
+        struct sockaddr_in addr = {
+		.sin_family = AF_INET,
+		.sin_port = htons(conf.ports[peer_id]),
+		.sin_addr.s_addr = inet_addr(conf.addresses[peer_id])
+        };
+        connect(sock, (struct sockaddr *) &addr, sizeof(addr));
         //Let's send some messages
         puts("Ready to do stuffs");
         //Let's check the integrity of delivered messages
-
+        //Close the connection
+        close(sock);
         //Break the event loop for all nodes
         for(int i=0; i<NUMBER_OF_NODES; i++) {
             kill(pids[i], SIGHUP);
