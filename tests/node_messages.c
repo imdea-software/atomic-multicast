@@ -7,8 +7,10 @@
 #include <error.h>
 #include <errno.h>
 #include <signal.h>
+#include <string.h>
 
 #include "node.h"
+#include "message.h"
 #include "tests.h"
 
 // Everything is done manually here, quite normal since we want
@@ -19,6 +21,30 @@
 
 id_t id;
 pid_t pids[NUMBER_OF_NODES];
+
+int envcmp(struct enveloppe *env1, struct enveloppe *env2) {
+    int out = 0;
+    if (env1->sid != env2->sid)
+        out++;
+    if (env1->cmd_type != env2->cmd_type)
+        out++;
+    if (env1->cmd.multicast.mid != env2->cmd.multicast.mid)
+        out++;
+    if (env1->cmd.multicast.destgrps_count != env2->cmd.multicast.destgrps_count) {
+        out++;
+        for (int i=0; i<env1->cmd.multicast.destgrps_count; i++) {
+            if (env1->cmd.multicast.destgrps[i] != env2->cmd.multicast.destgrps[i])
+                out++;
+        }
+    }
+    if (env1->cmd.multicast.value.len != env2->cmd.multicast.value.len) {
+        out++;
+	if (strcmp(env1->cmd.multicast.value.val, env2->cmd.multicast.value.val) != 0)
+            out++;
+    }
+
+    return out;
+}
 
 //Scenario:
 //  Start all the nodes
