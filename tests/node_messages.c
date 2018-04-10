@@ -53,17 +53,17 @@ int main(int argc, char *argv[]) {
     //Let the main process do some stuffs e.g. be a client
     else {
         //Let's wait until connections are successful
-	sleep(2); //No longer possible to inspect nodes, memory is not shared
-	//Let's send some messages
+        sleep(2); //No longer possible to inspect nodes, memory is not shared
+        //Let's send some messages
         puts("Ready to do stuffs");
-	//Let's check the integrity of delivered messages
+        //Let's check the integrity of delivered messages
 
-	//Break the event loop for all nodes
+        //Break the event loop for all nodes
         for(int i=0; i<NUMBER_OF_NODES; i++) {
             kill(pids[i], SIGHUP);
         }
 
-	puts("The test is finished, if nothing was reported, it means it works!\n");
+        puts("The test is finished, if nothing was reported, it means it works!\n");
     }
 
     //Cleanup and exit
