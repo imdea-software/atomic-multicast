@@ -9,14 +9,30 @@
 
 
 typedef enum cmd_type {
+    //AMCAST COMMANDS
     MULTICAST,
+    ACCEPT,
+    ACCEPT_ACK,
+    COMMIT,
+    DELIVER,
+    NEWLEADER,
+    NEWLEADER_ACK,
+    NEWLEADER_SYNC,
+    NEWLEADER_SYNC_ACK
 } cmd_type;
 
 struct enveloppe {
     id_t		sid;
     cmd_type		cmd_type;
     union {
-        message_t 		multicast;
+        message_t		multicast;
+        accept_t		accept;
+        accept_ack_t		accept_ack;
+        deliver_t		deliver;
+        newleader_t		newleader;
+        newleader_ack_t 	newleader_ack;
+        newleader_sync_t	newleader_sync;
+        newleader_sync_ack_t	newleader_sync_ack;
     } cmd;
 };
 
