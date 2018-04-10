@@ -3,7 +3,7 @@
 #include "node.h"
 #include "events.h"
 
-static struct timeval reconnect_timeout = { 0, 0 };
+static struct timeval reconnect_timeout = { 1, 0 };
 
 struct cb_arg *set_cb_arg(id_t peer_id, struct node *node) {
     struct cb_arg *arg = malloc(sizeof(struct cb_arg));
