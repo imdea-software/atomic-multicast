@@ -1,3 +1,6 @@
+#ifndef _CLUSTER_H_
+#define _CLUSTER_H_
+
 #include "types.h"
 
 struct cluster_config {
@@ -7,3 +10,5 @@ struct cluster_config {
     address_t 		*addresses;
     port_t 		*ports;
 };
+
+#endif

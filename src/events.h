@@ -1,3 +1,6 @@
+#ifndef _EVENTS_H_
+#define _EVENTS_H_
+
 struct cb_arg {
     id_t	peer_id;
     struct node	*node;
@@ -15,3 +18,5 @@ void reconnect_cb(evutil_socket_t sock, short events, void *ptr);
 void interrupt_cb(evutil_socket_t sock, short events, void *ptr);
 void read_cb(struct bufferevent *bev, void *ptr);
 void event_cb(struct bufferevent *bev, short flags, void *ptr);
+
+#endif
