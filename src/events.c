@@ -2,6 +2,7 @@
 
 #include "node.h"
 #include "events.h"
+#include "message.h"
 
 static struct timeval reconnect_timeout = { 1, 0 };
 
@@ -105,8 +106,14 @@ void accept_error_cb(struct evconnlistener *lev, void *ptr) {
 
 //Called whenever data gets into the bufferevents
 void read_cb(struct bufferevent *bev, void *ptr) {
+    struct node *node = NULL; id_t peer_id;
+    retrieve_cb_arg(&peer_id, &node, (struct cb_arg *) ptr);
     //TODO Implement message reception
-    puts("We got mail!\n");
+    struct enveloppe env;
+    read_enveloppe(bev, &env);
+    //TODO Have a dedicated cmd_type for receive tests
+    write_enveloppe(bev, &env);
+    dispatch_message(node, &env);
 }
 
 //Called when the status of a connection changes

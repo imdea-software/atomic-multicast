@@ -3,6 +3,19 @@
 #include "node.h"
 #include "message.h"
 
+
+//TODO Add some non-multicast specific message types, e.g. discovery protocol
+void dispatch_message(struct node *node, struct enveloppe *env) {
+    switch(env->cmd_type) {
+        case MULTICAST:
+            printf("[%u] We got MULTICAST command from %u!\n", node->id, env->sid);
+            break;
+        default:
+            printf("[%u] Unhandled command received from %u\n", node->id, env->sid);
+            break;
+    }
+}
+
 //TODO Properly implement de-serialization of the enveloppe and its content
 void read_enveloppe(struct bufferevent *bev, struct enveloppe *env) {
     bufferevent_read(bev, env, sizeof(struct enveloppe));
