@@ -4,6 +4,7 @@
 #include "types.h"
 #include "node.h"
 #include "amcast_types.h"
+#include "message.h"
 
 
 struct amcast_msg_proposal {

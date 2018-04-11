@@ -1,4 +1,7 @@
+#include "types.h"
+#include "node.h"
 #include "message.h"
+#include "amcast_types.h"
 #include "amcast.h"
 
 
