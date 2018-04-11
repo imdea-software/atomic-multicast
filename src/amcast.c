@@ -66,6 +66,27 @@ void dispatch_amcast_command(struct node *node, struct enveloppe *env) {
     }
 }
 
+static struct amcast_msg_proposal *init_amcast_msg_proposal() {
+    struct amcast_msg_proposal *prop = malloc(sizeof(struct amcast_msg_proposal));
+    prop->ballot = -1;
+    prop->status = UNDEF;
+    prop->lts = -1;
+    return prop;
+}
+
+static struct amcast_msg *init_amcast_msg(unsigned int groups_count) {
+    struct amcast_msg *msg = malloc(sizeof(struct amcast_msg));
+    msg->phase = START;
+    msg->lts = -1;
+    msg->gts = -1;
+    msg->delivered = FALSE;
+    msg->proposals_count = groups_count;
+    msg->proposals = malloc(sizeof(struct amcast_msg_proposals *) * groups_count);
+    for(int i=0; i<groups_count; i++)
+        msg->proposals[i] = init_amcast_msg_proposal();
+    return msg;
+}
+
 struct amcast *amcast_init() {
     struct amcast *amcast = malloc(sizeof(struct amcast));
     amcast->status = INIT;
