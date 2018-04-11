@@ -30,6 +30,8 @@ struct amcast {
     struct amcast_msg **msgs;
 };
 
+struct amcast *amcast_init();
+int amcast_free(struct amcast *amcast);
 void dispatch_amcast_command(struct node *node, struct enveloppe *env);
 
 #endif
