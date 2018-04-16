@@ -4,6 +4,7 @@
 
 #include "node.h"
 #include "events.h"
+#include "amcast.h"
 
 
 //TODO Do the proper security checks on system calls
@@ -141,6 +142,7 @@ struct node *node_init(struct cluster_config *conf, id_t id) {
     node->groups = init_groups(conf);
     node->comm = init_node_comm(conf);
     node->events = init_node_events(node->comm, id);
+    node->amcast = amcast_init();
     return node;
 }
 
@@ -152,6 +154,7 @@ int node_free(struct node *node) {
     free_groups(node->groups);
     free_node_comm(node->comm);
     free_node_events(node->events);
+    amcast_free(node->amcast);
     free(node);
     return 0;
 }

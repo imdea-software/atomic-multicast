@@ -7,6 +7,8 @@
 
 #include "types.h"
 #include "cluster.h"
+//TODO fix: do not compile when adding this include
+//#include "amcast.h"
 
 struct groups {
     unsigned int	groups_count;
@@ -39,6 +41,7 @@ struct node {
     struct groups	*groups;
     struct node_comm	*comm;
     struct node_events	*events;
+    struct amcast	*amcast;
 };
 
 struct 	node 	*node_init	(struct cluster_config *conf, id_t id);
