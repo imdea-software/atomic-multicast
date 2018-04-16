@@ -77,12 +77,13 @@ static struct amcast_msg_proposal *init_amcast_msg_proposal() {
     return prop;
 }
 
-static struct amcast_msg *init_amcast_msg(unsigned int groups_count) {
+static struct amcast_msg *init_amcast_msg(unsigned int groups_count, message_t *cmd) {
     struct amcast_msg *msg = malloc(sizeof(struct amcast_msg));
     msg->phase = START;
     msg->lts = -1;
     msg->gts = -1;
     msg->delivered = FALSE;
+    msg->msg = *cmd;
     msg->proposals_count = groups_count;
     msg->proposals = malloc(sizeof(struct amcast_msg_proposals *) * groups_count);
     for(int i=0; i<groups_count; i++)

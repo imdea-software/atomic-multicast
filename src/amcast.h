@@ -19,6 +19,7 @@ struct amcast_msg {
     uid_t gts;
     enum { TRUE, FALSE } delivered;
     uint32_t proposals_count;
+    message_t msg;
     struct amcast_msg_proposal **proposals;
 };
 
