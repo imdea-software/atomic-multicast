@@ -28,6 +28,7 @@ typedef struct accept {
     id_t		grp;
     uid_t		ballot;
     uid_t		lts;
+    message_t           msg;
 } accept_t;
 
 typedef struct accept_ack {
