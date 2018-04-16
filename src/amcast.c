@@ -4,21 +4,212 @@
 #include "amcast_types.h"
 #include "amcast.h"
 
+//TODO Make helper functions to create enveloppes in clean and nice looking way
+//TODO Following pointers makes it a lot harder to read the code, try to find some simplification
+//         e.g. properly defined macros could help,
+//         or sub-functions using only the useful structure fields passed as arguments
+
+static struct amcast_msg *init_amcast_msg(unsigned int groups_count, message_t *cmd);
 
 static void handle_multicast(struct node *node, id_t sid, message_t *cmd) {
     printf("[%u] We got MULTICAST command from %u!\n", node->id, sid);
+    if (node->amcast->status == LEADER) {
+	if(node->amcast->msgs_count == 0 || node->amcast->msgs_count == cmd->mid) {
+	//if(!node->amcast->msgs+cmd->mid) {
+            node->amcast->msgs_count++;
+            node->amcast->msgs = realloc(node->amcast->msgs,
+                            sizeof(struct amcast_msg *) * node->amcast->msgs_count);
+	    //TODO Have a proper group structure to avoid manually counting groups
+	    int groups_count = 0;
+	    for(int i=0; i<node->comm->cluster_size; i++)
+                if (node->comm->groups[i] >= groups_count)
+                    groups_count++;
+            node->amcast->msgs[cmd->mid] = init_amcast_msg(groups_count, cmd);
+	}
+        if(node->amcast->msgs[cmd->mid]->phase == START) {
+            node->amcast->msgs[cmd->mid]->phase = PROPOSED;
+            node->amcast->clock++;
+	    //TODO Properly implement the uid_t type (only a placeholder now)
+            node->amcast->msgs[cmd->mid]->lts = node->amcast->clock;
+        }
+        struct enveloppe rep = {
+	    .sid = node->id,
+	    .cmd_type = ACCEPT,
+	    .cmd.accept = {
+	        .mid = cmd->mid,
+		.grp = node->comm->groups[node->id],
+		.ballot = node->amcast->ballot,
+		.lts = node->amcast->msgs[cmd->mid]->lts,
+		.msg = *cmd
+	    },
+	};
+        send_to_destgrps(node, &rep, cmd->destgrps, cmd->destgrps_count);
+    }
 }
 
 static void handle_accept(struct node *node, id_t sid, accept_t *cmd) {
     printf("[%u] We got ACCEPT command from %u!\n", node->id, sid);
+    if(node->amcast->msgs_count == 0 || node->amcast->msgs_count == cmd->mid) {
+    //if(!node->amcast->msgs+cmd->mid) {
+        node->amcast->msgs_count++;
+        node->amcast->msgs = realloc(node->amcast->msgs,
+                        sizeof(struct amcast_msg *) * node->amcast->msgs_count);
+	//TODO Have a proper group structure to avoid manually counting groups
+	int groups_count = 0;
+	for(int i=0; i<node->comm->cluster_size; i++)
+            if (node->comm->groups[i] >= groups_count)
+                groups_count++;
+        node->amcast->msgs[cmd->mid] = init_amcast_msg(groups_count, &cmd->msg);
+    }
+    if ((node->amcast->status == LEADER || node->amcast->status == FOLLOWER)
+            && node->amcast->msgs[cmd->mid]->proposals[cmd->grp]->ballot <= cmd->ballot
+            && !( cmd->grp == node->comm->groups[node->id]
+                  && !(node->amcast->ballot == cmd->ballot) )) {
+        if (node->amcast->msgs[cmd->mid]->proposals[cmd->grp]->status != UNDEF) {
+	    for(id_t *grp = node->amcast->msgs[cmd->mid]->msg.destgrps;
+                grp < node->amcast->msgs[cmd->mid]->msg.destgrps + node->amcast->msgs[cmd->mid]->msg.destgrps_count;
+		grp++)
+                if(node->amcast->msgs[cmd->mid]->proposals[*grp]->status == CONFIRMED)
+                    node->amcast->msgs[cmd->mid]->proposals[*grp]->status = RECEIVED;
+        }
+	node->amcast->msgs[cmd->mid]->proposals[cmd->grp]->status = RECEIVED;
+	node->amcast->msgs[cmd->mid]->proposals[cmd->grp]->ballot = cmd->ballot;
+	node->amcast->msgs[cmd->mid]->proposals[cmd->grp]->lts = cmd->lts;
+	for(id_t *grp = node->amcast->msgs[cmd->mid]->msg.destgrps;
+            grp < node->amcast->msgs[cmd->mid]->msg.destgrps + node->amcast->msgs[cmd->mid]->msg.destgrps_count;
+	    grp++)
+            if(node->amcast->msgs[cmd->mid]->proposals[*grp]->status != RECEIVED)
+	        return;
+        if(node->amcast->msgs[cmd->mid]->phase != COMMITTED) {
+            node->amcast->msgs[cmd->mid]->phase = ACCEPTED;
+            node->amcast->msgs[cmd->mid]->lts =
+		    node->amcast->msgs[cmd->mid]->proposals[node->comm->groups[node->id]]->lts;
+	    for(id_t *grp = node->amcast->msgs[cmd->mid]->msg.destgrps;
+                grp < node->amcast->msgs[cmd->mid]->msg.destgrps + node->amcast->msgs[cmd->mid]->msg.destgrps_count;
+	        grp++)
+                if(node->amcast->msgs[cmd->mid]->gts < node->amcast->msgs[cmd->mid]->proposals[*grp]->lts)
+                    node->amcast->msgs[cmd->mid]->gts = node->amcast->msgs[cmd->mid]->proposals[*grp]->lts;
+            if(node->amcast->clock < node->amcast->msgs[cmd->mid]->gts)
+                node->amcast->clock = node->amcast->msgs[cmd->mid]->gts;
+        }
+        struct enveloppe rep = {
+	    .sid = node->id,
+	    .cmd_type = ACCEPT_ACK,
+	    .cmd.accept_ack = {
+	        .mid = cmd->mid,
+		.grp = node->comm->groups[node->id],
+		.ballot = cmd->ballot,
+		.gts = node->amcast->msgs[cmd->mid]->gts
+	    },
+	};
+        //send_to_destgrps(node, &rep, node->amcast->msgs[cmd->mid]->msg.destgrps,
+        //                 node->amcast->msgs[cmd->mid]->msg.destgrps_count);
+        send_to_peer(node, &rep, 0);
+        send_to_peer(node, &rep, 3);
+    }
 }
 
 static void handle_accept_ack(struct node *node, id_t sid, accept_ack_t *cmd) {
     printf("[%u] We got ACCEPT_ACK command from %u!\n", node->id, sid);
+    if (node->amcast->status == LEADER) {
+        //TODO Not too sure about the entry condition
+        static int accept_acks_per_group_count[256];
+        static int accept_acks_per_node_count[256];
+        //static int accept_acks_per_group_count[node->amcast->msgs[cmd->mid]->msg.destgrps_count];
+        //static int accept_acks_per_node_count[node->comm->cluster_size];
+        if(node->amcast->msgs[cmd->mid]->proposals[cmd->grp]->ballot == cmd->ballot
+                && node->amcast->msgs[cmd->mid]->gts == cmd->gts
+                && accept_acks_per_node_count[sid] < 1) {
+            accept_acks_per_node_count[sid] += 1;
+            accept_acks_per_group_count[cmd->grp] += 1;
+        }
+        //TODO Have a proper group structure to avoid manually counting nodes in group
+        int nodes_in_group_count = 0;
+        for(int i=0; i<node->comm->cluster_size; i++)
+            if (node->comm->groups[i] == cmd->grp)
+                nodes_in_group_count++;
+        //TODO Also check if the ACCEPT_ACK from the grp leader was received
+        if(accept_acks_per_group_count[cmd->grp] >= nodes_in_group_count/2 + 1) {
+            node->amcast->msgs[cmd->mid]->proposals[cmd->grp]->status = CONFIRMED;
+        }
+	for(id_t *grp = node->amcast->msgs[cmd->mid]->msg.destgrps;
+                grp < node->amcast->msgs[cmd->mid]->msg.destgrps + node->amcast->msgs[cmd->mid]->msg.destgrps_count;
+	        grp++)
+            if(node->amcast->msgs[cmd->mid]->proposals[*grp]->status != CONFIRMED)
+                return;
+        node->amcast->msgs[cmd->mid]->phase = COMMITTED;
+	//TODO Do not rebuild on every call the gts-ordered set of messages
+	//This really is INEFFICIENT
+	int gts_order[node->amcast->msgs_count];
+	for(int i=0; i<node->amcast->msgs_count; i++)
+            gts_order[i] = 1;
+	for(int i=0; i<node->amcast->msgs_count; i++) {
+	    int lowest = 0;
+	    for(int j=0; j<node->amcast->msgs_count; j++) {
+		    /*
+                if(!node->amcast->msgs+j) {
+                    printf("[%u] Message at index %u does not exists, "
+				    "only %u were received "
+				    "and current mid is: %u\n",
+				    node->id, j, node->amcast->msgs_count,
+				    //node->amcast->msgs[node->amcast->msgs_count - 1]->msg.mid);
+				    cmd->mid);
+		    return;
+                }
+		*/
+                if(node->amcast->msgs[j]->gts <=
+				node->amcast->msgs[lowest]->gts) {
+                    for(int k=0; k<node->amcast->msgs_count; k++) {
+                        if(gts_order[k] != j)
+                            lowest = j;
+                    }
+                }
+	    }
+	    gts_order[i] = lowest;
+        }
+	//TODO A lot of possible improvements in the delivery pattern
+	for(int *i = gts_order; i<gts_order + node->amcast->msgs_count; i++) {
+            if(node->amcast->msgs[*i]->phase == COMMITTED
+               && node->amcast->msgs[*i]->delivered == FALSE) {
+	        for(int j=0; j<node->amcast->msgs_count; j++) {
+                    if(node->amcast->msgs[j]->lts < node->amcast->msgs[*i]->gts
+                       && node->amcast->msgs[j]->phase != COMMITTED)
+                    return;
+                }
+                node->amcast->msgs[*i]->delivered = TRUE;
+                //TODO Invok some deliver callback
+                struct enveloppe rep = {
+	            .sid = node->id,
+	            .cmd_type = DELIVER,
+	            .cmd.deliver = {
+	                .mid = *i,
+		        .ballot = node->amcast->ballot,
+		        .lts = node->amcast->msgs[*i]->lts,
+		        .gts = node->amcast->msgs[*i]->gts
+	            },
+	        };
+                send_to_group(node, &rep, node->comm->groups[node->id]);
+                for(int i=0; i<256; i++) {
+                    accept_acks_per_group_count[i] = 0;
+                    accept_acks_per_node_count[i] = 0;
+	        }
+            }
+        }
+    }
 }
 
 static void handle_deliver(struct node *node, id_t sid, deliver_t *cmd) {
-    printf("[%u] We got DELIVER command from %u!\n", node->id, sid);
+    printf("[%u] We got DELIVER command from %u for message %u!\n", node->id, sid, cmd->mid);
+    if (node->amcast->status == FOLLOWER
+            && node->amcast->ballot == cmd->ballot
+            && node->amcast->msgs[cmd->mid]->delivered == FALSE) {
+        node->amcast->msgs[cmd->mid]->lts = cmd->lts;
+        node->amcast->msgs[cmd->mid]->gts = cmd->gts;
+        if(node->amcast->clock < node->amcast->msgs[cmd->mid]->gts)
+            node->amcast->clock = node->amcast->msgs[cmd->mid]->gts;
+        node->amcast->msgs[cmd->mid]->delivered = TRUE;
+	//TODO Invok some deliver callback
+    }
 }
 
 static void handle_newleader(struct node *node, id_t sid, newleader_t *cmd) {
