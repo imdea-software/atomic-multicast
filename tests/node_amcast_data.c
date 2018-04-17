@@ -76,7 +76,7 @@ int main(int argc, char *argv[]) {
         struct node *n = node_init(&conf, id);
 	//Let's give them some AMCAST ROLES and fake proper states
         n->amcast->status = (id == 0 || id == 3) ? LEADER : FOLLOWER;
-        n->amcast->ballot = (id < 3) ? -1 : -1;
+        n->amcast->ballot.id = (id < 3) ? 0 : 3;
 
         node_start(n);
         if (n->comm->accepted_count != NUMBER_OF_NODES)

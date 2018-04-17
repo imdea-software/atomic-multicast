@@ -8,15 +8,15 @@
 
 
 struct amcast_msg_proposal {
-    uid_t ballot;
+    p_uid_t ballot;
     enum { UNDEF, RECEIVED, CONFIRMED } status;
-    uid_t lts;
+    g_uid_t lts;
 };
 
 struct amcast_msg {
-    uid_t lts;
-    uid_t gts;
     phase_t phase;
+    g_uid_t lts;
+    g_uid_t gts;
     enum { TRUE, FALSE } delivered;
     uint32_t proposals_count;
     message_t msg;
@@ -25,8 +25,8 @@ struct amcast_msg {
 
 struct amcast {
     enum { INIT, LEADER, FOLLOWER, LEADER_INIT, FOLLOWER_PREPARE, LEADER_SYNC } status;
-    uid_t ballot;
-    uid_t aballot;
+    p_uid_t ballot;
+    p_uid_t aballot;
     clk_t clock;
     uint32_t msgs_count;
     struct amcast_msg **msgs;

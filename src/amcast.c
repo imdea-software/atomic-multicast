@@ -49,7 +49,8 @@ static void handle_multicast(struct node *node, xid_t sid, message_t *cmd) {
             node->amcast->msgs[cmd->mid]->phase = PROPOSED;
             node->amcast->clock++;
 	    //TODO Properly implement the uid_t type (only a placeholder now)
-            node->amcast->msgs[cmd->mid]->lts = node->amcast->clock;
+            node->amcast->msgs[cmd->mid]->lts.time = node->amcast->clock;
+            node->amcast->msgs[cmd->mid]->lts.id = node->comm->groups[node->id];
         }
         struct enveloppe rep = {
 	    .sid = node->id,
@@ -81,9 +82,9 @@ static void handle_accept(struct node *node, xid_t sid, accept_t *cmd) {
         node->amcast->msgs[cmd->mid] = init_amcast_msg(groups_count, &cmd->msg);
     }
     if ((node->amcast->status == LEADER || node->amcast->status == FOLLOWER)
-            && node->amcast->msgs[cmd->mid]->proposals[cmd->grp]->ballot <= cmd->ballot
+            && paircmp(&node->amcast->msgs[cmd->mid]->proposals[cmd->grp]->ballot, &cmd->ballot) <= 0
             && !( cmd->grp == node->comm->groups[node->id]
-                  && !(node->amcast->ballot == cmd->ballot) )) {
+                  && !(paircmp(&node->amcast->ballot, &cmd->ballot) == 0) )) {
         if (node->amcast->msgs[cmd->mid]->proposals[cmd->grp]->status != UNDEF) {
 	    for(xid_t *grp = node->amcast->msgs[cmd->mid]->msg.destgrps;
                 grp < node->amcast->msgs[cmd->mid]->msg.destgrps + node->amcast->msgs[cmd->mid]->msg.destgrps_count;
@@ -106,10 +107,11 @@ static void handle_accept(struct node *node, xid_t sid, accept_t *cmd) {
 	    for(xid_t *grp = node->amcast->msgs[cmd->mid]->msg.destgrps;
                 grp < node->amcast->msgs[cmd->mid]->msg.destgrps + node->amcast->msgs[cmd->mid]->msg.destgrps_count;
 	        grp++)
-                if(node->amcast->msgs[cmd->mid]->gts < node->amcast->msgs[cmd->mid]->proposals[*grp]->lts)
+                if(paircmp(&node->amcast->msgs[cmd->mid]->gts,
+					&node->amcast->msgs[cmd->mid]->proposals[*grp]->lts) < 0)
                     node->amcast->msgs[cmd->mid]->gts = node->amcast->msgs[cmd->mid]->proposals[*grp]->lts;
-            if(node->amcast->clock < node->amcast->msgs[cmd->mid]->gts)
-                node->amcast->clock = node->amcast->msgs[cmd->mid]->gts;
+            if(node->amcast->clock < node->amcast->msgs[cmd->mid]->gts.time)
+                node->amcast->clock = node->amcast->msgs[cmd->mid]->gts.time;
         }
         struct enveloppe rep = {
 	    .sid = node->id,
@@ -136,8 +138,8 @@ static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
         static int accept_acks_per_node_count[256];
         //static int accept_acks_per_group_count[node->amcast->msgs[cmd->mid]->msg.destgrps_count];
         //static int accept_acks_per_node_count[node->comm->cluster_size];
-        if(node->amcast->msgs[cmd->mid]->proposals[cmd->grp]->ballot == cmd->ballot
-                && node->amcast->msgs[cmd->mid]->gts == cmd->gts
+        if(paircmp(&node->amcast->msgs[cmd->mid]->proposals[cmd->grp]->ballot, &cmd->ballot) == 0
+                && paircmp(&node->amcast->msgs[cmd->mid]->gts, &cmd->gts) == 0
                 && accept_acks_per_node_count[sid] < 1) {
             accept_acks_per_node_count[sid] += 1;
             accept_acks_per_group_count[cmd->grp] += 1;
@@ -176,8 +178,8 @@ static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
 		    return;
                 }
 		*/
-                if(node->amcast->msgs[j]->gts <=
-				node->amcast->msgs[lowest]->gts) {
+                if(paircmp(&node->amcast->msgs[j]->gts,
+				&node->amcast->msgs[lowest]->gts) <= 0) {
                     for(int k=0; k<node->amcast->msgs_count; k++) {
                         if(gts_order[k] != j)
                             lowest = j;
@@ -191,7 +193,7 @@ static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
             if(node->amcast->msgs[*i]->phase == COMMITTED
                && node->amcast->msgs[*i]->delivered == FALSE) {
 	        for(int j=0; j<node->amcast->msgs_count; j++) {
-                    if(node->amcast->msgs[j]->lts < node->amcast->msgs[*i]->gts
+                    if(paircmp(&node->amcast->msgs[j]->lts, &node->amcast->msgs[*i]->gts) < 0
                        && node->amcast->msgs[j]->phase != COMMITTED)
                     return;
                 }
@@ -220,12 +222,12 @@ static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
 static void handle_deliver(struct node *node, xid_t sid, deliver_t *cmd) {
     printf("[%u] We got DELIVER command from %u for message %u!\n", node->id, sid, cmd->mid);
     if (node->amcast->status == FOLLOWER
-            && node->amcast->ballot == cmd->ballot
+            && paircmp(&node->amcast->ballot, &cmd->ballot) == 0
             && node->amcast->msgs[cmd->mid]->delivered == FALSE) {
         node->amcast->msgs[cmd->mid]->lts = cmd->lts;
         node->amcast->msgs[cmd->mid]->gts = cmd->gts;
-        if(node->amcast->clock < node->amcast->msgs[cmd->mid]->gts)
-            node->amcast->clock = node->amcast->msgs[cmd->mid]->gts;
+        if(node->amcast->clock < node->amcast->msgs[cmd->mid]->gts.time)
+            node->amcast->clock = node->amcast->msgs[cmd->mid]->gts.time;
         node->amcast->msgs[cmd->mid]->delivered = TRUE;
 	//TODO Invok some deliver callback
     }
@@ -281,17 +283,17 @@ void dispatch_amcast_command(struct node *node, struct enveloppe *env) {
 
 static struct amcast_msg_proposal *init_amcast_msg_proposal() {
     struct amcast_msg_proposal *prop = malloc(sizeof(struct amcast_msg_proposal));
-    prop->ballot = -1;
+    prop->ballot = default_pair;
     prop->status = UNDEF;
-    prop->lts = -1;
+    prop->lts = default_pair;
     return prop;
 }
 
 static struct amcast_msg *init_amcast_msg(unsigned int groups_count, message_t *cmd) {
     struct amcast_msg *msg = malloc(sizeof(struct amcast_msg));
     msg->phase = START;
-    msg->lts = -1;
-    msg->gts = -1;
+    msg->lts = default_pair;
+    msg->gts = default_pair;
     msg->delivered = FALSE;
     msg->msg = *cmd;
     msg->proposals_count = groups_count;
@@ -304,8 +306,8 @@ static struct amcast_msg *init_amcast_msg(unsigned int groups_count, message_t *
 struct amcast *amcast_init() {
     struct amcast *amcast = malloc(sizeof(struct amcast));
     amcast->status = INIT;
-    amcast->ballot = -1;
-    amcast->aballot = -1;
+    amcast->ballot = default_pair;
+    amcast->aballot = default_pair;
     amcast->clock = 0;
     amcast->msgs_count = 0;
     amcast->msgs = NULL;
