@@ -14,9 +14,9 @@ struct amcast_msg_proposal {
 };
 
 struct amcast_msg {
-    enum { START, PROPOSED, ACCEPTED, COMMITTED } phase;
     uid_t lts;
     uid_t gts;
+    phase_t phase;
     enum { TRUE, FALSE } delivered;
     uint32_t proposals_count;
     message_t msg;

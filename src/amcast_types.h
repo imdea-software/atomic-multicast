@@ -7,7 +7,7 @@
 
 
 typedef uint32_t uid_t;
-typedef uint32_t phase_t;
+typedef enum { START, PROPOSED, ACCEPTED, COMMITTED } phase_t;
 
 //CLIENT_CMD_TYPES
 typedef struct payload {
