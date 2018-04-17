@@ -9,7 +9,7 @@
 typedef uint32_t uid_t;
 typedef uint32_t phase_t;
 
-//CLIENT TYPES
+//CLIENT_CMD_TYPES
 typedef struct payload {
     unsigned int	len;
     char		*val;
@@ -22,7 +22,7 @@ typedef struct message {
     struct payload	value;
 } message_t;
 
-//NODE_TYPES
+//NODE_CMD_TYPES
 typedef struct accept {
     m_uid_t 		mid;
     uid_t		ballot;
