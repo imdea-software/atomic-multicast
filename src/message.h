@@ -19,11 +19,11 @@ typedef enum cmd_type {
     NEWLEADER_ACK,
     NEWLEADER_SYNC,
     NEWLEADER_SYNC_ACK
-} cmd_type;
+} cmd_t;
 
 struct enveloppe {
-    cmd_type		cmd_type;
     xid_t		sid;
+    cmd_t		cmd_type;
     union {
         message_t		multicast;
         accept_t		accept;
