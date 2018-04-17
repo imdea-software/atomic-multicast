@@ -4,6 +4,23 @@
 #include "amcast_types.h"
 #include "amcast.h"
 
+
+int paircmp(struct pair *p1, struct pair *p2) {
+    if(p1->time < p2->time)
+        return -1;
+    if(p1->time > p2->time)
+        return 1;
+    if(p1->time == p2->time && p1->id < p2->id)
+        return -1;
+    if(p1->time == p2->time && p1->id > p2->id)
+        return 1;
+    if(p1->time == p2->time && p1->id == p2->id)
+        return 0;
+    else {
+	printf("Bad pair comparison\n");
+        exit(EXIT_FAILURE);
+    }
+}
 //TODO Make helper functions to create enveloppes in clean and nice looking way
 //TODO Following pointers makes it a lot harder to read the code, try to find some simplification
 //         e.g. properly defined macros could help,
