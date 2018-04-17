@@ -133,6 +133,13 @@ static void handle_accept(struct node *node, xid_t sid, accept_t *cmd) {
 static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
     printf("[%u] We got ACCEPT_ACK command from %u!\n", node->id, sid);
     if (node->amcast->status == LEADER) {
+        //It seems ACCEPT_ACKS are sometime recevied before gts is initialized
+        if(paircmp(&node->amcast->msgs[cmd->mid]->gts, &default_pair) == 0) {
+            printf("[%d] Re-sending ACCEPT_ACK command from %d!\n", node->id, sid);
+            struct enveloppe retry = { .sid = sid, .cmd_type = ACCEPT_ACK, .cmd.accept_ack = *cmd };
+            send_to_peer(node, &retry, node->id);
+            return;
+        }
         //TODO Not too sure about the entry condition
         static int accept_acks_per_group_count[256];
         static int accept_acks_per_node_count[256];
