@@ -21,6 +21,8 @@ int paircmp(struct pair *p1, struct pair *p2) {
         exit(EXIT_FAILURE);
     }
 }
+struct pair default_pair = { .time = 0, .id = -1};
+
 //TODO Make helper functions to create enveloppes in clean and nice looking way
 //TODO Following pointers makes it a lot harder to read the code, try to find some simplification
 //         e.g. properly defined macros could help,
