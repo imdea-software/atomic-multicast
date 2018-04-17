@@ -27,7 +27,7 @@ struct amcast {
     enum { INIT, LEADER, FOLLOWER, LEADER_INIT, FOLLOWER_PREPARE, LEADER_SYNC } status;
     uid_t ballot;
     uid_t aballot;
-    int clock;
+    clk_t clock;
     uint32_t msgs_count;
     struct amcast_msg **msgs;
 };

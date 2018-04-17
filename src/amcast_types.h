@@ -7,7 +7,9 @@
 
 
 typedef uint32_t uid_t;
+//DATATYPES
 typedef enum { START, PROPOSED, ACCEPTED, COMMITTED } phase_t;
+typedef unsigned int clk_t;
 
 //CLIENT_CMD_TYPES
 typedef struct payload {
@@ -52,7 +54,7 @@ typedef struct newleader {
 typedef struct newleader_ack {
     uid_t		ballot;
     uid_t		aballot;
-    int 		clock;
+    clk_t 		clock;
     int 		msg_count;
     struct {
         m_uid_t 	mid;
@@ -64,7 +66,7 @@ typedef struct newleader_ack {
 
 typedef struct newleader_sync {
     uid_t 		ballot;
-    int 		clock;
+    clk_t 		clock;
     int 		msg_count;
     struct {
         m_uid_t 	mid;
