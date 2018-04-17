@@ -10,6 +10,12 @@ typedef uint32_t uid_t;
 //DATATYPES
 typedef enum { START, PROPOSED, ACCEPTED, COMMITTED } phase_t;
 typedef unsigned int clk_t;
+struct pair {
+    clk_t time;
+    xid_t id;
+};
+typedef struct pair p_uid_t;
+typedef struct pair g_uid_t;
 
 //CLIENT_CMD_TYPES
 typedef struct payload {
