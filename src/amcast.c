@@ -11,7 +11,7 @@
 
 static struct amcast_msg *init_amcast_msg(unsigned int groups_count, message_t *cmd);
 
-static void handle_multicast(struct node *node, id_t sid, message_t *cmd) {
+static void handle_multicast(struct node *node, xid_t sid, message_t *cmd) {
     printf("[%u] We got MULTICAST command from %u!\n", node->id, sid);
     if (node->amcast->status == LEADER) {
 	if(node->amcast->msgs_count == 0 || node->amcast->msgs_count == cmd->mid) {
@@ -47,7 +47,7 @@ static void handle_multicast(struct node *node, id_t sid, message_t *cmd) {
     }
 }
 
-static void handle_accept(struct node *node, id_t sid, accept_t *cmd) {
+static void handle_accept(struct node *node, xid_t sid, accept_t *cmd) {
     printf("[%u] We got ACCEPT command from %u!\n", node->id, sid);
     if(node->amcast->msgs_count == 0 || node->amcast->msgs_count == cmd->mid) {
     //if(!node->amcast->msgs+cmd->mid) {
@@ -66,7 +66,7 @@ static void handle_accept(struct node *node, id_t sid, accept_t *cmd) {
             && !( cmd->grp == node->comm->groups[node->id]
                   && !(node->amcast->ballot == cmd->ballot) )) {
         if (node->amcast->msgs[cmd->mid]->proposals[cmd->grp]->status != UNDEF) {
-	    for(id_t *grp = node->amcast->msgs[cmd->mid]->msg.destgrps;
+	    for(xid_t *grp = node->amcast->msgs[cmd->mid]->msg.destgrps;
                 grp < node->amcast->msgs[cmd->mid]->msg.destgrps + node->amcast->msgs[cmd->mid]->msg.destgrps_count;
 		grp++)
                 if(node->amcast->msgs[cmd->mid]->proposals[*grp]->status == CONFIRMED)
@@ -75,7 +75,7 @@ static void handle_accept(struct node *node, id_t sid, accept_t *cmd) {
 	node->amcast->msgs[cmd->mid]->proposals[cmd->grp]->status = RECEIVED;
 	node->amcast->msgs[cmd->mid]->proposals[cmd->grp]->ballot = cmd->ballot;
 	node->amcast->msgs[cmd->mid]->proposals[cmd->grp]->lts = cmd->lts;
-	for(id_t *grp = node->amcast->msgs[cmd->mid]->msg.destgrps;
+	for(xid_t *grp = node->amcast->msgs[cmd->mid]->msg.destgrps;
             grp < node->amcast->msgs[cmd->mid]->msg.destgrps + node->amcast->msgs[cmd->mid]->msg.destgrps_count;
 	    grp++)
             if(node->amcast->msgs[cmd->mid]->proposals[*grp]->status != RECEIVED)
@@ -84,7 +84,7 @@ static void handle_accept(struct node *node, id_t sid, accept_t *cmd) {
             node->amcast->msgs[cmd->mid]->phase = ACCEPTED;
             node->amcast->msgs[cmd->mid]->lts =
 		    node->amcast->msgs[cmd->mid]->proposals[node->comm->groups[node->id]]->lts;
-	    for(id_t *grp = node->amcast->msgs[cmd->mid]->msg.destgrps;
+	    for(xid_t *grp = node->amcast->msgs[cmd->mid]->msg.destgrps;
                 grp < node->amcast->msgs[cmd->mid]->msg.destgrps + node->amcast->msgs[cmd->mid]->msg.destgrps_count;
 	        grp++)
                 if(node->amcast->msgs[cmd->mid]->gts < node->amcast->msgs[cmd->mid]->proposals[*grp]->lts)
@@ -109,7 +109,7 @@ static void handle_accept(struct node *node, id_t sid, accept_t *cmd) {
     }
 }
 
-static void handle_accept_ack(struct node *node, id_t sid, accept_ack_t *cmd) {
+static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
     printf("[%u] We got ACCEPT_ACK command from %u!\n", node->id, sid);
     if (node->amcast->status == LEADER) {
         //TODO Not too sure about the entry condition
@@ -132,7 +132,7 @@ static void handle_accept_ack(struct node *node, id_t sid, accept_ack_t *cmd) {
         if(accept_acks_per_group_count[cmd->grp] >= nodes_in_group_count/2 + 1) {
             node->amcast->msgs[cmd->mid]->proposals[cmd->grp]->status = CONFIRMED;
         }
-	for(id_t *grp = node->amcast->msgs[cmd->mid]->msg.destgrps;
+	for(xid_t *grp = node->amcast->msgs[cmd->mid]->msg.destgrps;
                 grp < node->amcast->msgs[cmd->mid]->msg.destgrps + node->amcast->msgs[cmd->mid]->msg.destgrps_count;
 	        grp++)
             if(node->amcast->msgs[cmd->mid]->proposals[*grp]->status != CONFIRMED)
@@ -198,7 +198,7 @@ static void handle_accept_ack(struct node *node, id_t sid, accept_ack_t *cmd) {
     }
 }
 
-static void handle_deliver(struct node *node, id_t sid, deliver_t *cmd) {
+static void handle_deliver(struct node *node, xid_t sid, deliver_t *cmd) {
     printf("[%u] We got DELIVER command from %u for message %u!\n", node->id, sid, cmd->mid);
     if (node->amcast->status == FOLLOWER
             && node->amcast->ballot == cmd->ballot
@@ -212,19 +212,19 @@ static void handle_deliver(struct node *node, id_t sid, deliver_t *cmd) {
     }
 }
 
-static void handle_newleader(struct node *node, id_t sid, newleader_t *cmd) {
+static void handle_newleader(struct node *node, xid_t sid, newleader_t *cmd) {
     printf("[%u] We got NEWLEADER command from %u!\n", node->id, sid);
 }
 
-static void handle_newleader_ack(struct node *node, id_t sid, newleader_ack_t *cmd) {
+static void handle_newleader_ack(struct node *node, xid_t sid, newleader_ack_t *cmd) {
     printf("[%u] We got NEWLEADER_ACK command from %u!\n", node->id, sid);
 }
 
-static void handle_newleader_sync(struct node *node, id_t sid, newleader_sync_t *cmd) {
+static void handle_newleader_sync(struct node *node, xid_t sid, newleader_sync_t *cmd) {
     printf("[%u] We got NEWLEADER_SYNC command from %u!\n", node->id, sid);
 }
 
-static void handle_newleader_sync_ack(struct node *node, id_t sid, newleader_sync_ack_t *cmd) {
+static void handle_newleader_sync_ack(struct node *node, xid_t sid, newleader_sync_ack_t *cmd) {
     printf("[%u] We got NEWLEADER_SYNC_ACK command from %u!\n", node->id, sid);
 }
 

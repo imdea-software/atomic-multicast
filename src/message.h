@@ -22,8 +22,8 @@ typedef enum cmd_type {
 } cmd_type;
 
 struct enveloppe {
-    id_t		sid;
     cmd_type		cmd_type;
+    xid_t		sid;
     union {
         message_t		multicast;
         accept_t		accept;
@@ -39,8 +39,8 @@ struct enveloppe {
 void dispatch_message(struct node *node, struct enveloppe *env);
 void read_enveloppe(struct bufferevent *bev, struct enveloppe *env);
 void write_enveloppe(struct bufferevent *bev, struct enveloppe *env);
-void send_to_destgrps(struct node *node, struct enveloppe *env, id_t *destgrps, unsigned int count);
-void send_to_group(struct node *node, struct enveloppe *env, id_t group_id);
-void send_to_peer(struct node *node, struct enveloppe *env, id_t peer_id);
+void send_to_destgrps(struct node *node, struct enveloppe *env, xid_t *destgrps, unsigned int count);
+void send_to_group(struct node *node, struct enveloppe *env, xid_t group_id);
+void send_to_peer(struct node *node, struct enveloppe *env, xid_t peer_id);
 
 #endif

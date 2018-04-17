@@ -18,24 +18,24 @@ typedef struct payload {
 typedef struct message {
     m_uid_t 		mid;
     unsigned int 	destgrps_count;
-    id_t 		destgrps[10];
+    xid_t 		destgrps[10];
     struct payload	value;
 } message_t;
 
 //NODE_TYPES
 typedef struct accept {
     m_uid_t 		mid;
-    id_t		grp;
     uid_t		ballot;
     uid_t		lts;
+    xid_t		grp;
     message_t           msg;
 } accept_t;
 
 typedef struct accept_ack {
     m_uid_t 		mid;
-    id_t		grp;
     uid_t		ballot;
     uid_t		gts;
+    xid_t		grp;
 } accept_ack_t;
 
 typedef struct deliver {

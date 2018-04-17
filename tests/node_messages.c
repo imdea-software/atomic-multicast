@@ -19,7 +19,7 @@
 // are finished and are returning appropriate error codes.
 // In other words, this is should not be taken as a usage example!
 
-id_t id;
+xid_t id;
 pid_t pids[NUMBER_OF_NODES];
 
 int envcmp(struct enveloppe *env1, struct enveloppe *env2) {
@@ -81,7 +81,7 @@ int main(int argc, char *argv[]) {
         //Let's wait until connections are successful
         sleep(2); //No longer possible to inspect nodes, memory is not shared
         //Connect as a client
-        id_t peer_id = 0;
+        xid_t peer_id = 0;
         int sock = socket(AF_INET, SOCK_STREAM, 0);
         struct sockaddr_in addr = {
 		.sin_family = AF_INET,

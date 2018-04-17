@@ -20,7 +20,7 @@
 // are finished and are returning appropriate error codes.
 // In other words, this is should not be taken as a usage example!
 
-id_t id;
+xid_t id;
 pid_t pids[NUMBER_OF_NODES];
 
 int envcmp(struct enveloppe *env1, struct enveloppe *env2) {
@@ -92,7 +92,7 @@ int main(int argc, char *argv[]) {
         //Connect as a client
 	int sock[NUMBER_OF_NODES];
 	for(int i=0; i<2; i++) {
-            id_t peer_id = i*3;
+            xid_t peer_id = i*3;
             sock[peer_id] = socket(AF_INET, SOCK_STREAM, 0);
             struct sockaddr_in addr = {
 	        .sin_family = AF_INET,
@@ -118,7 +118,7 @@ int main(int argc, char *argv[]) {
 	for(int j=0; j<1; j++) {
             env.cmd.multicast.mid = j;
 	    for(int i=0; i<2; i++) {
-                id_t peer_id = i*3;
+                xid_t peer_id = i*3;
 	        struct enveloppe rep;
                 send(sock[peer_id], &env, sizeof(env), 0);
                 recv(sock[peer_id], &rep, sizeof(rep), 0);
@@ -131,7 +131,7 @@ int main(int argc, char *argv[]) {
 	}
         //Close the connections
 	for(int i=0; i<2; i++) {
-            id_t peer_id = i*3;
+            xid_t peer_id = i*3;
             close(sock[peer_id]);
         }
 	for(;;);

@@ -44,13 +44,13 @@ static struct node_comm *init_node_comm(struct cluster_config *conf) {
 
     struct node_comm *comm = malloc(sizeof(struct node_comm));
     struct sockaddr_in *addrs = malloc(size * sizeof(struct sockaddr_in));
-    id_t *ids = malloc(size * sizeof(id_t));
-    id_t *groups = malloc(size * sizeof(id_t));
+    xid_t *ids = malloc(size * sizeof(xid_t));
+    xid_t *groups = malloc(size * sizeof(xid_t));
     //TODO It might be better to realloc when connection is accepted/lost
     struct bufferevent **bevs = malloc(size * sizeof(struct bufferevent *));
 
     for(int i=0; i<size; i++) {
-	id_t c_id = conf->id[i];
+	xid_t c_id = conf->id[i];
 	//Prepare the sockaddr_in structs for each node
 	memset(addrs+c_id, 0, sizeof(struct sockaddr_in));
         addrs[c_id].sin_family = AF_INET;
@@ -58,8 +58,8 @@ static struct node_comm *init_node_comm(struct cluster_config *conf) {
 	inet_aton(conf->addresses[c_id], &(addrs[c_id].sin_addr));
     }
     //TODO Use the new dedicated group structure
-    memcpy(groups, conf->group_membership, size * sizeof(id_t));
-    memcpy(ids, conf->id, size * sizeof(id_t));
+    memcpy(groups, conf->group_membership, size * sizeof(xid_t));
+    memcpy(ids, conf->id, size * sizeof(xid_t));
 
     comm->cluster_size = size;
     comm->accepted_count = 0;
@@ -91,7 +91,7 @@ static int free_node_comm(struct node_comm *comm) {
     return 0;
 }
 
-static struct node_events *init_node_events(struct node_comm *comm, id_t id) {
+static struct node_events *init_node_events(struct node_comm *comm, xid_t id) {
     struct node_events *events = malloc(sizeof(struct node_events));
     //Create a new event base
     events->base = event_base_new();
@@ -113,7 +113,7 @@ static int configure_node_events(struct node *node) {
     //Connect to the other nodes of the cluster
     //TODO Maybe re-add the event when BEV_EVENT_EOF|ERROR to reconnect when lost
     for(int i=0; i<node->comm->cluster_size; i++) {
-        id_t peer_id = node->comm->ids[i];
+        xid_t peer_id = node->comm->ids[i];
         node->events->reconnect_evs[peer_id] = evtimer_new(node->events->base, reconnect_cb,
 			set_cb_arg(peer_id, node));
         connect_to_node(node, peer_id);
@@ -136,7 +136,7 @@ static int free_node_events(struct node_events *events) {
     return 0;
 }
 
-struct node *node_init(struct cluster_config *conf, id_t id) {
+struct node *node_init(struct cluster_config *conf, xid_t id) {
     struct node *node = malloc(sizeof(struct node));
     node->id = id;
     node->groups = init_groups(conf);

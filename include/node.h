@@ -22,8 +22,8 @@ struct node_comm {
     unsigned int	cluster_size;
     unsigned int	accepted_count;
     unsigned int	a_size;
-    id_t		*ids;
-    id_t 		*groups;
+    xid_t		*ids;
+    xid_t 		*groups;
     struct sockaddr_in	*addrs;
     struct bufferevent  **bevs;
     struct bufferevent	**a_bevs;
@@ -37,14 +37,14 @@ struct node_events {
 };
 
 struct node {
-    id_t		id;
+    xid_t		id;
     struct groups	*groups;
     struct node_comm	*comm;
     struct node_events	*events;
     struct amcast	*amcast;
 };
 
-struct 	node 	*node_init	(struct cluster_config *conf, id_t id);
+struct 	node 	*node_init	(struct cluster_config *conf, xid_t id);
 int 		node_free	(struct node *node);
 void		node_start	(struct node *node);
 void		node_stop	(struct node *node);
