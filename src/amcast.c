@@ -119,7 +119,7 @@ static void handle_accept(struct node *node, xid_t sid, accept_t *cmd) {
 	    .cmd.accept_ack = {
 	        .mid = cmd->mid,
 		.grp = node->comm->groups[node->id],
-		.ballot = cmd->ballot,
+		.ballot = node->amcast->ballot,
 		.gts = node->amcast->msgs[cmd->mid]->gts
 	    },
 	};
