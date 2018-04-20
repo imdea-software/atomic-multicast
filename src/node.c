@@ -100,6 +100,8 @@ static struct node_events *init_node_events(struct node_comm *comm, id_t id) {
 		    -1, (struct sockaddr*) comm->addrs+id, sizeof(comm->addrs[id]));
     //Create an array of reconnection events
     events->reconnect_evs = malloc(comm->cluster_size * sizeof(struct event *));
+    memset(events->reconnect_evs, 0, sizeof(struct event *) * comm->cluster_size);
+    events->interrupt_ev = NULL;
     return events;
 }
 
@@ -124,7 +126,8 @@ static int configure_node_events(struct node *node) {
 }
 
 static int free_node_events(struct node_events *events) {
-    event_free(events->interrupt_ev);
+    if(events->interrupt_ev)
+        event_free(events->interrupt_ev);
     evconnlistener_free(events->lev);
     event_base_free(events->base);
     free(events->reconnect_evs);
@@ -144,7 +147,8 @@ struct node *node_init(struct cluster_config *conf, id_t id) {
 int node_free(struct node *node) {
     //TODO Find a better place to free the events
     for(int i=0; i<node->comm->cluster_size; i++)
-        event_free(node->events->reconnect_evs[i]);
+        if(node->events->reconnect_evs[i])
+            event_free(node->events->reconnect_evs[i]);
     free_groups(node->groups);
     free_node_comm(node->comm);
     free_node_events(node->events);
