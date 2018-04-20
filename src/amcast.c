@@ -143,28 +143,16 @@ static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
             return;
         }
         //TODO Not too sure about the entry condition
-        static int accept_acks_per_group_count[256];
-        static int accept_acks_per_node_count[256];
-        static int accept_acks_per_leader_count[256];
-        //static int accept_acks_per_group_count[node->amcast->msgs[cmd->mid]->msg.destgrps_count];
-        //static int accept_acks_per_node_count[node->comm->cluster_size];
         if(paircmp(&node->amcast->msgs[cmd->mid]->proposals[cmd->grp]->ballot, &cmd->ballot) == 0
                 && paircmp(&node->amcast->msgs[cmd->mid]->gts, &cmd->gts) == 0
-                && accept_acks_per_node_count[sid] < 1) {
-            accept_acks_per_node_count[sid] += 1;
-            accept_acks_per_group_count[cmd->grp] += 1;
-            if (sid == cmd->ballot.id) {
-                accept_acks_per_leader_count[cmd->grp] += 1;
-            }
+                && node->amcast->msgs[cmd->mid]->proposals[cmd->grp]->accept_ack_counts[sid] < 1) {
+            node->amcast->msgs[cmd->mid]->proposals[cmd->grp]->accept_ack_counts[sid] += 1;
+            node->amcast->msgs[cmd->mid]->proposals[cmd->grp]->accept_ack_totalcount += 1;
         }
-        //TODO Have a proper group structure to avoid manually counting nodes in group
-        int nodes_in_group_count = 0;
-        for(int i=0; i<node->comm->cluster_size; i++)
-            if (node->comm->groups[i] == cmd->grp)
-                nodes_in_group_count++;
-        //TODO Also check if the ACCEPT_ACK from the grp leader was received
-        if(accept_acks_per_group_count[cmd->grp] >= nodes_in_group_count/2 + 1
-            && accept_acks_per_leader_count[cmd->grp] > 0) {
+        if(node->amcast->msgs[cmd->mid]->proposals[cmd->grp]->accept_ack_totalcount >=
+                node->groups->node_counts[cmd->grp]/2 + 1
+            //Also check if the ACCEPT_ACK from the grp leader was received
+            && node->amcast->msgs[cmd->mid]->proposals[cmd->grp]->accept_ack_counts[cmd->ballot.id] > 0) {
             node->amcast->msgs[cmd->mid]->proposals[cmd->grp]->status = CONFIRMED;
         }
 	for(xid_t *grp = node->amcast->msgs[cmd->mid]->msg.destgrps;
@@ -224,11 +212,12 @@ static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
 	            },
 	        };
                 send_to_group(node, &rep, node->comm->groups[node->id]);
-                //RESET static variables
-                for(int i=0; i<256; i++) {
-                    accept_acks_per_group_count[i] = 0;
-                    accept_acks_per_node_count[i] = 0;
-                    accept_acks_per_leader_count[i] = 0;
+                //RESET counter variables
+                for(int i=0; i<node->groups->groups_count; i++) {
+                    node->amcast->msgs[cmd->mid]->proposals[i]->accept_ack_totalcount = 0;
+                    memset(node->amcast->msgs[cmd->mid]->proposals[i]->accept_ack_counts,
+                            0, sizeof(unsigned int) *
+                            node->amcast->msgs[cmd->mid]->proposals[i]->accept_ack_counts_size);
 	        }
             }
         }
