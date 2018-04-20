@@ -8,6 +8,35 @@
 
 //TODO Do the proper security checks on system calls
 
+static struct groups *init_groups(struct cluster_config *conf) {
+    struct groups *g = malloc(sizeof(struct groups));
+    g->node_counts = malloc(sizeof(unsigned int) * conf->size);
+    g->members = malloc(sizeof(id_t *) * conf->size);
+    g->groups_count = conf->groups_count;
+
+    for(int j=0; j<g->groups_count; j++) {
+        g->members[j] = malloc(sizeof(id_t) * conf->size);
+        for(int i=0; i<conf->size; i++)
+            if(conf->group_membership[i] == j) {
+                g->node_counts[j] += 1;
+                g->members[j][g->node_counts[j] - 1] = conf->id[i];
+            }
+        g->members[j] = realloc(g->members[j], sizeof(id_t) * g->node_counts[j]);
+    }
+    g->node_counts = realloc(g->node_counts, sizeof(unsigned int) * g->groups_count);
+    g->members = realloc(g->members, sizeof(id_t *) * g->groups_count);
+    return g;
+}
+
+static int free_groups(struct groups *groups) {
+    for(int i=0; i<groups->groups_count; i++)
+        free(groups->members[i]);
+    free(groups->members);
+    free(groups->node_counts);
+    free(groups);
+    return 0;
+}
+
 static struct node_comm *init_node_comm(struct cluster_config *conf) {
     unsigned int size = conf->size;
 
