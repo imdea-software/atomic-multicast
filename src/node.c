@@ -16,6 +16,7 @@ static struct groups *init_groups(struct cluster_config *conf) {
 
     for(int j=0; j<g->groups_count; j++) {
         g->members[j] = malloc(sizeof(id_t) * conf->size);
+        g->node_counts[j] = 0;
         for(int i=0; i<conf->size; i++)
             if(conf->group_membership[i] == j) {
                 g->node_counts[j] += 1;
