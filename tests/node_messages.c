@@ -53,7 +53,7 @@ int envcmp(struct enveloppe *env1, struct enveloppe *env2) {
 //  Succesfully exits
 int main(int argc, char *argv[]) {
     //TODO Create some better public config helper function to make it easier
-    fill_cluster_config(&conf, NUMBER_OF_NODES, ids, group_memberships, addresses, ports);
+    fill_cluster_config(&conf, NUMBER_OF_NODES, NUMBER_OF_GROUPS, ids, group_memberships, addresses, ports);
 
     //The plan is to start each node in a separate process
     id = -1;

@@ -8,6 +8,36 @@
 
 //TODO Do the proper security checks on system calls
 
+static struct groups *init_groups(struct cluster_config *conf) {
+    struct groups *g = malloc(sizeof(struct groups));
+    g->node_counts = malloc(sizeof(unsigned int) * conf->size);
+    g->members = malloc(sizeof(id_t *) * conf->size);
+    g->groups_count = conf->groups_count;
+
+    for(int j=0; j<g->groups_count; j++) {
+        g->members[j] = malloc(sizeof(id_t) * conf->size);
+        g->node_counts[j] = 0;
+        for(int i=0; i<conf->size; i++)
+            if(conf->group_membership[i] == j) {
+                g->node_counts[j] += 1;
+                g->members[j][g->node_counts[j] - 1] = conf->id[i];
+            }
+        g->members[j] = realloc(g->members[j], sizeof(id_t) * g->node_counts[j]);
+    }
+    g->node_counts = realloc(g->node_counts, sizeof(unsigned int) * g->groups_count);
+    g->members = realloc(g->members, sizeof(id_t *) * g->groups_count);
+    return g;
+}
+
+static int free_groups(struct groups *groups) {
+    for(int i=0; i<groups->groups_count; i++)
+        free(groups->members[i]);
+    free(groups->members);
+    free(groups->node_counts);
+    free(groups);
+    return 0;
+}
+
 static struct node_comm *init_node_comm(struct cluster_config *conf) {
     unsigned int size = conf->size;
 
@@ -26,7 +56,7 @@ static struct node_comm *init_node_comm(struct cluster_config *conf) {
         addrs[c_id].sin_port = htons(conf->ports[c_id]);
 	inet_aton(conf->addresses[c_id], &(addrs[c_id].sin_addr));
     }
-    //TODO Create a dedicated group structure
+    //TODO Use the new dedicated group structure
     memcpy(groups, conf->group_membership, size * sizeof(id_t));
     memcpy(ids, conf->id, size * sizeof(id_t));
 
@@ -70,6 +100,8 @@ static struct node_events *init_node_events(struct node_comm *comm, id_t id) {
 		    -1, (struct sockaddr*) comm->addrs+id, sizeof(comm->addrs[id]));
     //Create an array of reconnection events
     events->reconnect_evs = malloc(comm->cluster_size * sizeof(struct event *));
+    memset(events->reconnect_evs, 0, sizeof(struct event *) * comm->cluster_size);
+    events->interrupt_ev = NULL;
     return events;
 }
 
@@ -94,7 +126,8 @@ static int configure_node_events(struct node *node) {
 }
 
 static int free_node_events(struct node_events *events) {
-    event_free(events->interrupt_ev);
+    if(events->interrupt_ev)
+        event_free(events->interrupt_ev);
     evconnlistener_free(events->lev);
     event_base_free(events->base);
     free(events->reconnect_evs);
@@ -105,6 +138,7 @@ static int free_node_events(struct node_events *events) {
 struct node *node_init(struct cluster_config *conf, id_t id) {
     struct node *node = malloc(sizeof(struct node));
     node->id = id;
+    node->groups = init_groups(conf);
     node->comm = init_node_comm(conf);
     node->events = init_node_events(node->comm, id);
     return node;
@@ -113,7 +147,9 @@ struct node *node_init(struct cluster_config *conf, id_t id) {
 int node_free(struct node *node) {
     //TODO Find a better place to free the events
     for(int i=0; i<node->comm->cluster_size; i++)
-        event_free(node->events->reconnect_evs[i]);
+        if(node->events->reconnect_evs[i])
+            event_free(node->events->reconnect_evs[i]);
+    free_groups(node->groups);
     free_node_comm(node->comm);
     free_node_events(node->events);
     free(node);
