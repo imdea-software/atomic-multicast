@@ -11,6 +11,10 @@ struct amcast_msg_proposal {
     p_uid_t ballot;
     enum { UNDEF, RECEIVED, CONFIRMED } status;
     g_uid_t lts;
+    //EXTRA FIELDS (NOT IN SPEC)
+    unsigned int accept_ack_totalcount;
+    unsigned int accept_ack_counts_size;
+    unsigned int *accept_ack_counts;
 };
 
 struct amcast_msg {
