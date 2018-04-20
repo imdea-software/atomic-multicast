@@ -8,6 +8,14 @@
 #include "types.h"
 #include "cluster.h"
 
+struct groups {
+    unsigned int	groups_count;
+    unsigned int	*node_counts;
+    id_t		**members;
+    //NOT USED
+    //id_t		*memberships;
+};
+
 struct node_comm {
     unsigned int	cluster_size;
     unsigned int	accepted_count;
