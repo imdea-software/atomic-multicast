@@ -36,6 +36,7 @@ struct node_events {
 
 struct node {
     id_t		id;
+    struct groups	*groups;
     struct node_comm	*comm;
     struct node_events	*events;
 };

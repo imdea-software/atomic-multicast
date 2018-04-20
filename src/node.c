@@ -55,7 +55,7 @@ static struct node_comm *init_node_comm(struct cluster_config *conf) {
         addrs[c_id].sin_port = htons(conf->ports[c_id]);
 	inet_aton(conf->addresses[c_id], &(addrs[c_id].sin_addr));
     }
-    //TODO Create a dedicated group structure
+    //TODO Use the new dedicated group structure
     memcpy(groups, conf->group_membership, size * sizeof(id_t));
     memcpy(ids, conf->id, size * sizeof(id_t));
 
@@ -134,6 +134,7 @@ static int free_node_events(struct node_events *events) {
 struct node *node_init(struct cluster_config *conf, id_t id) {
     struct node *node = malloc(sizeof(struct node));
     node->id = id;
+    node->groups = init_groups(conf);
     node->comm = init_node_comm(conf);
     node->events = init_node_events(node->comm, id);
     return node;
@@ -143,6 +144,7 @@ int node_free(struct node *node) {
     //TODO Find a better place to free the events
     for(int i=0; i<node->comm->cluster_size; i++)
         event_free(node->events->reconnect_evs[i]);
+    free_groups(node->groups);
     free_node_comm(node->comm);
     free_node_events(node->events);
     free(node);
