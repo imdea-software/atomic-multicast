@@ -1,9 +1,11 @@
 #include <string.h>
+#include <event2/buffer.h>
 
 #include "node.h"
 #include "events.h"
+#include "message.h"
 
-static struct timeval reconnect_timeout = { 0, 0 };
+static struct timeval reconnect_timeout = { 1, 0 };
 
 struct cb_arg *set_cb_arg(id_t peer_id, struct node *node) {
     struct cb_arg *arg = malloc(sizeof(struct cb_arg));
@@ -105,8 +107,18 @@ void accept_error_cb(struct evconnlistener *lev, void *ptr) {
 
 //Called whenever data gets into the bufferevents
 void read_cb(struct bufferevent *bev, void *ptr) {
-    //TODO Implement message reception
-    puts("We got mail!\n");
+    struct node *node = NULL; id_t peer_id;
+    retrieve_cb_arg(&peer_id, &node, (struct cb_arg *) ptr);
+    //TODO Change read_enveloppe() implem so that looping over it
+    //     doesn't cause bufferevent_read() to be called several times
+    struct evbuffer *in_buf = bufferevent_get_input(bev);
+    while (evbuffer_get_length(in_buf) >= sizeof(struct enveloppe)) {
+        struct enveloppe env;
+        read_enveloppe(bev, &env);
+        //TODO Have a dedicated cmd_type for receive tests
+        write_enveloppe(bev, &env);
+        dispatch_message(node, &env);
+    }
 }
 
 //Called when the status of a connection changes

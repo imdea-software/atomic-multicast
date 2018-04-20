@@ -1,3 +1,6 @@
+#ifndef _NODE_H_
+#define _NODE_H_
+
 #include <event2/event.h>
 #include <event2/listener.h>
 #include <event2/bufferevent.h>
@@ -33,3 +36,5 @@ struct 	node 	*node_init	(struct cluster_config *conf, id_t id);
 int 		node_free	(struct node *node);
 void		node_start	(struct node *node);
 void		node_stop	(struct node *node);
+
+#endif

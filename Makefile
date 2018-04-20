@@ -7,8 +7,8 @@ CFLAGS  = -O2 -Wall -g -I$(INC_DIR) -I$(SRC_DIR)
 LDFLAGS = -levent
 LDFLAGS_TEST = $(LDFLAGS) -lpthread -levent_pthreads
 VERBOSE =
-TARGET  = $(TEST_DIR)/node_init_free $(TEST_DIR)/node_connect
-OBJS    = $(SRC_DIR)/node.o $(SRC_DIR)/events.o
+TARGET  = $(TEST_DIR)/node_init_free $(TEST_DIR)/node_connect $(TEST_DIR)/node_messages
+OBJS    = $(SRC_DIR)/node.o $(SRC_DIR)/events.o $(SRC_DIR)/message.o
 
 all: $(TARGET)
 
@@ -17,6 +17,9 @@ $(TEST_DIR)/node_init_free: $(TEST_DIR)/node_init_free.o $(OBJS)
 
 $(TEST_DIR)/node_connect: $(TEST_DIR)/node_connect.o $(OBJS)
 	$(CC) $(VERBOSE) -o $@ $< $(OBJS) $(LDFLAGS_TEST)
+
+$(TEST_DIR)/node_messages: $(TEST_DIR)/node_messages.o $(OBJS)
+	$(CC) $(VERBOSE) -o $@ $< $(OBJS) $(LDFLAGS)
 
 $(SRC_DIR)/%.o: %.c
 	$(CC) $(CFLAGS) -c $< $(VERBOSE)

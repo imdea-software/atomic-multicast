@@ -14,7 +14,7 @@
 
 int main(int argc, char *argv[]) {
     //TODO Create some better public config helper function to make it easier
-    fill_cluster_config(&conf, NUMBER_OF_NODES, id, group_membership, addresses, ports);
+    fill_cluster_config(&conf, NUMBER_OF_NODES, ids, group_memberships, addresses, ports);
 
     //Let's now create the nodes
     struct node *nodes[NUMBER_OF_NODES];
