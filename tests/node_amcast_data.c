@@ -134,7 +134,7 @@ int main(int argc, char *argv[]) {
             xid_t peer_id = i*3;
             close(sock[peer_id]);
         }
-	for(;;);
+	sleep(5);
         //Break the event loop for all nodes
         for(int i=0; i<NUMBER_OF_NODES; i++) {
             kill(pids[i], SIGHUP);
