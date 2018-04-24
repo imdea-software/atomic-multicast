@@ -27,6 +27,7 @@ struct amcast_msg {
     struct amcast_msg_proposal **proposals;
     //EXTRA FIELDS (NOT IN SPEC)
     unsigned int accept_totalcount;
+    unsigned int accept_ack_totalcount;
     g_uid_t accept_max_lts;
 };
 

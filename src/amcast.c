@@ -140,13 +140,14 @@ static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
                 node->groups->node_counts[cmd->grp]/2 + 1
             //Also check if the ACCEPT_ACK from the grp leader was received
             && node->amcast->msgs[cmd->mid]->proposals[cmd->grp]->accept_ack_counts[cmd->ballot.id] > 0) {
+            //TODO Check for the best time to reset this counter
+            if(node->amcast->msgs[cmd->mid]->proposals[cmd->grp]->status != CONFIRMED)
+                node->amcast->msgs[cmd->mid]->accept_ack_totalcount += 1;
             node->amcast->msgs[cmd->mid]->proposals[cmd->grp]->status = CONFIRMED;
         }
-	for(xid_t *grp = node->amcast->msgs[cmd->mid]->msg.destgrps;
-                grp < node->amcast->msgs[cmd->mid]->msg.destgrps + node->amcast->msgs[cmd->mid]->msg.destgrps_count;
-	        grp++)
-            if(node->amcast->msgs[cmd->mid]->proposals[*grp]->status != CONFIRMED)
-                return;
+        if(node->amcast->msgs[cmd->mid]->accept_ack_totalcount !=
+			node->amcast->msgs[cmd->mid]->msg.destgrps_count)
+            return;
         node->amcast->msgs[cmd->mid]->phase = COMMITTED;
 	//TODO Do not rebuild on every call the gts-ordered set of messages
 	//This really is INEFFICIENT
@@ -299,6 +300,7 @@ static struct amcast_msg *init_amcast_msg(struct groups *groups, message_t *cmd)
         msg->proposals[i] = init_amcast_msg_proposal(groups->node_counts[i]);
     //EXTRA FIELDS (NOT IN SPEC)
     msg->accept_totalcount = 0;
+    msg->accept_ack_totalcount = 0;
     msg->accept_max_lts = default_pair;
     return msg;
 }
