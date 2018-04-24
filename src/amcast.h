@@ -25,6 +25,8 @@ struct amcast_msg {
     uint32_t proposals_count;
     message_t msg;
     struct amcast_msg_proposal **proposals;
+    //EXTRA FIELDS (NOT IN SPEC)
+    unsigned int accept_totalcount;
 };
 
 struct amcast {

@@ -82,14 +82,15 @@ static void handle_accept(struct node *node, xid_t sid, accept_t *cmd) {
                 if(node->amcast->msgs[cmd->mid]->proposals[*grp]->status == CONFIRMED)
                     node->amcast->msgs[cmd->mid]->proposals[*grp]->status = RECEIVED;
         }
+	//TODO Carefully try to see when it's the best time to reset this counter
+	//     Probably upon a leader change
+	if (node->amcast->msgs[cmd->mid]->proposals[cmd->grp]->status != RECEIVED)
+            node->amcast->msgs[cmd->mid]->accept_totalcount += 1;
 	node->amcast->msgs[cmd->mid]->proposals[cmd->grp]->status = RECEIVED;
 	node->amcast->msgs[cmd->mid]->proposals[cmd->grp]->ballot = cmd->ballot;
 	node->amcast->msgs[cmd->mid]->proposals[cmd->grp]->lts = cmd->lts;
-	for(xid_t *grp = node->amcast->msgs[cmd->mid]->msg.destgrps;
-            grp < node->amcast->msgs[cmd->mid]->msg.destgrps + node->amcast->msgs[cmd->mid]->msg.destgrps_count;
-	    grp++)
-            if(node->amcast->msgs[cmd->mid]->proposals[*grp]->status != RECEIVED)
-	        return;
+        if(node->amcast->msgs[cmd->mid]->accept_totalcount != node->amcast->msgs[cmd->mid]->msg.destgrps_count)
+	    return;
         if(node->amcast->msgs[cmd->mid]->phase != COMMITTED) {
             node->amcast->msgs[cmd->mid]->phase = ACCEPTED;
             node->amcast->msgs[cmd->mid]->lts =
@@ -298,6 +299,8 @@ static struct amcast_msg *init_amcast_msg(struct groups *groups, message_t *cmd)
     msg->proposals = malloc(sizeof(struct amcast_msg_proposals *) * groups->groups_count);
     for(int i=0; i<groups->groups_count; i++)
         msg->proposals[i] = init_amcast_msg_proposal(groups->node_counts[i]);
+    //EXTRA FIELDS (NOT IN SPEC)
+    msg->accept_totalcount = 0;
     return msg;
 }
 
