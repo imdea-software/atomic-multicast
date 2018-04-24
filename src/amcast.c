@@ -33,7 +33,7 @@ struct pair default_pair = { .time = 0, .id = -1};
 static struct amcast_msg *init_amcast_msg(struct groups *groups, message_t *cmd);
 
 static void handle_multicast(struct node *node, xid_t sid, message_t *cmd) {
-    printf("[%u] We got MULTICAST command from %u!\n", node->id, sid);
+    printf("[%u] {%u} We got MULTICAST command from %u!\n", node->id, cmd->mid, sid);
     if (node->amcast->status == LEADER) {
 	if(node->amcast->msgs_count == 0 || node->amcast->msgs_count == cmd->mid) {
 	//if(!node->amcast->msgs+cmd->mid) {
@@ -70,7 +70,7 @@ static void handle_multicast(struct node *node, xid_t sid, message_t *cmd) {
 }
 
 static void handle_accept(struct node *node, xid_t sid, accept_t *cmd) {
-    printf("[%u] We got ACCEPT command from %u!\n", node->id, sid);
+    printf("[%u] {%u} We got ACCEPT command from %u!\n", node->id, cmd->mid, sid);
     if(node->amcast->msgs_count == 0 || node->amcast->msgs_count == cmd->mid) {
     //if(!node->amcast->msgs+cmd->mid) {
         node->amcast->msgs_count++;
@@ -133,11 +133,11 @@ static void handle_accept(struct node *node, xid_t sid, accept_t *cmd) {
 }
 
 static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
-    printf("[%u] We got ACCEPT_ACK command from %u!\n", node->id, sid);
+    printf("[%u] {%u} We got ACCEPT_ACK command from %u!\n", node->id, cmd->mid, sid);
     if (node->amcast->status == LEADER) {
         //It seems ACCEPT_ACKS are sometime recevied before gts is initialized
         if(paircmp(&node->amcast->msgs[cmd->mid]->gts, &default_pair) == 0) {
-            printf("[%d] Re-sending ACCEPT_ACK command from %d!\n", node->id, sid);
+            printf("[%d] {%u} Re-sending ACCEPT_ACK command from %d!\n", node->id, cmd->mid, sid);
             struct enveloppe retry = { .sid = sid, .cmd_type = ACCEPT_ACK, .cmd.accept_ack = *cmd };
             send_to_peer(node, &retry, node->id);
             return;
@@ -225,7 +225,7 @@ static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
 }
 
 static void handle_deliver(struct node *node, xid_t sid, deliver_t *cmd) {
-    printf("[%u] We got DELIVER command from %u for message %u!\n", node->id, sid, cmd->mid);
+    printf("[%u] {%u} We got DELIVER command from %u with gts: (%u,%u)!\n", node->id, cmd->mid, sid, cmd->gts.time, cmd->gts.id);
     if (node->amcast->status == FOLLOWER
             && paircmp(&node->amcast->ballot, &cmd->ballot) == 0
             && node->amcast->msgs[cmd->mid]->delivered == FALSE) {
