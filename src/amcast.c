@@ -165,10 +165,10 @@ static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
 	//This really is INEFFICIENT
 	int gts_order[node->amcast->msgs_count];
 	for(int i=0; i<node->amcast->msgs_count; i++)
-            gts_order[i] = 1;
+            gts_order[i] = -1;
 	for(int i=0; i<node->amcast->msgs_count; i++) {
-	    int lowest = 0;
-	    for(int j=0; j<node->amcast->msgs_count; j++) {
+            int lowest = i;
+            for(int j=i; j<node->amcast->msgs_count; j++) {
 		    /*
                 if(!node->amcast->msgs+j) {
                     printf("[%u] Message at index %u does not exists, "
