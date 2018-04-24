@@ -134,9 +134,9 @@ static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
                 && paircmp(&node->amcast->msgs[cmd->mid]->gts, &cmd->gts) == 0
                 && node->amcast->msgs[cmd->mid]->proposals[cmd->grp]->accept_ack_counts[sid] < 1) {
             node->amcast->msgs[cmd->mid]->proposals[cmd->grp]->accept_ack_counts[sid] += 1;
-            node->amcast->msgs[cmd->mid]->proposals[cmd->grp]->accept_ack_totalcount += 1;
+            node->amcast->msgs[cmd->mid]->proposals[cmd->grp]->accept_ack_groupcount += 1;
         }
-        if(node->amcast->msgs[cmd->mid]->proposals[cmd->grp]->accept_ack_totalcount >=
+        if(node->amcast->msgs[cmd->mid]->proposals[cmd->grp]->accept_ack_groupcount >=
                 node->groups->node_counts[cmd->grp]/2 + 1
             //Also check if the ACCEPT_ACK from the grp leader was received
             && node->amcast->msgs[cmd->mid]->proposals[cmd->grp]->accept_ack_counts[cmd->ballot.id] > 0) {
@@ -201,7 +201,7 @@ static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
                 send_to_group(node, &rep, node->comm->groups[node->id]);
                 //RESET counter variables
                 for(int i=0; i<node->groups->groups_count; i++) {
-                    node->amcast->msgs[cmd->mid]->proposals[i]->accept_ack_totalcount = 0;
+                    node->amcast->msgs[cmd->mid]->proposals[i]->accept_ack_groupcount = 0;
                     memset(node->amcast->msgs[cmd->mid]->proposals[i]->accept_ack_counts,
                             0, sizeof(unsigned int) *
                             node->amcast->msgs[cmd->mid]->proposals[i]->accept_ack_counts_size);
@@ -279,7 +279,7 @@ static struct amcast_msg_proposal *init_amcast_msg_proposal(unsigned int nodes_c
     prop->status = UNDEF;
     prop->lts = default_pair;
     //EXTRA FIELDS (NOT IN SPEC)
-    prop->accept_ack_totalcount = 0;
+    prop->accept_ack_groupcount = 0;
     prop->accept_ack_counts_size = nodes_count;
     prop->accept_ack_counts = malloc(sizeof(unsigned int) * nodes_count);
     memset(prop->accept_ack_counts, 0, sizeof(unsigned int) * nodes_count);

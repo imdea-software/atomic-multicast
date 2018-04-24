@@ -12,7 +12,7 @@ struct amcast_msg_proposal {
     enum { UNDEF, RECEIVED, CONFIRMED } status;
     g_uid_t lts;
     //EXTRA FIELDS (NOT IN SPEC)
-    unsigned int accept_ack_totalcount;
+    unsigned int accept_ack_groupcount;
     unsigned int accept_ack_counts_size;
     unsigned int *accept_ack_counts;
 };
