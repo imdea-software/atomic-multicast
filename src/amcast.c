@@ -84,8 +84,11 @@ static void handle_accept(struct node *node, xid_t sid, accept_t *cmd) {
         }
 	//TODO Carefully try to see when it's the best time to reset this counter
 	//     Probably upon a leader change
-	if (node->amcast->msgs[cmd->mid]->proposals[cmd->grp]->status != RECEIVED)
+	if (node->amcast->msgs[cmd->mid]->proposals[cmd->grp]->status != RECEIVED) {
             node->amcast->msgs[cmd->mid]->accept_totalcount += 1;
+            if(paircmp(&node->amcast->msgs[cmd->mid]->accept_max_lts, &cmd->lts) < 0)
+                node->amcast->msgs[cmd->mid]->accept_max_lts = cmd->lts;
+	}
 	node->amcast->msgs[cmd->mid]->proposals[cmd->grp]->status = RECEIVED;
 	node->amcast->msgs[cmd->mid]->proposals[cmd->grp]->ballot = cmd->ballot;
 	node->amcast->msgs[cmd->mid]->proposals[cmd->grp]->lts = cmd->lts;
@@ -95,12 +98,7 @@ static void handle_accept(struct node *node, xid_t sid, accept_t *cmd) {
             node->amcast->msgs[cmd->mid]->phase = ACCEPTED;
             node->amcast->msgs[cmd->mid]->lts =
 		    node->amcast->msgs[cmd->mid]->proposals[node->comm->groups[node->id]]->lts;
-	    for(xid_t *grp = node->amcast->msgs[cmd->mid]->msg.destgrps;
-                grp < node->amcast->msgs[cmd->mid]->msg.destgrps + node->amcast->msgs[cmd->mid]->msg.destgrps_count;
-	        grp++)
-                if(paircmp(&node->amcast->msgs[cmd->mid]->gts,
-					&node->amcast->msgs[cmd->mid]->proposals[*grp]->lts) < 0)
-                    node->amcast->msgs[cmd->mid]->gts = node->amcast->msgs[cmd->mid]->proposals[*grp]->lts;
+            node->amcast->msgs[cmd->mid]->gts = node->amcast->msgs[cmd->mid]->accept_max_lts;
             if(node->amcast->clock < node->amcast->msgs[cmd->mid]->gts.time)
                 node->amcast->clock = node->amcast->msgs[cmd->mid]->gts.time;
         }
@@ -301,6 +299,7 @@ static struct amcast_msg *init_amcast_msg(struct groups *groups, message_t *cmd)
         msg->proposals[i] = init_amcast_msg_proposal(groups->node_counts[i]);
     //EXTRA FIELDS (NOT IN SPEC)
     msg->accept_totalcount = 0;
+    msg->accept_max_lts = default_pair;
     return msg;
 }
 
