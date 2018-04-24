@@ -115,7 +115,7 @@ int main(int argc, char *argv[]) {
 		}
 	    },
 	};
-	for(int j=0; j<1; j++) {
+	for(int j=0; j<50; j++) {
             env.cmd.multicast.mid = j;
 	    for(int i=0; i<2; i++) {
                 xid_t peer_id = i*3;
