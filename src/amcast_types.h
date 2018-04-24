@@ -24,6 +24,7 @@ typedef struct payload {
 typedef struct message {
     m_uid_t 		mid;
     unsigned int 	destgrps_count;
+    //TODO Change that fixed size array
     xid_t 		destgrps[10];
     struct payload	value;
 } message_t;
