@@ -36,15 +36,9 @@ static void handle_multicast(struct node *node, xid_t sid, message_t *cmd) {
     printf("[%u] {%u} We got MULTICAST command from %u!\n", node->id, cmd->mid, sid);
     if (node->amcast->status == LEADER) {
 	if(node->amcast->msgs_count == 0 || node->amcast->msgs_count == cmd->mid) {
-	//if(!node->amcast->msgs+cmd->mid) {
             node->amcast->msgs_count++;
             node->amcast->msgs = realloc(node->amcast->msgs,
                             sizeof(struct amcast_msg *) * node->amcast->msgs_count);
-	    //TODO Have a proper group structure to avoid manually counting groups
-	    int groups_count = 0;
-	    for(int i=0; i<node->comm->cluster_size; i++)
-                if (node->comm->groups[i] >= groups_count)
-                    groups_count++;
             node->amcast->msgs[cmd->mid] = init_amcast_msg(node->groups, cmd);
 	}
         if(node->amcast->msgs[cmd->mid]->phase == START) {
@@ -72,15 +66,9 @@ static void handle_multicast(struct node *node, xid_t sid, message_t *cmd) {
 static void handle_accept(struct node *node, xid_t sid, accept_t *cmd) {
     printf("[%u] {%u} We got ACCEPT command from %u!\n", node->id, cmd->mid, sid);
     if(node->amcast->msgs_count == 0 || node->amcast->msgs_count == cmd->mid) {
-    //if(!node->amcast->msgs+cmd->mid) {
         node->amcast->msgs_count++;
         node->amcast->msgs = realloc(node->amcast->msgs,
                         sizeof(struct amcast_msg *) * node->amcast->msgs_count);
-	//TODO Have a proper group structure to avoid manually counting groups
-	int groups_count = 0;
-	for(int i=0; i<node->comm->cluster_size; i++)
-            if (node->comm->groups[i] >= groups_count)
-                groups_count++;
         node->amcast->msgs[cmd->mid] = init_amcast_msg(node->groups, &cmd->msg);
     }
     if ((node->amcast->status == LEADER || node->amcast->status == FOLLOWER)
