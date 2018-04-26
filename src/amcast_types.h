@@ -15,6 +15,9 @@ struct pair {
 typedef struct pair p_uid_t;
 typedef struct pair g_uid_t;
 
+//OPERATIONS
+int paircmp(struct pair *p1, struct pair *p2);
+
 //CLIENT_CMD_TYPES
 typedef struct payload {
     unsigned int	len;
