@@ -38,6 +38,7 @@ struct amcast {
     p_uid_t aballot;
     clk_t clock;
     uint32_t msgs_count;
+    uint32_t msgs_size;
     struct amcast_msg **msgs;
     //EXTRA FIELDS (NOT IN SPEC)
     pqueue_t *committed_gts;
