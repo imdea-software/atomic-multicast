@@ -60,6 +60,7 @@ pq_val_t *pqueue_pop(pqueue_t *pq) {
     if(!g_tree_remove(pq->tree, pq->lowest_pri))
         min = NULL;
     if(min != NULL) {
+        pq->size -= 1;
         //Because it iterates in order, it stops after the first iteration
         g_tree_foreach(pq->tree, (GTraverseFunc) update_min, (void*) pq);
     }
