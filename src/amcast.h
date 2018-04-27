@@ -7,6 +7,8 @@
 #include "message.h"
 #include "pqueue.h"
 
+#define MSGS_DEFAULT_SIZE 100
+
 
 struct amcast_msg_proposal {
     p_uid_t ballot;

@@ -305,7 +305,8 @@ struct amcast *amcast_init() {
     amcast->aballot = default_pair;
     amcast->clock = 0;
     amcast->msgs_count = 0;
-    amcast->msgs = NULL;
+    amcast->msgs_size = MSGS_DEFAULT_SIZE;
+    amcast->msgs = malloc(sizeof(struct amcast_msg *) * MSGS_DEFAULT_SIZE);
     //EXTRA FIELDS (NOT IN SPEC)
     amcast->committed_gts = pqueue_init((pq_pricmp_fun) paircmp);
     amcast->pending_lts = pqueue_init((pq_pricmp_fun) paircmp);
