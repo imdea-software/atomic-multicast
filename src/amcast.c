@@ -300,6 +300,7 @@ struct amcast *amcast_init() {
     amcast->msgs = NULL;
     //EXTRA FIELDS (NOT IN SPEC)
     amcast->committed_gts = pqueue_init((pq_pricmp_fun) paircmp);
+    amcast->pending_lts = pqueue_init((pq_pricmp_fun) paircmp);
     return amcast;
 }
 
@@ -320,6 +321,7 @@ static int free_amcast_msg(struct amcast_msg *msg) {
 
 int amcast_free(struct amcast *amcast) {
     pqueue_free(amcast->committed_gts);
+    pqueue_free(amcast->pending_lts);
     for(struct amcast_msg **msg = amcast->msgs; msg < amcast->msgs + amcast->msgs_count; msg++)
         if(*msg)
             free_amcast_msg(*msg);
