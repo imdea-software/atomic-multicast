@@ -41,6 +41,7 @@ struct amcast {
     struct amcast_msg **msgs;
     //EXTRA FIELDS (NOT IN SPEC)
     pqueue_t *committed_gts;
+    pqueue_t *pending_lts;
 };
 
 struct amcast *amcast_init();
