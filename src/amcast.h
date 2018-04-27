@@ -5,6 +5,7 @@
 #include "node.h"
 #include "amcast_types.h"
 #include "message.h"
+#include "pqueue.h"
 
 
 struct amcast_msg_proposal {
@@ -38,6 +39,8 @@ struct amcast {
     clk_t clock;
     uint32_t msgs_count;
     struct amcast_msg **msgs;
+    //EXTRA FIELDS (NOT IN SPEC)
+    pqueue_t *committed_gts;
 };
 
 struct amcast *amcast_init();
