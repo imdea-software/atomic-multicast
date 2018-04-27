@@ -48,6 +48,7 @@ static void handle_multicast(struct node *node, xid_t sid, message_t *cmd) {
 	    //TODO Properly implement the uid_t type (only a placeholder now)
             node->amcast->msgs[cmd->mid]->lts.time = node->amcast->clock;
             node->amcast->msgs[cmd->mid]->lts.id = node->comm->groups[node->id];
+            pqueue_push(node->amcast->pending_lts, &cmd->mid, &node->amcast->msgs[cmd->mid]->lts);
         }
         struct enveloppe rep = {
 	    .sid = node->id,
@@ -97,6 +98,12 @@ static void handle_accept(struct node *node, xid_t sid, accept_t *cmd) {
 	    return;
         if(node->amcast->msgs[cmd->mid]->phase != COMMITTED) {
             node->amcast->msgs[cmd->mid]->phase = ACCEPTED;
+            if(node->amcast->status == LEADER && paircmp(&node->amcast->msgs[cmd->mid]->lts,
+                       &node->amcast->msgs[cmd->mid]->proposals[node->comm->groups[node->id]]->lts) != 0) {
+                pqueue_remove(node->amcast->pending_lts, &node->amcast->msgs[cmd->mid]->lts);
+                pqueue_push(node->amcast->pending_lts, &cmd->mid,
+				&node->amcast->msgs[cmd->mid]->proposals[node->comm->groups[node->id]]->lts);
+            }
             node->amcast->msgs[cmd->mid]->lts =
 		    node->amcast->msgs[cmd->mid]->proposals[node->comm->groups[node->id]]->lts;
             node->amcast->msgs[cmd->mid]->gts = node->amcast->msgs[cmd->mid]->accept_max_lts;
@@ -150,6 +157,7 @@ static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
 			node->amcast->msgs[cmd->mid]->msg.destgrps_count)
             return;
         node->amcast->msgs[cmd->mid]->phase = COMMITTED;
+        pqueue_remove(node->amcast->pending_lts, &node->amcast->msgs[cmd->mid]->lts);
         pqueue_push(node->amcast->committed_gts, &cmd->mid, &node->amcast->msgs[cmd->mid]->gts);
 	//TODO A lot of possible improvements in the delivery pattern
         int try_next = 1;
@@ -162,9 +170,9 @@ static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
             }
             if(node->amcast->msgs[*i]->phase == COMMITTED
                && node->amcast->msgs[*i]->delivered == FALSE) {
-	        for(int j=0; j<node->amcast->msgs_count; j++) {
-                    if(paircmp(&node->amcast->msgs[j]->lts, &node->amcast->msgs[*i]->gts) < 0
-                       && node->amcast->msgs[j]->phase != COMMITTED)
+                m_uid_t *j = pqueue_peek(node->amcast->pending_lts);
+                if(j != NULL && paircmp(&node->amcast->msgs[*j]->lts, &node->amcast->msgs[*i]->gts) < 0
+                             && node->amcast->msgs[*j]->phase != COMMITTED) {
                     return;
                 }
                 if((i = pqueue_pop(node->amcast->committed_gts)) == NULL) {
