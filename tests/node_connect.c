@@ -22,7 +22,7 @@ struct node *nodes[NUMBER_OF_NODES];
 int status[NUMBER_OF_NODES];
 
 struct arg {
-    id_t id;
+    xid_t id;
     struct cluster_config *conf;
     pthread_barrier_t *barrier;
 };
@@ -34,7 +34,7 @@ struct arg {
 //      and instead send a signal to the process to stop the main event loop
 //TODO ReWrite using processes (fork) instead of threads (pthread)
 void* node_create_run(void* arg) {
-    id_t id = ((struct arg *) arg)->id;
+    xid_t id = ((struct arg *) arg)->id;
     struct cluster_config *conf = ((struct arg *) arg)->conf;
     pthread_barrier_t *pth_barrier = ((struct arg *) arg)->barrier;
 
@@ -106,7 +106,7 @@ int main(int argc, char *argv[]) {
 
     //Let's terminate some random nodes
     for(int i=0; i<NUMBER_OF_FAILURES; ) {
-	id_t id = rand() % NUMBER_OF_NODES;
+	xid_t id = rand() % NUMBER_OF_NODES;
 	if(status[id] != 0) {
             printf("Closing node %u\n", id);
             node_stop(nodes[id]);

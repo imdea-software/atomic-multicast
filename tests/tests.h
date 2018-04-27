@@ -11,13 +11,13 @@
 
 struct cluster_config conf;
 
-id_t ids[NUMBER_OF_NODES] = CLUSTER_ID;
-id_t group_memberships[NUMBER_OF_NODES] = CLUSTER_GRP;
+xid_t ids[NUMBER_OF_NODES] = CLUSTER_ID;
+xid_t group_memberships[NUMBER_OF_NODES] = CLUSTER_GRP;
 address_t addresses[NUMBER_OF_NODES] = CLUSTER_ADDR;
 port_t ports[NUMBER_OF_NODES] = CLUSTER_PORTS;
 
 void fill_cluster_config(struct cluster_config *conf, int size, int groups_count,
-		id_t *ids, id_t *group_membership, address_t *addresses, port_t *ports) {
+		xid_t *ids, xid_t *group_membership, address_t *addresses, port_t *ports) {
     conf->size = size;
     conf->groups_count = groups_count;
     conf->id = ids;

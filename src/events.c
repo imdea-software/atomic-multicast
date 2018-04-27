@@ -7,13 +7,13 @@
 
 static struct timeval reconnect_timeout = { 1, 0 };
 
-struct cb_arg *set_cb_arg(id_t peer_id, struct node *node) {
+struct cb_arg *set_cb_arg(xid_t peer_id, struct node *node) {
     struct cb_arg *arg = malloc(sizeof(struct cb_arg));
     arg->peer_id = peer_id;
     arg->node = node;
     return arg;
 }
-int retrieve_cb_arg(id_t *peer_id, struct node **node, struct cb_arg *arg) {
+int retrieve_cb_arg(xid_t *peer_id, struct node **node, struct cb_arg *arg) {
     *peer_id = arg->peer_id;
     *node = arg->node;
     //TODO Change this broken design: either store all the cb_arg struct and
@@ -23,14 +23,14 @@ int retrieve_cb_arg(id_t *peer_id, struct node **node, struct cb_arg *arg) {
     return 0;
 }
 
-int connect_to_node(struct node *node, id_t peer_id) {
+int connect_to_node(struct node *node, xid_t peer_id) {
     event_add(node->events->reconnect_evs[peer_id], &reconnect_timeout);
     return 0;
 }
 
 // STATIC FUNCTIONS
 
-static int init_connection(struct node *node, id_t peer_id) {
+static int init_connection(struct node *node, xid_t peer_id) {
     //Create a new bufferevent
     node->comm->bevs[peer_id] = bufferevent_socket_new(node->events->base,
 		   -1, BEV_OPT_CLOSE_ON_FREE);
@@ -42,7 +42,7 @@ static int init_connection(struct node *node, id_t peer_id) {
     return 0;
 }
 
-static int close_connection(struct node *node, id_t peer_id) {
+static int close_connection(struct node *node, xid_t peer_id) {
     bufferevent_free(node->comm->bevs[peer_id]);
     node->comm->bevs[peer_id] = NULL;
     return 0;
@@ -51,7 +51,7 @@ static int close_connection(struct node *node, id_t peer_id) {
 //Called when the status of a connection changes
 //TODO Find something useful to do in there
 static void event_a_cb(struct bufferevent *bev, short events, void *ptr) {
-    struct node *node = NULL; id_t a_id;
+    struct node *node = NULL; xid_t a_id;
     retrieve_cb_arg(&a_id, &node, (struct cb_arg *) ptr);
 
     if (events & (BEV_EVENT_EOF|BEV_EVENT_ERROR)) {
@@ -107,7 +107,7 @@ void accept_error_cb(struct evconnlistener *lev, void *ptr) {
 
 //Called whenever data gets into the bufferevents
 void read_cb(struct bufferevent *bev, void *ptr) {
-    struct node *node = NULL; id_t peer_id;
+    struct node *node = NULL; xid_t peer_id;
     retrieve_cb_arg(&peer_id, &node, (struct cb_arg *) ptr);
     //TODO Change read_enveloppe() implem so that looping over it
     //     doesn't cause bufferevent_read() to be called several times
@@ -116,14 +116,15 @@ void read_cb(struct bufferevent *bev, void *ptr) {
         struct enveloppe env;
         read_enveloppe(bev, &env);
         //TODO Have a dedicated cmd_type for receive tests
-        write_enveloppe(bev, &env);
+        if(env.cmd_type == MULTICAST)
+            write_enveloppe(bev, &env);
         dispatch_message(node, &env);
     }
 }
 
 //Called when the status of a connection changes
 void event_cb(struct bufferevent *bev, short events, void *ptr) {
-    struct node *node = NULL; id_t peer_id;
+    struct node *node = NULL; xid_t peer_id;
     retrieve_cb_arg(&peer_id, &node, (struct cb_arg *) ptr);
 
     if (events & BEV_EVENT_CONNECTED) {
@@ -141,7 +142,7 @@ void event_cb(struct bufferevent *bev, short events, void *ptr) {
 }
 
 void reconnect_cb(evutil_socket_t sock, short flags, void *ptr) {
-    struct node *node = NULL; id_t peer_id;
+    struct node *node = NULL; xid_t peer_id;
     retrieve_cb_arg(&peer_id, &node, (struct cb_arg *) ptr);
 
     init_connection(node, peer_id);
