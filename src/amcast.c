@@ -36,12 +36,15 @@ static struct amcast_msg *init_amcast_msg(struct groups *groups, message_t *cmd)
 static void handle_multicast(struct node *node, xid_t sid, message_t *cmd) {
     printf("[%u] {%u} We got MULTICAST command from %u!\n", node->id, cmd->mid, sid);
     if (node->amcast->status == LEADER) {
-	if(node->amcast->msgs_count == 0 || node->amcast->msgs_count == cmd->mid) {
-            node->amcast->msgs_count++;
+        if(node->amcast->msgs_count >= node->amcast->msgs_size) {
+            node->amcast->msgs_size *= 2;
             node->amcast->msgs = realloc(node->amcast->msgs,
-                            sizeof(struct amcast_msg *) * node->amcast->msgs_count);
+                            sizeof(struct amcast_msg *) * node->amcast->msgs_size);
+        }
+        if(cmd->mid >= node->amcast->msgs_count) {
+            node->amcast->msgs_count++;
             node->amcast->msgs[cmd->mid] = init_amcast_msg(node->groups, cmd);
-	}
+        }
         if(node->amcast->msgs[cmd->mid]->phase == START) {
             node->amcast->msgs[cmd->mid]->phase = PROPOSED;
             node->amcast->clock++;
@@ -67,10 +70,13 @@ static void handle_multicast(struct node *node, xid_t sid, message_t *cmd) {
 
 static void handle_accept(struct node *node, xid_t sid, accept_t *cmd) {
     printf("[%u] {%u} We got ACCEPT command from %u!\n", node->id, cmd->mid, sid);
-    if(node->amcast->msgs_count == 0 || node->amcast->msgs_count == cmd->mid) {
-        node->amcast->msgs_count++;
+    if(node->amcast->msgs_count >= node->amcast->msgs_size) {
+        node->amcast->msgs_size *= 2;
         node->amcast->msgs = realloc(node->amcast->msgs,
-                        sizeof(struct amcast_msg *) * node->amcast->msgs_count);
+                        sizeof(struct amcast_msg *) * node->amcast->msgs_size);
+    }
+    if(cmd->mid >= node->amcast->msgs_count) {
+        node->amcast->msgs_count++;
         node->amcast->msgs[cmd->mid] = init_amcast_msg(node->groups, &cmd->msg);
     }
     if ((node->amcast->status == LEADER || node->amcast->status == FOLLOWER)
