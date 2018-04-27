@@ -150,37 +150,16 @@ static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
 			node->amcast->msgs[cmd->mid]->msg.destgrps_count)
             return;
         node->amcast->msgs[cmd->mid]->phase = COMMITTED;
-	//TODO Do not rebuild on every call the gts-ordered set of messages
-	//This really is INEFFICIENT
-	int gts_order[node->amcast->msgs_count];
-	for(int i=0; i<node->amcast->msgs_count; i++)
-            gts_order[i] = -1;
-	for(int i=0; i<node->amcast->msgs_count; i++) {
-            int lowest = i;
-            for(int j=i; j<node->amcast->msgs_count; j++) {
-		    /*
-                if(!node->amcast->msgs+j) {
-                    printf("[%u] Message at index %u does not exists, "
-				    "only %u were received "
-				    "and current mid is: %u\n",
-				    node->id, j, node->amcast->msgs_count,
-				    //node->amcast->msgs[node->amcast->msgs_count - 1]->msg.mid);
-				    cmd->mid);
-		    return;
-                }
-		*/
-                if(paircmp(&node->amcast->msgs[j]->gts,
-				&node->amcast->msgs[lowest]->gts) <= 0) {
-                    for(int k=0; k<node->amcast->msgs_count; k++) {
-                        if(gts_order[k] != j)
-                            lowest = j;
-                    }
-                }
-	    }
-	    gts_order[i] = lowest;
-        }
+        pqueue_push(node->amcast->committed_gts, &cmd->mid, &node->amcast->msgs[cmd->mid]->gts);
 	//TODO A lot of possible improvements in the delivery pattern
-	for(int *i = gts_order; i<gts_order + node->amcast->msgs_count; i++) {
+        int try_next = 1;
+        while(try_next) {
+            try_next = 0;
+            m_uid_t *i;
+            if((i = pqueue_peek(node->amcast->committed_gts)) == NULL) {
+                printf("Failed to peek - %u\n", pqueue_size(node->amcast->committed_gts));
+                return;
+            }
             if(node->amcast->msgs[*i]->phase == COMMITTED
                && node->amcast->msgs[*i]->delivered == FALSE) {
 	        for(int j=0; j<node->amcast->msgs_count; j++) {
@@ -188,6 +167,11 @@ static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
                        && node->amcast->msgs[j]->phase != COMMITTED)
                     return;
                 }
+                if((i = pqueue_pop(node->amcast->committed_gts)) == NULL) {
+		    printf("Failed to pop - %u\n", pqueue_size(node->amcast->committed_gts));
+                    return;
+                }
+                try_next = 1;
                 node->amcast->msgs[*i]->delivered = TRUE;
                 //TODO Invok some deliver callback
                 struct enveloppe rep = {
