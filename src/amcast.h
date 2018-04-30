@@ -22,7 +22,8 @@ struct amcast_msg_proposal {
 
 struct amcast_msg {
     phase_t phase;
-    g_uid_t lts;
+    p_uid_t *lballot;
+    g_uid_t *lts;
     g_uid_t gts;
     enum { TRUE, FALSE } delivered;
     uint32_t proposals_count;
@@ -30,8 +31,13 @@ struct amcast_msg {
     struct amcast_msg_proposal **proposals;
     //EXTRA FIELDS (NOT IN SPEC)
     unsigned int accept_totalcount;
-    unsigned int accept_ack_totalcount;
     g_uid_t accept_max_lts;
+    //EXTRA FIELDS - ACCEPT_ACK COUNTERS
+    unsigned int groups_count;
+    unsigned int accept_ack_totalcount;
+    unsigned int *accept_ack_groupready;
+    unsigned int *accept_ack_groupcount;
+    unsigned int *accept_ack_counts;
 };
 
 struct amcast {
