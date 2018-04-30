@@ -91,6 +91,7 @@ static void handle_accept(struct node *node, xid_t sid, accept_t *cmd) {
                 node->amcast->msgs[cmd->mid]->accept_max_lts = cmd->lts;
 	}
         if(node->amcast->status == LEADER
+                   && cmd->grp == node->comm->groups[node->id]
                    && paircmp(&node->amcast->msgs[cmd->mid]->lts[node->comm->groups[node->id]],
                               &cmd->lts) < 0) {
             pqueue_remove(node->amcast->pending_lts,
