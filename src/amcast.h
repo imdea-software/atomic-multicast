@@ -10,28 +10,22 @@
 #define MSGS_DEFAULT_SIZE 100
 
 
-struct amcast_msg_proposal {
-    p_uid_t ballot;
-    enum { UNDEF, RECEIVED, CONFIRMED } status;
-    g_uid_t lts;
-    //EXTRA FIELDS (NOT IN SPEC)
-    unsigned int accept_ack_groupcount;
-    unsigned int accept_ack_counts_size;
-    unsigned int *accept_ack_counts;
-};
-
 struct amcast_msg {
     phase_t phase;
-    g_uid_t lts;
+    p_uid_t *lballot;
+    g_uid_t *lts;
     g_uid_t gts;
     enum { TRUE, FALSE } delivered;
-    uint32_t proposals_count;
     message_t msg;
-    struct amcast_msg_proposal **proposals;
-    //EXTRA FIELDS (NOT IN SPEC)
+    //EXTRA FIELDS - ACCEPT COUNTERS
     unsigned int accept_totalcount;
-    unsigned int accept_ack_totalcount;
     g_uid_t accept_max_lts;
+    //EXTRA FIELDS - ACCEPT_ACK COUNTERS
+    unsigned int groups_count;
+    unsigned int accept_ack_totalcount;
+    unsigned int *accept_ack_groupready;
+    unsigned int *accept_ack_groupcount;
+    unsigned int *accept_ack_counts;
 };
 
 struct amcast {

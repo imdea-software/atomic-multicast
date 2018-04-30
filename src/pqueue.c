@@ -52,7 +52,7 @@ int pqueue_remove(pqueue_t *pq, pq_pri_t *pri) {
 }
 
 pq_val_t *pqueue_peek(pqueue_t *pq) {
-    return g_tree_lookup(pq->tree, pq->lowest_pri);
+    return (pq->lowest_pri != NULL) ? g_tree_lookup(pq->tree, pq->lowest_pri) : NULL;
 }
 
 pq_val_t *pqueue_pop(pqueue_t *pq) {
@@ -61,8 +61,12 @@ pq_val_t *pqueue_pop(pqueue_t *pq) {
         min = NULL;
     if(min != NULL) {
         pq->size -= 1;
+        if(pq->size == 0) {
+            pq->lowest_pri = NULL;
+        } else {
         //Because it iterates in order, it stops after the first iteration
-        g_tree_foreach(pq->tree, (GTraverseFunc) update_min, (void*) pq);
+            g_tree_foreach(pq->tree, (GTraverseFunc) update_min, (void*) pq);
+        }
     }
     return min;
 }
