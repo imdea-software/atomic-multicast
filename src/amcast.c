@@ -117,10 +117,11 @@ static void handle_accept(struct node *node, xid_t sid, accept_t *cmd) {
 	    .cmd.accept_ack = {
 	        .mid = cmd->mid,
 		.grp = node->comm->groups[node->id],
-		.ballot = node->amcast->ballot,
 		.gts = node->amcast->msgs[cmd->mid]->gts
 	    },
 	};
+	memcpy(rep.cmd.accept_ack.ballot, node->amcast->msgs[cmd->mid]->lballot,
+			sizeof(p_uid_t) * node->groups->groups_count);
         //send_to_destgrps(node, &rep, node->amcast->msgs[cmd->mid]->msg.destgrps,
         //                 node->amcast->msgs[cmd->mid]->msg.destgrps_count);
         send_to_peer(node, &rep, 0);

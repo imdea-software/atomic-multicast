@@ -46,7 +46,7 @@ typedef struct accept {
 typedef struct accept_ack {
     m_uid_t 		mid;
     xid_t		grp;
-    p_uid_t		ballot;
+    p_uid_t		ballot[MAX_NUMBER_OF_GROUPS];
     g_uid_t		gts;
 } accept_ack_t;
 
