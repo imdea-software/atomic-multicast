@@ -159,9 +159,10 @@ static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
         if(node->amcast->msgs[cmd->mid]->accept_ack_totalcount !=
 			node->amcast->msgs[cmd->mid]->msg.destgrps_count)
             return;
+            pqueue_remove(node->amcast->pending_lts,
+                          &node->amcast->msgs[cmd->mid]->lts[node->comm->groups[node->id]]);
+            pqueue_push(node->amcast->committed_gts, &cmd->mid, &node->amcast->msgs[cmd->mid]->gts);
         node->amcast->msgs[cmd->mid]->phase = COMMITTED;
-        pqueue_remove(node->amcast->pending_lts, &node->amcast->msgs[cmd->mid]->lts);
-        pqueue_push(node->amcast->committed_gts, &cmd->mid, &node->amcast->msgs[cmd->mid]->gts);
 	//TODO A lot of possible improvements in the delivery pattern
         int try_next = 1;
         while(try_next) {
