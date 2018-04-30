@@ -97,16 +97,17 @@ static void handle_accept(struct node *node, xid_t sid, accept_t *cmd) {
             if(paircmp(&node->amcast->msgs[cmd->mid]->accept_max_lts, &cmd->lts) < 0)
                 node->amcast->msgs[cmd->mid]->accept_max_lts = cmd->lts;
 	}
+        if(node->amcast->status == LEADER
+                   && paircmp(&node->amcast->msgs[cmd->mid]->lts[node->comm->groups[node->id]],
+                              &cmd->lts) < 0) {
+            pqueue_remove(node->amcast->pending_lts,
+                   &node->amcast->msgs[cmd->mid]->lts[node->comm->groups[node->id]]);
+            pqueue_push(node->amcast->pending_lts, &cmd->mid, &cmd->lts);
+        }
 	node->amcast->msgs[cmd->mid]->lballot[cmd->grp] = cmd->ballot;
 	node->amcast->msgs[cmd->mid]->lts[cmd->grp] = cmd->lts;
         if(node->amcast->msgs[cmd->mid]->accept_totalcount != node->amcast->msgs[cmd->mid]->msg.destgrps_count)
 	    return;
-            if(node->amcast->status == LEADER && paircmp(&node->amcast->msgs[cmd->mid]->lts,
-                       &node->amcast->msgs[cmd->mid]->proposals[node->comm->groups[node->id]]->lts) != 0) {
-                pqueue_remove(node->amcast->pending_lts, &node->amcast->msgs[cmd->mid]->lts);
-                pqueue_push(node->amcast->pending_lts, &cmd->mid,
-				&node->amcast->msgs[cmd->mid]->proposals[node->comm->groups[node->id]]->lts);
-            }
         node->amcast->msgs[cmd->mid]->phase = ACCEPTED;
         node->amcast->msgs[cmd->mid]->gts = node->amcast->msgs[cmd->mid]->accept_max_lts;
         if(node->amcast->clock < node->amcast->msgs[cmd->mid]->gts.time)
