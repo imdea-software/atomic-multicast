@@ -52,7 +52,7 @@ int pqueue_remove(pqueue_t *pq, pq_pri_t *pri) {
 }
 
 pq_val_t *pqueue_peek(pqueue_t *pq) {
-    return g_tree_lookup(pq->tree, pq->lowest_pri);
+    return (pq->lowest_pri != NULL) ? g_tree_lookup(pq->tree, pq->lowest_pri) : NULL;
 }
 
 pq_val_t *pqueue_pop(pqueue_t *pq) {
