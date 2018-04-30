@@ -5,6 +5,8 @@
 
 #include "types.h"
 
+#define MAX_NUMBER_OF_GROUPS 10
+
 //DATATYPES
 typedef enum { START, PROPOSED, ACCEPTED, COMMITTED } phase_t;
 typedef unsigned int clk_t;
@@ -28,7 +30,7 @@ typedef struct message {
     m_uid_t 		mid;
     unsigned int 	destgrps_count;
     //TODO Change that fixed size array
-    xid_t 		destgrps[10];
+    xid_t 		destgrps[MAX_NUMBER_OF_GROUPS];
     struct payload	value;
 } message_t;
 
