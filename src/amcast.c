@@ -161,7 +161,7 @@ static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
         node->amcast->msgs[cmd->mid]->phase = COMMITTED;
 	//TODO A lot of possible improvements in the delivery pattern
         int try_next = 1;
-        while(try_next) {
+        while(try_next && pqueue_size(node->amcast->committed_gts) > 0) {
             try_next = 0;
             m_uid_t *i;
             if((i = pqueue_peek(node->amcast->committed_gts)) == NULL) {
