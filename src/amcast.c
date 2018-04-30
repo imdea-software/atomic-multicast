@@ -273,19 +273,6 @@ void dispatch_amcast_command(struct node *node, struct enveloppe *env) {
     }
 }
 
-static struct amcast_msg_proposal *init_amcast_msg_proposal(unsigned int nodes_count) {
-    struct amcast_msg_proposal *prop = malloc(sizeof(struct amcast_msg_proposal));
-    prop->ballot = default_pair;
-    prop->status = UNDEF;
-    prop->lts = default_pair;
-    //EXTRA FIELDS (NOT IN SPEC)
-    prop->accept_ack_groupcount = 0;
-    prop->accept_ack_counts_size = nodes_count;
-    prop->accept_ack_counts = malloc(sizeof(unsigned int) * nodes_count);
-    memset(prop->accept_ack_counts, 0, sizeof(unsigned int) * nodes_count);
-    return prop;
-}
-
 static struct amcast_msg *init_amcast_msg(struct groups *groups, unsigned int cluster_size, message_t *cmd) {
     struct amcast_msg *msg = malloc(sizeof(struct amcast_msg));
     msg->phase = START;
@@ -294,11 +281,7 @@ static struct amcast_msg *init_amcast_msg(struct groups *groups, unsigned int cl
     msg->gts = default_pair;
     msg->delivered = FALSE;
     msg->msg = *cmd;
-    msg->proposals_count = groups->groups_count;
-    msg->proposals = malloc(sizeof(struct amcast_msg_proposals *) * groups->groups_count);
-    for(int i=0; i<groups->groups_count; i++)
-        msg->proposals[i] = init_amcast_msg_proposal(groups->node_counts[i]);
-    //EXTRA FIELDS (NOT IN SPEC)
+    //EXTRA FIELDS - ACCEPT COUNTERS
     msg->accept_totalcount = 0;
     msg->accept_max_lts = default_pair;
     //EXTRA FIELDS - ACCEPT_ACK COUNTERS
@@ -333,17 +316,7 @@ struct amcast *amcast_init() {
     return amcast;
 }
 
-static int free_amcast_msg_proposal(struct amcast_msg_proposal *prop) {
-    free(prop->accept_ack_counts);
-    free(prop);
-    return 0;
-}
-
 static int free_amcast_msg(struct amcast_msg *msg) {
-    struct amcast_msg_proposal **prop;
-    for(prop = msg->proposals; prop < msg->proposals + msg->proposals_count; prop++)
-        if(*prop)
-            free_amcast_msg_proposal(*prop);
     free(msg->lballot);
     free(msg->lts);
     free(msg->accept_ack_groupready);
