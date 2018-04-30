@@ -83,13 +83,6 @@ static void handle_accept(struct node *node, xid_t sid, accept_t *cmd) {
             && paircmp(&node->amcast->msgs[cmd->mid]->lballot[cmd->grp], &cmd->ballot) <= 0
             && !( cmd->grp == node->comm->groups[node->id]
                   && !(paircmp(&node->amcast->ballot, &cmd->ballot) == 0) )) {
-        if (node->amcast->msgs[cmd->mid]->proposals[cmd->grp]->status != UNDEF) {
-	    for(xid_t *grp = node->amcast->msgs[cmd->mid]->msg.destgrps;
-                grp < node->amcast->msgs[cmd->mid]->msg.destgrps + node->amcast->msgs[cmd->mid]->msg.destgrps_count;
-		grp++)
-                if(node->amcast->msgs[cmd->mid]->proposals[*grp]->status == CONFIRMED)
-                    node->amcast->msgs[cmd->mid]->proposals[*grp]->status = RECEIVED;
-        }
 	//TODO Carefully try to see when it's the best time to reset this counter
 	//     Probably upon a leader change
 	if (paircmp(&node->amcast->msgs[cmd->mid]->lballot[cmd->grp], &default_pair) == 0) {
