@@ -31,7 +31,7 @@ struct pair default_pair = { .time = 0, .id = -1};
 //         e.g. properly defined macros could help,
 //         or sub-functions using only the useful structure fields passed as arguments
 
-static struct amcast_msg *init_amcast_msg(struct groups *groups, message_t *cmd);
+static struct amcast_msg *init_amcast_msg(struct groups *groups, unsigned int cluster_size, message_t *cmd);
 
 static void handle_multicast(struct node *node, xid_t sid, message_t *cmd) {
     printf("[%u] {%u} We got MULTICAST command from %u!\n", node->id, cmd->mid, sid);
@@ -43,7 +43,7 @@ static void handle_multicast(struct node *node, xid_t sid, message_t *cmd) {
         }
         if(cmd->mid >= node->amcast->msgs_count) {
             node->amcast->msgs_count++;
-            node->amcast->msgs[cmd->mid] = init_amcast_msg(node->groups, cmd);
+            node->amcast->msgs[cmd->mid] = init_amcast_msg(node->groups, node->comm->cluster_size, cmd);
         }
         if(node->amcast->msgs[cmd->mid]->phase == START) {
             node->amcast->msgs[cmd->mid]->phase = PROPOSED;
@@ -77,7 +77,7 @@ static void handle_accept(struct node *node, xid_t sid, accept_t *cmd) {
     }
     if(cmd->mid >= node->amcast->msgs_count) {
         node->amcast->msgs_count++;
-        node->amcast->msgs[cmd->mid] = init_amcast_msg(node->groups, &cmd->msg);
+        node->amcast->msgs[cmd->mid] = init_amcast_msg(node->groups, node->comm->cluster_size, &cmd->msg);
     }
     if ((node->amcast->status == LEADER || node->amcast->status == FOLLOWER)
             && paircmp(&node->amcast->msgs[cmd->mid]->proposals[cmd->grp]->ballot, &cmd->ballot) <= 0
@@ -286,10 +286,11 @@ static struct amcast_msg_proposal *init_amcast_msg_proposal(unsigned int nodes_c
     return prop;
 }
 
-static struct amcast_msg *init_amcast_msg(struct groups *groups, message_t *cmd) {
+static struct amcast_msg *init_amcast_msg(struct groups *groups, unsigned int cluster_size, message_t *cmd) {
     struct amcast_msg *msg = malloc(sizeof(struct amcast_msg));
     msg->phase = START;
-    msg->lts = default_pair;
+    msg->lballot = malloc(sizeof(struct pair) * groups->groups_count);
+    msg->lts = malloc(sizeof(struct pair) * groups->groups_count);
     msg->gts = default_pair;
     msg->delivered = FALSE;
     msg->msg = *cmd;
@@ -299,8 +300,21 @@ static struct amcast_msg *init_amcast_msg(struct groups *groups, message_t *cmd)
         msg->proposals[i] = init_amcast_msg_proposal(groups->node_counts[i]);
     //EXTRA FIELDS (NOT IN SPEC)
     msg->accept_totalcount = 0;
-    msg->accept_ack_totalcount = 0;
     msg->accept_max_lts = default_pair;
+    //EXTRA FIELDS - ACCEPT_ACK COUNTERS
+    msg->groups_count = groups->groups_count;
+    msg->accept_ack_totalcount = 0;
+    msg->accept_ack_groupready = malloc(sizeof(unsigned int) * groups->groups_count);
+    msg->accept_ack_groupcount = malloc(sizeof(unsigned int) * groups->groups_count);
+    msg->accept_ack_counts = malloc(sizeof(unsigned int) * cluster_size);
+    //Init the several arrays
+    memset(msg->accept_ack_counts, 0, sizeof(unsigned int) * cluster_size);
+    for(unsigned int *i = groups->node_counts; i<groups->node_counts + groups->groups_count; i++) {
+        msg->lballot[i-groups->node_counts] = default_pair;
+        msg->lts[i-groups->node_counts] = default_pair;
+        msg->accept_ack_groupready[i-groups->node_counts] = 0;
+        msg->accept_ack_groupcount[i-groups->node_counts] = 0;
+    }
     return msg;
 }
 
@@ -330,6 +344,11 @@ static int free_amcast_msg(struct amcast_msg *msg) {
     for(prop = msg->proposals; prop < msg->proposals + msg->proposals_count; prop++)
         if(*prop)
             free_amcast_msg_proposal(*prop);
+    free(msg->lballot);
+    free(msg->lts);
+    free(msg->accept_ack_groupready);
+    free(msg->accept_ack_groupcount);
+    free(msg->accept_ack_counts);
     free(msg);
     return 0;
 }
