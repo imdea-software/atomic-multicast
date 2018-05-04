@@ -104,13 +104,19 @@ void init_cluster_config(struct cluster_config *config, unsigned int n_nodes, un
 }
 
 int main(int argc, char *argv[]) {
-    struct cluster_config config = {0};
+    struct cluster_config config;
     xid_t node_id = -1;
 
-//TODO process CLI args here, make those switches :
-//    - node id
-//    - client or node
-//TODO read cluster config from stdin
+    //TODO Add a server/client switch
+    if(argc != 4) {
+        printf("USAGE: node-bench [node_id] [number_of_nodes] [number_of_groups]\n");
+        exit(EXIT_FAILURE);
+    }
+
+    //Init node & cluster config
+    node_id = atoi(argv[1]);
+    init_cluster_config(&config, atoi(argv[2]), atoi(argv[3]));
+    read_cluster_config_from_stdin(&config);
 
     //Let's create some child processes...
     pid_idx = -1;
