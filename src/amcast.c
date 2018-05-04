@@ -299,7 +299,7 @@ static struct amcast_msg *init_amcast_msg(struct groups *groups, unsigned int cl
     return msg;
 }
 
-struct amcast *amcast_init() {
+struct amcast *amcast_init(delivery_cb_fun delivery_cb) {
     struct amcast *amcast = malloc(sizeof(struct amcast));
     amcast->status = INIT;
     amcast->ballot = default_pair;
@@ -312,6 +312,7 @@ struct amcast *amcast_init() {
     //EXTRA FIELDS (NOT IN SPEC)
     amcast->committed_gts = pqueue_init((pq_pricmp_fun) paircmp);
     amcast->pending_lts = pqueue_init((pq_pricmp_fun) paircmp);
+    amcast->delivery_cb = delivery_cb;
     return amcast;
 }
 

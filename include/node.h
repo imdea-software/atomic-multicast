@@ -46,7 +46,7 @@ struct node {
 
 typedef void (*delivery_cb_fun)(struct node *node, m_uid_t mid);
 
-struct 	node 	*node_init	(struct cluster_config *conf, xid_t id);
+struct 	node 	*node_init	(struct cluster_config *conf, xid_t id, delivery_cb_fun delivery_cb);
 int 		node_free	(struct node *node);
 void		node_start	(struct node *node);
 void		node_stop	(struct node *node);

@@ -68,7 +68,7 @@ int main(int argc, char *argv[]) {
 
     //Let's now create the nodes
     if (id != -1) {
-        struct node *n = node_init(&conf, id);
+        struct node *n = node_init(&conf, id, NULL);
         node_start(n);
         if (n->comm->accepted_count != NUMBER_OF_NODES)
             printf("[%u] Failed to connect to the whole cluster"
