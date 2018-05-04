@@ -23,6 +23,13 @@
 xid_t id;
 pid_t pids[NUMBER_OF_NODES];
 
+//TODO Use the delivery callback to check correctness:
+//    Do local checks during protocol execution (in this callback),
+//    Then write them to parent thread,
+//    Finally do global checks
+void delivery_cb(struct node *node, m_uid_t mid) {
+}
+
 int envcmp(struct enveloppe *env1, struct enveloppe *env2) {
     int out = 0;
     if (env1->sid != env2->sid)
@@ -73,7 +80,7 @@ int main(int argc, char *argv[]) {
 
     //Let's now create the nodes
     if (id != -1) {
-        struct node *n = node_init(&conf, id);
+        struct node *n = node_init(&conf, id, delivery_cb);
 	//Let's give them some AMCAST ROLES and fake proper states
         n->amcast->status = (id == 0 || id == 3) ? LEADER : FOLLOWER;
         n->amcast->ballot.id = (id < 3) ? 0 : 3;
