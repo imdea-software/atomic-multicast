@@ -39,6 +39,7 @@ struct amcast {
     //EXTRA FIELDS (NOT IN SPEC)
     pqueue_t *committed_gts;
     pqueue_t *pending_lts;
+    delivery_cb_fun delivery_cb;
 };
 
 struct amcast *amcast_init();
