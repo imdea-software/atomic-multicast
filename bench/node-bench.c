@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 #include <signal.h>
 #include <wait.h>
@@ -10,6 +11,7 @@
 #include "node.h"
 #include "amcast.h"
 
+#define CONF_SEPARATOR "\t"
 #define NODES_PER_GROUP 3
 #define INITIAL_LEADER_IN_GROUP 0
 
@@ -46,6 +48,42 @@ void run_amcast_node(struct cluster_config *config, xid_t node_id) {
     n->amcast->ballot.id = n->comm->groups[node_id] * NODES_PER_GROUP;
     node_start(n);
     node_free(n);
+}
+
+//TODO Should find a trick to avoid the ugly conditionals
+void read_cluster_config_from_stdin(struct cluster_config *config) {
+    char *line = NULL, *token = NULL;
+    size_t len = 0;
+    ssize_t read;
+    int cur_x, cur_y = 0;
+
+    while ((read = getline(&line, &len, stdin)) != -1 && cur_y < config->size) {
+        if(line[0] == '#')
+            continue;
+        cur_x = 0;
+        while((token = strtok(line, CONF_SEPARATOR)) != NULL && cur_x < 4) {
+            line = NULL;
+            switch(cur_x) {
+                case 0:
+                    config->id[cur_y] = atoi(token);
+                    break;
+                case 1:
+                    config->group_membership[cur_y] = atoi(token);
+                    break;
+                case 2:
+                    config->addresses[cur_y] = token;
+                    break;
+                case 3:
+                    config->ports[cur_y] = atoi(token);
+                    break;
+                default:
+                    printf("Error: bad config file formatting");
+                    exit(EXIT_FAILURE);
+            }
+            cur_x++;
+        }
+        cur_y++;
+    }
 }
 
 //TODO This should be part of the lib, nothing to do here
