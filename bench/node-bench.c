@@ -48,6 +48,23 @@ void run_amcast_node(struct cluster_config *config, xid_t node_id) {
     node_free(n);
 }
 
+//TODO This should be part of the lib, nothing to do here
+void init_cluster_config(struct cluster_config *config, unsigned int n_nodes, unsigned int n_groups) {
+    config->size = n_nodes;
+    config->groups_count = n_groups;
+
+    //TODO Do not forget to free those, somewhere ...
+    xid_t *ids = malloc(sizeof(xid_t) * n_nodes);
+    xid_t *group_memberships = malloc(sizeof(xid_t) * n_nodes);
+    address_t *addresses = malloc(sizeof(address_t) * n_nodes);
+    port_t *ports = malloc(sizeof(port_t) * n_nodes);
+
+    config->id = ids;
+    config->group_membership = group_memberships;
+    config->addresses = addresses;
+    config->ports = ports;
+}
+
 int main(int argc, char *argv[]) {
     struct cluster_config config = {0};
     xid_t node_id = -1;
