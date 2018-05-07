@@ -114,6 +114,7 @@ void wait_until_all_messages_delivered() {
 //TODO Let the stats process know when a new message is delivered
 //     and maybe pass some data to it about the message through a FIFO for instance
 void delivery_cb(struct node *node, struct amcast_msg *msg) {
+    update_stats(&stats);
 }
 
 void run_amcast_node(struct cluster_config *config, xid_t node_id) {
@@ -123,6 +124,7 @@ void run_amcast_node(struct cluster_config *config, xid_t node_id) {
     n->amcast->ballot.id = n->comm->groups[node_id] * NODES_PER_GROUP;
     node_start(n);
     node_free(n);
+    report_stats(&stats);
 }
 
 void run_client_node(struct cluster_config *config, xid_t client_id) {
@@ -267,7 +269,7 @@ int main(int argc, char *argv[]) {
             break;
         //Stats process
         case 1:
-            update_stats();
+            //update_stats(&stats);
             break;
         //Parent process
         case -1:
