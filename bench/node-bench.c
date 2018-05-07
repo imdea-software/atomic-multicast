@@ -234,9 +234,9 @@ int main(int argc, char *argv[]) {
     xid_t node_id = -1;
 
     memset(&stats, 0, sizeof(struct stats));
-    //TODO Add a server/client switch
-    if(argc != 4) {
-        printf("USAGE: node-bench [node_id] [number_of_nodes] [number_of_groups]\n");
+
+    if(argc != 5) {
+        printf("USAGE: node-bench [node_id] [number_of_nodes] [number_of_groups] [isClient?]\n");
         exit(EXIT_FAILURE);
     }
 
@@ -260,7 +260,10 @@ int main(int argc, char *argv[]) {
     switch(pid_idx) {
         //Node process
         case 0:
-            run_amcast_node(&config, node_id);
+            if(!atoi(argv[4]))
+                run_amcast_node(&config, node_id);
+            if(atoi(argv[4]))
+                run_client_node(&config, -1);
             break;
         //Stats process
         case 1:
