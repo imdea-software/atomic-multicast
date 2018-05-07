@@ -31,6 +31,18 @@ static int tspcmp(struct timespec *tv1, struct timespec *tv2) {
         return 1;
     return 0;
 }
+static void tspdiff(struct timespec *end, struct timespec *start, struct timespec *diff) {
+    if(!end || !start || !diff) {
+        puts("Error: un-initialized timespec structs");
+        exit(EXIT_FAILURE);
+    }
+    diff->tv_sec = end->tv_sec - start->tv_sec;
+    diff->tv_nsec = end->tv_nsec - start->tv_nsec;
+    if(diff->tv_nsec < 0) {
+        diff->tv_sec -= 1;
+        diff->tv_nsec = 1e9 + diff->tv_nsec;
+    }
+}
 
 
 //TODO Find out whether directly computing stats
