@@ -11,6 +11,7 @@
 #include "node.h"
 #include "amcast.h"
 
+#define NUMBER_OF_CHILDREN 2
 #define CONF_SEPARATOR "\t"
 #define NODES_PER_GROUP 3
 #define INITIAL_LEADER_IN_GROUP 0
@@ -120,7 +121,7 @@ int main(int argc, char *argv[]) {
 
     //Let's create some child processes...
     pid_idx = -1;
-    for(int i=0; i<2; i++) {
+    for(int i=0; i<NUMBER_OF_CHILDREN; i++) {
         if ((pids[i] = fork()) < 0)
             error_at_line(EXIT_FAILURE, pids[i], __FILE__, __LINE__, "fctname");
         if (pids[i] == 0) {
@@ -142,12 +143,11 @@ int main(int argc, char *argv[]) {
         //Parent process
         case -1:
             wait_until_all_messages_delivered();
-
-            kill(pids[0], SIGHUP);
-            waitpid(pids[0], NULL, 0);
-
-            kill(pids[1], SIGTERM);
-            waitpid(pids[1], NULL, 0);
+            //... and kill them when they're done
+            for(pid_t *child=pids; child<pids+NUMBER_OF_CHILDREN; child++) {
+                kill(*child, SIGHUP);
+                waitpid(*child, NULL, 0);
+            }
             break;
         //Error
         default:
