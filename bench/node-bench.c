@@ -233,6 +233,7 @@ int main(int argc, char *argv[]) {
     struct cluster_config config;
     xid_t node_id = -1;
 
+    memset(&stats, 0, sizeof(struct stats));
     //TODO Add a server/client switch
     if(argc != 4) {
         printf("USAGE: node-bench [node_id] [number_of_nodes] [number_of_groups]\n");
