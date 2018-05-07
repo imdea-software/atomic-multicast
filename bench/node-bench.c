@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 #include <signal.h>
 #include <wait.h>
@@ -18,6 +19,18 @@
 
 pid_t pids[2];
 int pid_idx;
+
+static int tspcmp(struct timespec *tv1, struct timespec *tv2) {
+    if(!tv1 || !tv2) {
+        puts("Error: un-initialized timespec structs");
+        exit(EXIT_FAILURE);
+    }
+    if(tv1->tv_sec < tv2->tv_sec || ( tv1->tv_sec == tv2->tv_sec && tv1->tv_nsec < tv2->tv_nsec))
+        return -1;
+    if(tv1->tv_sec > tv2->tv_sec || ( tv1->tv_sec == tv2->tv_sec && tv1->tv_nsec > tv2->tv_nsec))
+        return 1;
+    return 0;
+}
 
 
 //TODO Find out whether directly computing stats
