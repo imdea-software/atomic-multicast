@@ -65,7 +65,28 @@ static void tspdiff(struct timespec *end, struct timespec *start, struct timespe
 //TODO Wait for the node process msg delivery notice
 //    Semaphore Producer-Consummer
 //    FIFO for data exchange if needed
-void update_stats() {
+void update_stats(struct stats *stats) {
+    struct timespec tv, latency;
+    clock_gettime(CLOCK_MONOTONIC, &tv);
+    tspdiff(&tv, &stats->last_tv, &latency);
+    if(stats->delivered++ == 0) {
+        stats->first_tv = tv;
+        stats->last_tv = tv;
+        stats->min_latency = latency;
+        //stats->max_latency = latency;
+        //stats->avg_latency = latency;
+        return;
+    }
+
+    if(tspcmp(&latency, &stats->min_latency) < 0)
+        stats->min_latency = latency;
+    if(tspcmp(&latency, &stats->max_latency) > 0)
+        stats->max_latency = latency;
+    stats->avg_latency.tv_sec =
+        stats->avg_latency.tv_sec + ((latency.tv_sec - stats->avg_latency.tv_sec) / stats->delivered);
+    stats->avg_latency.tv_nsec =
+        stats->avg_latency.tv_nsec + ((latency.tv_nsec - stats->avg_latency.tv_nsec) / stats->delivered);
+    stats->last_tv = tv;
 }
 
 //TODO Wait for the stats process to tell the parent when to close
