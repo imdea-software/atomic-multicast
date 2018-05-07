@@ -13,7 +13,7 @@
 struct groups {
     unsigned int	groups_count;
     unsigned int	*node_counts;
-    id_t		**members;
+    xid_t		**members;
     //NOT USED
     //id_t		*memberships;
 };
