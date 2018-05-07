@@ -20,6 +20,16 @@
 pid_t pids[2];
 int pid_idx;
 
+struct stats {
+    long delivered;
+    double msg_per_sec;
+    struct timespec avg_latency;
+    struct timespec min_latency;
+    struct timespec max_latency;
+    struct timespec last_tv;
+    struct timespec first_tv;
+} stats;
+
 static int tspcmp(struct timespec *tv1, struct timespec *tv2) {
     if(!tv1 || !tv2) {
         puts("Error: un-initialized timespec structs");
