@@ -6,12 +6,14 @@
 #include <signal.h>
 #include <wait.h>
 #include <error.h>
+#include <arpa/inet.h>
 
 #include "types.h"
 #include "cluster.h"
 #include "node.h"
 #include "amcast.h"
 
+#define NUMBER_OF_MESSAGES 100000
 #define NUMBER_OF_CHILDREN 2
 #define CONF_SEPARATOR "\t"
 #define NODES_PER_GROUP 3
@@ -121,6 +123,49 @@ void run_amcast_node(struct cluster_config *config, xid_t node_id) {
     n->amcast->ballot.id = n->comm->groups[node_id] * NODES_PER_GROUP;
     node_start(n);
     node_free(n);
+}
+
+void run_client_node(struct cluster_config *config, xid_t client_id) {
+    //Connect with TCP to group LEADERS
+    int *sock = malloc(sizeof(int) * config->size);
+    for(int i=0; i<config->groups_count; i++) {
+        xid_t peer_id = i*NODES_PER_GROUP+INITIAL_LEADER_IN_GROUP;
+        sock[peer_id] = socket(AF_INET, SOCK_STREAM, 0);
+        struct sockaddr_in addr = {
+            .sin_family = AF_INET,
+            .sin_port = htons(config->ports[peer_id]),
+            .sin_addr.s_addr = inet_addr(config->addresses[peer_id])
+        };
+        connect(sock[peer_id], (struct sockaddr *) &addr, sizeof(addr));
+	}
+    //Let's send some messages
+    struct enveloppe env = {
+	    .sid = client_id,
+	    .cmd_type = MULTICAST,
+	    .cmd.multicast = {
+	        .mid = {-1, client_id},
+            .destgrps_count = config->groups_count,
+            .destgrps = {0, 1},
+            .value = {
+                .len = sizeof("coucou"),
+                .val = "coucou"
+            }
+	    },
+	};
+    for(int j=0; j<NUMBER_OF_MESSAGES; j++) {
+        env.cmd.multicast.mid.time = j;
+	    for(int i=0; i<config->groups_count; i++) {
+            xid_t peer_id = i*NODES_PER_GROUP+INITIAL_LEADER_IN_GROUP;
+	        struct enveloppe rep;
+            send(sock[peer_id], &env, sizeof(env), 0);
+            recv(sock[peer_id], &rep, sizeof(rep), 0);
+	    }
+	}
+    //Close the connections
+	for(int i=0; i<config->groups_count; i++) {
+            xid_t peer_id = i*NODES_PER_GROUP+INITIAL_LEADER_IN_GROUP;
+            close(sock[peer_id]);
+    }
 }
 
 //TODO Should find a trick to avoid the ugly conditionals
