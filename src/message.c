@@ -30,9 +30,9 @@ void send_to_peer(struct node *node, struct enveloppe *env, xid_t peer_id) {
 
 //TODO Add a decent groups structure so that looping over all nodes is not required
 void send_to_group(struct node *node, struct enveloppe *env, xid_t group_id) {
-    for(xid_t *grp = node->comm->groups; grp < node->comm->groups + node->comm->cluster_size; grp++)
-        if (*grp == group_id)
-            send_to_peer(node, env, grp - node->comm->groups);
+    for(xid_t *peer = node->groups->members[group_id];
+            peer < node->groups->members[group_id] + node->groups->node_counts[group_id]; peer++)
+        send_to_peer(node, env, *peer);
 }
 
 void send_to_destgrps(struct node *node, struct enveloppe *env, xid_t *destgrps, unsigned int count) {
