@@ -89,6 +89,22 @@ void update_stats(struct stats *stats) {
     stats->last_tv = tv;
 }
 
+void report_stats(struct stats *stats) {
+    struct timespec complete_duration;
+    tspdiff(&stats->last_tv, &stats->first_tv, &complete_duration);
+    stats->msg_per_sec = stats->delivered / (complete_duration.tv_sec + complete_duration.tv_nsec * 1e-9);
+
+    printf("AverageLatency=%fms MinLatency=%fms MaxLatency=%fms "
+            "MsgPerSec=%fmsg/sec Duration=%lfsec "
+            "TotalMsgReceived=%ldmsg\n",
+        stats->avg_latency.tv_sec * 1e3 + stats->avg_latency.tv_nsec * 1e-6,
+        stats->min_latency.tv_sec * 1e3 + stats->min_latency.tv_nsec * 1e-6,
+        stats->max_latency.tv_sec * 1e3 + stats->max_latency.tv_nsec * 1e-6,
+        stats->msg_per_sec,
+        complete_duration.tv_sec + complete_duration.tv_nsec * 1e-9,
+        stats->delivered);
+}
+
 //TODO Wait for the stats process to tell the parent when to close
 void wait_until_all_messages_delivered() {
 }
