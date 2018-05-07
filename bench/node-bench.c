@@ -103,6 +103,14 @@ void init_cluster_config(struct cluster_config *config, unsigned int n_nodes, un
     config->addresses = addresses;
     config->ports = ports;
 }
+int free_cluster_config(struct cluster_config *config) {
+    free(config->id);
+    free(config->group_membership);
+    free(config->addresses);
+    free(config->ports);
+    free(config);
+    return 0;
+}
 
 int main(int argc, char *argv[]) {
     struct cluster_config config;
