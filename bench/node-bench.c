@@ -247,6 +247,12 @@ int main(int argc, char *argv[]) {
     init_cluster_config(&config, atoi(argv[2]), atoi(argv[3]));
     read_cluster_config_from_stdin(&config);
 
+    //CLIENT NODE PATTERN
+    if(atoi(argv[4])) {
+        run_client_node(&config, -1);
+        return EXIT_SUCCESS;
+    }
+
     //Let's create some child processes...
     pid_idx = -1;
     for(int i=0; i<NUMBER_OF_CHILDREN; i++) {
@@ -262,10 +268,7 @@ int main(int argc, char *argv[]) {
     switch(pid_idx) {
         //Node process
         case 0:
-            if(!atoi(argv[4]))
-                run_amcast_node(&config, node_id);
-            if(atoi(argv[4]))
-                run_client_node(&config, -1);
+            run_amcast_node(&config, node_id);
             break;
         //Stats process
         case 1:
