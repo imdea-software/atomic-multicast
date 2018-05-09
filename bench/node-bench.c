@@ -236,7 +236,6 @@ void init_cluster_config(struct cluster_config *config, unsigned int n_nodes, un
     config->size = n_nodes;
     config->groups_count = n_groups;
 
-    //TODO Do not forget to free those, somewhere ...
     xid_t *ids = malloc(sizeof(xid_t) * n_nodes);
     xid_t *group_memberships = malloc(sizeof(xid_t) * n_nodes);
     address_t *addresses = malloc(sizeof(address_t) * n_nodes);
@@ -263,14 +262,14 @@ int main(int argc, char *argv[]) {
     }
 
     //Init node & cluster config
-    struct cluster_config config;
+    struct cluster_config *config = malloc(sizeof(struct cluster_config));
     xid_t node_id = atoi(argv[1]);
-    init_cluster_config(&config, atoi(argv[2]), atoi(argv[3]));
-    read_cluster_config_from_stdin(&config);
+    init_cluster_config(config, atoi(argv[2]), atoi(argv[3]));
+    read_cluster_config_from_stdin(config);
 
     //CLIENT NODE PATTERN
     if(atoi(argv[4])) {
-        run_client_node(&config, -1);
+        run_client_node(config, node_id);
         return EXIT_SUCCESS;
     }
 
@@ -311,7 +310,7 @@ int main(int argc, char *argv[]) {
     switch(pid_idx) {
         //Node process
         case 0:
-            run_amcast_node(&config, node_id);
+            run_amcast_node(config, node_id);
             break;
         //Stats process
         case 1:
@@ -335,5 +334,6 @@ int main(int argc, char *argv[]) {
     //Clean and exit
     sem_close(delivered);
     sem_close(finished);
+    free_cluster_config(config);
     return EXIT_SUCCESS;
 }
