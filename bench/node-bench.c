@@ -85,9 +85,9 @@ void update_stats(struct stats *stats) {
     if(tspcmp(&latency, &stats->max_latency) > 0)
         stats->max_latency = latency;
     stats->avg_latency.tv_sec =
-        stats->avg_latency.tv_sec + ((latency.tv_sec - stats->avg_latency.tv_sec) / stats->delivered);
+        stats->avg_latency.tv_sec + ((latency.tv_sec - stats->avg_latency.tv_sec) / (stats->delivered - 1));
     stats->avg_latency.tv_nsec =
-        stats->avg_latency.tv_nsec + ((latency.tv_nsec - stats->avg_latency.tv_nsec) / stats->delivered);
+        stats->avg_latency.tv_nsec + ((latency.tv_nsec - stats->avg_latency.tv_nsec) / (stats->delivered - 1));
     stats->last_tv = tv;
 }
 
