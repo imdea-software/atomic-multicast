@@ -29,7 +29,7 @@ $(TEST_DIR)/pqueue_unit: $(TEST_DIR)/pqueue_unit.o $(OBJS)
 	$(CC) $(VERBOSE) -o $@ $< $(OBJS) $(LDFLAGS)
 
 $(BENCH_DIR)/node-bench: $(BENCH_DIR)/node-bench.o $(OBJS)
-	$(CC) $(VERBOSE) -o $@ $< $(OBJS) $(LDFLAGS)
+	$(CC) $(VERBOSE) -o $@ $< $(OBJS) $(LDFLAGS) -lpthread
 
 $(SRC_DIR)/%.o: %.c
 	$(CC) $(CFLAGS) -c $< $(VERBOSE)

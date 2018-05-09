@@ -7,6 +7,9 @@
 #include <wait.h>
 #include <error.h>
 #include <arpa/inet.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <semaphore.h>
 
 #include "types.h"
 #include "cluster.h"
@@ -31,6 +34,9 @@ struct stats {
     struct timespec last_tv;
     struct timespec first_tv;
 } stats;
+
+sem_t *delivered, *finished;
+char sem_dev_name[20], sem_fin_name[20];
 
 static int tspcmp(struct timespec *tv1, struct timespec *tv2) {
     if(!tv1 || !tv2) {
@@ -251,6 +257,26 @@ int main(int argc, char *argv[]) {
 
     memset(&stats, 0, sizeof(struct stats));
 
+    //Semaphore init pattern - generate names specific to this node_id to avoid collisions
+    sprintf(sem_dev_name, "/delivered_%d", node_id);
+    sprintf(sem_fin_name, "/finished_%d", node_id);
+    sem_unlink(sem_dev_name);
+    sem_unlink(sem_fin_name);
+    if ((finished = sem_open(sem_fin_name, O_CREAT, S_IRWXU|S_IRWXG|S_IRWXO, 0)) == SEM_FAILED) {
+        int errsv = errno;
+        if(errsv == EEXIST)
+            finished = sem_open(sem_fin_name, 0);
+        if(finished == SEM_FAILED)
+            perror("Sem finished");
+    }
+    if ((delivered = sem_open(sem_dev_name, O_CREAT, S_IRWXU|S_IRWXG|S_IRWXO, 0)) == SEM_FAILED) {
+        int errsv = errno;
+        if(errsv == EEXIST)
+            delivered = sem_open(sem_dev_name, 0);
+        if(delivered == SEM_FAILED)
+            perror("Sem delivered");
+    }
+
     //Let's create some child processes...
     pid_idx = -1;
     for(int i=0; i<NUMBER_OF_CHILDREN; i++) {
@@ -288,5 +314,7 @@ int main(int argc, char *argv[]) {
     }
 
     //Clean and exit
+    sem_close(delivered);
+    sem_close(finished);
     return EXIT_SUCCESS;
 }
