@@ -232,18 +232,14 @@ int free_cluster_config(struct cluster_config *config) {
 }
 
 int main(int argc, char *argv[]) {
-    struct cluster_config config;
-    xid_t node_id = -1;
-
-    memset(&stats, 0, sizeof(struct stats));
-
     if(argc != 5) {
         printf("USAGE: node-bench [node_id] [number_of_nodes] [number_of_groups] [isClient?]\n");
         exit(EXIT_FAILURE);
     }
 
     //Init node & cluster config
-    node_id = atoi(argv[1]);
+    struct cluster_config config;
+    xid_t node_id = atoi(argv[1]);
     init_cluster_config(&config, atoi(argv[2]), atoi(argv[3]));
     read_cluster_config_from_stdin(&config);
 
@@ -252,6 +248,8 @@ int main(int argc, char *argv[]) {
         run_client_node(&config, -1);
         return EXIT_SUCCESS;
     }
+
+    memset(&stats, 0, sizeof(struct stats));
 
     //Let's create some child processes...
     pid_idx = -1;
