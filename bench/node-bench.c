@@ -113,14 +113,34 @@ void report_stats(struct stats *stats) {
         stats->delivered);
 }
 
+void wait_for_delivery(struct stats *stats) {
+    if(!delivered)
+        delivered = sem_open(sem_dev_name, 0);
+    if(!finished)
+        finished = sem_open(sem_fin_name, 0);
+    do {
+        sem_wait(delivered);
+        update_stats(stats);
+        if(stats->delivered >= NUMBER_OF_MESSAGES) {
+            report_stats(stats);
+            sem_post(finished);
+        }
+    } while(1);
+}
+
 //TODO Wait for the stats process to tell the parent when to close
 void wait_until_all_messages_delivered() {
+    if(!finished)
+        finished = sem_open(sem_fin_name, 0);
+    sem_wait(finished);
 }
 
 //TODO Let the stats process know when a new message is delivered
 //     and maybe pass some data to it about the message through a FIFO for instance
 void delivery_cb(struct node *node, struct amcast_msg *msg) {
-    update_stats(&stats);
+    if(!delivered)
+        delivered = sem_open(sem_dev_name, 0);
+    sem_post(delivered);
 }
 
 void run_amcast_node(struct cluster_config *config, xid_t node_id) {
@@ -130,7 +150,6 @@ void run_amcast_node(struct cluster_config *config, xid_t node_id) {
     n->amcast->ballot.id = n->comm->groups[node_id] * NODES_PER_GROUP;
     node_start(n);
     node_free(n);
-    report_stats(&stats);
 }
 
 void run_client_node(struct cluster_config *config, xid_t client_id) {
@@ -296,7 +315,7 @@ int main(int argc, char *argv[]) {
             break;
         //Stats process
         case 1:
-            //update_stats(&stats);
+            wait_for_delivery(&stats);
             break;
         //Parent process
         case -1:
