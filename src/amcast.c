@@ -26,6 +26,12 @@ int paircmp(struct pair *p1, struct pair *p2) {
 }
 struct pair default_pair = { .time = 0, .id = -1};
 
+int midequ(m_uid_t *m1, m_uid_t *m2) {
+    if(m1 == NULL || m2 == NULL)
+        exit(EXIT_FAILURE);
+    return *m1 == *m2;
+}
+
 //TODO Make helper functions to create enveloppes in clean and nice looking way
 //TODO Following pointers makes it a lot harder to read the code, try to find some simplification
 //         e.g. properly defined macros could help,
