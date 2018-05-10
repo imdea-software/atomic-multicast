@@ -145,6 +145,8 @@ static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
     printf("[%u] {%u} We got ACCEPT_ACK command from %u!\n", node->id, cmd->mid, sid);
     if (node->amcast->status == LEADER) {
         struct amcast_msg *msg = node->amcast->msgs[cmd->mid];
+        if((msg = htable_lookup(node->amcast->h_msgs, &cmd->mid)) == NULL)
+            exit(EXIT_FAILURE);
         //TODO Cache messages instead of resending to yourself
         //It seems ACCEPT_ACKS are sometime recevied before gts is initialized
         if(paircmp(&msg->gts, &default_pair) == 0) {
@@ -229,6 +231,8 @@ static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
 static void handle_deliver(struct node *node, xid_t sid, deliver_t *cmd) {
     printf("[%u] {%u} We got DELIVER command from %u with gts: (%u,%u)!\n", node->id, cmd->mid, sid, cmd->gts.time, cmd->gts.id);
     struct amcast_msg *msg = node->amcast->msgs[cmd->mid];
+    if((msg = htable_lookup(node->amcast->h_msgs, &cmd->mid)) == NULL)
+        exit(EXIT_FAILURE);
     if (node->amcast->status == FOLLOWER
             && paircmp(&node->amcast->ballot, &cmd->ballot) == 0
             && msg->delivered == FALSE) {
