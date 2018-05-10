@@ -53,8 +53,7 @@ static void handle_multicast(struct node *node, xid_t sid, message_t *cmd) {
             node->amcast->msgs[cmd->mid] = init_amcast_msg(node->groups, node->comm->cluster_size, cmd);
         }
         struct amcast_msg *msg = node->amcast->msgs[cmd->mid];
-        ht_key_t *ret_key = &msg;
-        if(htable_lookup(node->amcast->h_msgs, &cmd->mid, &ret_key, (void *) &msg) == 0 && ret_key != NULL) {
+        if((msg = htable_lookup(node->amcast->h_msgs, &cmd->mid)) == NULL) {
             msg = node->amcast->msgs[node->amcast->msgs_count-1];
             htable_insert(node->amcast->h_msgs, &cmd->mid, msg);
         }
@@ -93,8 +92,7 @@ static void handle_accept(struct node *node, xid_t sid, accept_t *cmd) {
         node->amcast->msgs[cmd->mid] = init_amcast_msg(node->groups, node->comm->cluster_size, &cmd->msg);
     }
     struct amcast_msg *msg = node->amcast->msgs[cmd->mid];
-    ht_key_t *ret_key = &msg;
-    if(htable_lookup(node->amcast->h_msgs, &cmd->mid, &ret_key, (void *) &msg) == 0 && ret_key != NULL) {
+    if((msg = htable_lookup(node->amcast->h_msgs, &cmd->mid)) == NULL) {
         msg = node->amcast->msgs[node->amcast->msgs_count-1];
         htable_insert(node->amcast->h_msgs, &cmd->mid, &cmd->msg);
     }

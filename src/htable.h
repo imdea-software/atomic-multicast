@@ -21,7 +21,10 @@ typedef GHashTable htable_t;
 #define htable_remove(ht, key) \
     g_hash_table_remove((ht), (key))
 
-#define htable_lookup(ht, key, ret_key, ret_val) \
+#define htable_lookup(ht, key) \
+    g_hash_table_lookup((ht), (key))
+
+#define htable_lookup_extended(ht, key, ret_key, ret_val) \
     g_hash_table_lookup_extended((ht), (key), (ret_key), (ret_val))
 
 #define htable_foreach(ht, fun, arg) \
