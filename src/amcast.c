@@ -6,6 +6,7 @@
 #include "amcast_types.h"
 #include "amcast.h"
 #include "pqueue.h"
+#include "htable.h"
 
 
 int paircmp(struct pair *p1, struct pair *p2) {
@@ -319,6 +320,7 @@ struct amcast *amcast_init(delivery_cb_fun delivery_cb) {
     amcast->msgs_size = MSGS_DEFAULT_SIZE;
     amcast->msgs = malloc(sizeof(struct amcast_msg *) * MSGS_DEFAULT_SIZE);
     memset(amcast->msgs, 0, sizeof(struct amcast_msg *) * MSGS_DEFAULT_SIZE);
+    amcast->h_msgs = htable_init(midequ);
     //EXTRA FIELDS (NOT IN SPEC)
     amcast->committed_gts = pqueue_init((pq_pricmp_fun) paircmp);
     amcast->pending_lts = pqueue_init((pq_pricmp_fun) paircmp);
@@ -339,6 +341,7 @@ static int free_amcast_msg(struct amcast_msg *msg) {
 int amcast_free(struct amcast *amcast) {
     pqueue_free(amcast->committed_gts);
     pqueue_free(amcast->pending_lts);
+    htable_free(amcast->h_msgs);
     for(struct amcast_msg **msg = amcast->msgs; msg < amcast->msgs + amcast->msgs_count; msg++)
         if(*msg)
             free_amcast_msg(*msg);
