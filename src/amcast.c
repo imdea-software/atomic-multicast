@@ -53,6 +53,11 @@ static void handle_multicast(struct node *node, xid_t sid, message_t *cmd) {
             node->amcast->msgs[cmd->mid] = init_amcast_msg(node->groups, node->comm->cluster_size, cmd);
         }
         struct amcast_msg *msg = node->amcast->msgs[cmd->mid];
+        ht_key_t *ret_key = &msg;
+        if(htable_lookup(node->amcast->h_msgs, &cmd->mid, &ret_key, (void *) &msg) == 0 && ret_key != NULL) {
+            msg = node->amcast->msgs[node->amcast->msgs_count-1];
+            htable_insert(node->amcast->h_msgs, &cmd->mid, msg);
+        }
         if(msg->phase == START) {
             msg->phase = PROPOSED;
             node->amcast->clock++;
@@ -88,6 +93,11 @@ static void handle_accept(struct node *node, xid_t sid, accept_t *cmd) {
         node->amcast->msgs[cmd->mid] = init_amcast_msg(node->groups, node->comm->cluster_size, &cmd->msg);
     }
     struct amcast_msg *msg = node->amcast->msgs[cmd->mid];
+    ht_key_t *ret_key = &msg;
+    if(htable_lookup(node->amcast->h_msgs, &cmd->mid, &ret_key, (void *) &msg) == 0 && ret_key != NULL) {
+        msg = node->amcast->msgs[node->amcast->msgs_count-1];
+        htable_insert(node->amcast->h_msgs, &cmd->mid, &cmd->msg);
+    }
     if ((node->amcast->status == LEADER || node->amcast->status == FOLLOWER)
             && paircmp(&msg->lballot[cmd->grp], &cmd->ballot) <= 0
             && !( cmd->grp == node->comm->groups[node->id]
