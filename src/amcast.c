@@ -45,13 +45,14 @@ static void handle_multicast(struct node *node, xid_t sid, message_t *cmd) {
             node->amcast->msgs_count++;
             node->amcast->msgs[cmd->mid] = init_amcast_msg(node->groups, node->comm->cluster_size, cmd);
         }
-        if(node->amcast->msgs[cmd->mid]->phase == START) {
-            node->amcast->msgs[cmd->mid]->phase = PROPOSED;
+        struct amcast_msg *msg = node->amcast->msgs[cmd->mid];
+        if(msg->phase == START) {
+            msg->phase = PROPOSED;
             node->amcast->clock++;
-            node->amcast->msgs[cmd->mid]->lts[node->comm->groups[node->id]].time = node->amcast->clock;
-            node->amcast->msgs[cmd->mid]->lts[node->comm->groups[node->id]].id = node->comm->groups[node->id];
+            msg->lts[node->comm->groups[node->id]].time = node->amcast->clock;
+            msg->lts[node->comm->groups[node->id]].id = node->comm->groups[node->id];
             pqueue_push(node->amcast->pending_lts, &cmd->mid,
-			    &node->amcast->msgs[cmd->mid]->lts[node->comm->groups[node->id]]);
+			    &msg->lts[node->comm->groups[node->id]]);
         }
         struct enveloppe rep = {
 	    .sid = node->id,
@@ -60,7 +61,7 @@ static void handle_multicast(struct node *node, xid_t sid, message_t *cmd) {
 	        .mid = cmd->mid,
 		.grp = node->comm->groups[node->id],
 		.ballot = node->amcast->ballot,
-		.lts = node->amcast->msgs[cmd->mid]->lts[node->comm->groups[node->id]],
+		.lts = msg->lts[node->comm->groups[node->id]],
 		.msg = *cmd
 	    },
 	};
@@ -79,43 +80,44 @@ static void handle_accept(struct node *node, xid_t sid, accept_t *cmd) {
         node->amcast->msgs_count++;
         node->amcast->msgs[cmd->mid] = init_amcast_msg(node->groups, node->comm->cluster_size, &cmd->msg);
     }
+    struct amcast_msg *msg = node->amcast->msgs[cmd->mid];
     if ((node->amcast->status == LEADER || node->amcast->status == FOLLOWER)
-            && paircmp(&node->amcast->msgs[cmd->mid]->lballot[cmd->grp], &cmd->ballot) <= 0
+            && paircmp(&msg->lballot[cmd->grp], &cmd->ballot) <= 0
             && !( cmd->grp == node->comm->groups[node->id]
                   && !(paircmp(&node->amcast->ballot, &cmd->ballot) == 0) )) {
 	//TODO Carefully try to see when it's the best time to reset this counter
 	//     Probably upon a leader change
-	if (paircmp(&node->amcast->msgs[cmd->mid]->lballot[cmd->grp], &default_pair) == 0) {
-            node->amcast->msgs[cmd->mid]->accept_totalcount += 1;
-            if(paircmp(&node->amcast->msgs[cmd->mid]->accept_max_lts, &cmd->lts) < 0)
-                node->amcast->msgs[cmd->mid]->accept_max_lts = cmd->lts;
+	if (paircmp(&msg->lballot[cmd->grp], &default_pair) == 0) {
+            msg->accept_totalcount += 1;
+            if(paircmp(&msg->accept_max_lts, &cmd->lts) < 0)
+                msg->accept_max_lts = cmd->lts;
 	}
         if(node->amcast->status == LEADER
                    && cmd->grp == node->comm->groups[node->id]
-                   && paircmp(&node->amcast->msgs[cmd->mid]->lts[node->comm->groups[node->id]],
+                   && paircmp(&msg->lts[node->comm->groups[node->id]],
                               &cmd->lts) < 0) {
             pqueue_remove(node->amcast->pending_lts,
-                   &node->amcast->msgs[cmd->mid]->lts[node->comm->groups[node->id]]);
+                   &msg->lts[node->comm->groups[node->id]]);
             pqueue_push(node->amcast->pending_lts, &cmd->mid, &cmd->lts);
         }
-	node->amcast->msgs[cmd->mid]->lballot[cmd->grp] = cmd->ballot;
-	node->amcast->msgs[cmd->mid]->lts[cmd->grp] = cmd->lts;
-        if(node->amcast->msgs[cmd->mid]->accept_totalcount != node->amcast->msgs[cmd->mid]->msg.destgrps_count)
-	    return;
-        node->amcast->msgs[cmd->mid]->phase = ACCEPTED;
-        node->amcast->msgs[cmd->mid]->gts = node->amcast->msgs[cmd->mid]->accept_max_lts;
-        if(node->amcast->clock < node->amcast->msgs[cmd->mid]->gts.time)
-            node->amcast->clock = node->amcast->msgs[cmd->mid]->gts.time;
+    msg->lballot[cmd->grp] = cmd->ballot;
+    msg->lts[cmd->grp] = cmd->lts;
+    if(msg->accept_totalcount != msg->msg.destgrps_count)
+        return;
+    msg->phase = ACCEPTED;
+    msg->gts = msg->accept_max_lts;
+    if(node->amcast->clock < msg->gts.time)
+        node->amcast->clock = msg->gts.time;
         struct enveloppe rep = {
 	    .sid = node->id,
 	    .cmd_type = ACCEPT_ACK,
 	    .cmd.accept_ack = {
 	        .mid = cmd->mid,
 		.grp = node->comm->groups[node->id],
-		.gts = node->amcast->msgs[cmd->mid]->gts
+		.gts = msg->gts
 	    },
 	};
-	memcpy(rep.cmd.accept_ack.ballot, node->amcast->msgs[cmd->mid]->lballot,
+	memcpy(rep.cmd.accept_ack.ballot, msg->lballot,
 			sizeof(p_uid_t) * node->groups->groups_count);
         //send_to_destgrps(node, &rep, node->amcast->msgs[cmd->mid]->msg.destgrps,
         //                 node->amcast->msgs[cmd->mid]->msg.destgrps_count);
@@ -127,9 +129,10 @@ static void handle_accept(struct node *node, xid_t sid, accept_t *cmd) {
 static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
     printf("[%u] {%u} We got ACCEPT_ACK command from %u!\n", node->id, cmd->mid, sid);
     if (node->amcast->status == LEADER) {
+        struct amcast_msg *msg = node->amcast->msgs[cmd->mid];
         //TODO Cache messages instead of resending to yourself
         //It seems ACCEPT_ACKS are sometime recevied before gts is initialized
-        if(paircmp(&node->amcast->msgs[cmd->mid]->gts, &default_pair) == 0) {
+        if(paircmp(&msg->gts, &default_pair) == 0) {
             printf("[%d] {%u} Re-sending ACCEPT_ACK command from %d!\n", node->id, cmd->mid, sid);
             struct enveloppe retry = { .sid = sid, .cmd_type = ACCEPT_ACK, .cmd.accept_ack = *cmd };
             send_to_peer(node, &retry, node->id);
@@ -137,29 +140,29 @@ static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
         }
         //Check whether the local ballot and the received one are equal
         for(xid_t i=0; i<node->groups->groups_count; i++)
-            if(paircmp(&node->amcast->msgs[cmd->mid]->lballot[i], &cmd->ballot[i]) != 0)
+            if(paircmp(&msg->lballot[i], &cmd->ballot[i]) != 0)
                 return;
-        if(node->amcast->msgs[cmd->mid]->accept_ack_counts[sid] < 1) {
-            node->amcast->msgs[cmd->mid]->accept_ack_counts[sid] += 1;
-            node->amcast->msgs[cmd->mid]->accept_ack_groupcount[cmd->grp] += 1;
+        if(msg->accept_ack_counts[sid] < 1) {
+            msg->accept_ack_counts[sid] += 1;
+            msg->accept_ack_groupcount[cmd->grp] += 1;
         }
-        if(node->amcast->msgs[cmd->mid]->accept_ack_groupcount[cmd->grp] >=
+        if(msg->accept_ack_groupcount[cmd->grp] >=
                 node->groups->node_counts[cmd->grp]/2 + 1
             //Also check if the ACCEPT_ACK from the grp leader was received
-            && node->amcast->msgs[cmd->mid]->accept_ack_counts[cmd->ballot[cmd->grp].id] > 0) {
+            && msg->accept_ack_counts[cmd->ballot[cmd->grp].id] > 0) {
             //TODO Check for the best time to reset this counter
-            if(node->amcast->msgs[cmd->mid]->accept_ack_groupready[cmd->grp]++ == 0)
-                node->amcast->msgs[cmd->mid]->accept_ack_totalcount += 1;
+            if(msg->accept_ack_groupready[cmd->grp]++ == 0)
+                msg->accept_ack_totalcount += 1;
         }
-        if(node->amcast->msgs[cmd->mid]->accept_ack_totalcount !=
-			node->amcast->msgs[cmd->mid]->msg.destgrps_count)
+        if(msg->accept_ack_totalcount !=
+			msg->msg.destgrps_count)
             return;
-        if(node->amcast->msgs[cmd->mid]->phase != COMMITTED) {
+        if(msg->phase != COMMITTED) {
             pqueue_remove(node->amcast->pending_lts,
-                          &node->amcast->msgs[cmd->mid]->lts[node->comm->groups[node->id]]);
-            pqueue_push(node->amcast->committed_gts, &cmd->mid, &node->amcast->msgs[cmd->mid]->gts);
+                          &msg->lts[node->comm->groups[node->id]]);
+            pqueue_push(node->amcast->committed_gts, &cmd->mid, &msg->gts);
         }
-        node->amcast->msgs[cmd->mid]->phase = COMMITTED;
+        msg->phase = COMMITTED;
 	//TODO A lot of possible improvements in the delivery pattern
         int try_next = 1;
         while(try_next && pqueue_size(node->amcast->committed_gts) > 0) {
@@ -197,11 +200,11 @@ static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
 	        };
                 send_to_group(node, &rep, node->comm->groups[node->id]);
                 //RESET counter variables
-                memset(node->amcast->msgs[cmd->mid]->accept_ack_counts,
+                memset(msg->accept_ack_counts,
                             0, sizeof(unsigned int) * node->comm->cluster_size);
                 for(int i=0; i<node->groups->groups_count; i++) {
-                    node->amcast->msgs[cmd->mid]->accept_ack_groupready[i] = 0;
-                    node->amcast->msgs[cmd->mid]->accept_ack_groupcount[i] = 0;
+                    msg->accept_ack_groupready[i] = 0;
+                    msg->accept_ack_groupcount[i] = 0;
 	        }
             }
         }
@@ -210,14 +213,15 @@ static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
 
 static void handle_deliver(struct node *node, xid_t sid, deliver_t *cmd) {
     printf("[%u] {%u} We got DELIVER command from %u with gts: (%u,%u)!\n", node->id, cmd->mid, sid, cmd->gts.time, cmd->gts.id);
+    struct amcast_msg *msg = node->amcast->msgs[cmd->mid];
     if (node->amcast->status == FOLLOWER
             && paircmp(&node->amcast->ballot, &cmd->ballot) == 0
-            && node->amcast->msgs[cmd->mid]->delivered == FALSE) {
-        node->amcast->msgs[cmd->mid]->lts[node->comm->groups[node->id]] = cmd->lts;
-        node->amcast->msgs[cmd->mid]->gts = cmd->gts;
-        if(node->amcast->clock < node->amcast->msgs[cmd->mid]->gts.time)
-            node->amcast->clock = node->amcast->msgs[cmd->mid]->gts.time;
-        node->amcast->msgs[cmd->mid]->delivered = TRUE;
+            && msg->delivered == FALSE) {
+        msg->lts[node->comm->groups[node->id]] = cmd->lts;
+        msg->gts = cmd->gts;
+        if(node->amcast->clock < msg->gts.time)
+            node->amcast->clock = msg->gts.time;
+        msg->delivered = TRUE;
         if(node->amcast->delivery_cb)
             node->amcast->delivery_cb(node, cmd->mid);
     }
