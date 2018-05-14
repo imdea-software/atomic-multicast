@@ -28,6 +28,8 @@ struct amcast_msg {
     unsigned int *accept_ack_counts;
 };
 
+#include "htable.h"
+
 struct amcast {
     enum { INIT, LEADER, FOLLOWER, LEADER_INIT, FOLLOWER_PREPARE, LEADER_SYNC } status;
     p_uid_t ballot;
@@ -36,6 +38,7 @@ struct amcast {
     uint32_t msgs_count;
     uint32_t msgs_size;
     struct amcast_msg **msgs;
+    htable_t *h_msgs;
     //EXTRA FIELDS (NOT IN SPEC)
     pqueue_t *committed_gts;
     pqueue_t *pending_lts;
