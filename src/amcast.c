@@ -43,18 +43,15 @@ static struct amcast_msg *init_amcast_msg(struct groups *groups, unsigned int cl
 static void handle_multicast(struct node *node, xid_t sid, message_t *cmd) {
     printf("[%u] {%u} We got MULTICAST command from %u!\n", node->id, cmd->mid, sid);
     if (node->amcast->status == LEADER) {
-        if(node->amcast->msgs_count >= node->amcast->msgs_size) {
-            node->amcast->msgs_size *= 2;
-            node->amcast->msgs = realloc(node->amcast->msgs,
-                            sizeof(struct amcast_msg *) * node->amcast->msgs_size);
-        }
-        if(cmd->mid >= node->amcast->msgs_count) {
-            node->amcast->msgs_count++;
-            node->amcast->msgs[cmd->mid] = init_amcast_msg(node->groups, node->comm->cluster_size, cmd);
-        }
-        struct amcast_msg *msg = node->amcast->msgs[cmd->mid];
+        struct amcast_msg *msg;
         if((msg = htable_lookup(node->amcast->h_msgs, &cmd->mid)) == NULL) {
-            msg = node->amcast->msgs[node->amcast->msgs_count-1];
+            if(node->amcast->msgs_count >= node->amcast->msgs_size) {
+                node->amcast->msgs_size *= 2;
+                node->amcast->msgs = realloc(node->amcast->msgs,
+                            sizeof(struct amcast_msg *) * node->amcast->msgs_size);
+            }
+            msg = init_amcast_msg(node->groups, node->comm->cluster_size, cmd);
+            node->amcast->msgs[node->amcast->msgs_count++] = msg;
             htable_insert(node->amcast->h_msgs, &cmd->mid, msg);
         }
         if(msg->phase == START) {
@@ -82,19 +79,16 @@ static void handle_multicast(struct node *node, xid_t sid, message_t *cmd) {
 
 static void handle_accept(struct node *node, xid_t sid, accept_t *cmd) {
     printf("[%u] {%u} We got ACCEPT command from %u!\n", node->id, cmd->mid, sid);
-    if(node->amcast->msgs_count >= node->amcast->msgs_size) {
-        node->amcast->msgs_size *= 2;
-        node->amcast->msgs = realloc(node->amcast->msgs,
-                        sizeof(struct amcast_msg *) * node->amcast->msgs_size);
-    }
-    if(cmd->mid >= node->amcast->msgs_count) {
-        node->amcast->msgs_count++;
-        node->amcast->msgs[cmd->mid] = init_amcast_msg(node->groups, node->comm->cluster_size, &cmd->msg);
-    }
-    struct amcast_msg *msg = node->amcast->msgs[cmd->mid];
+    struct amcast_msg *msg;
     if((msg = htable_lookup(node->amcast->h_msgs, &cmd->mid)) == NULL) {
-        msg = node->amcast->msgs[node->amcast->msgs_count-1];
-        htable_insert(node->amcast->h_msgs, &cmd->mid, &cmd->msg);
+        if(node->amcast->msgs_count >= node->amcast->msgs_size) {
+            node->amcast->msgs_size *= 2;
+            node->amcast->msgs = realloc(node->amcast->msgs,
+                        sizeof(struct amcast_msg *) * node->amcast->msgs_size);
+        }
+        msg = init_amcast_msg(node->groups, node->comm->cluster_size, &cmd->msg);
+        node->amcast->msgs[node->amcast->msgs_count++] = msg;
+        htable_insert(node->amcast->h_msgs, &cmd->mid, msg);
     }
     if ((node->amcast->status == LEADER || node->amcast->status == FOLLOWER)
             && paircmp(&msg->lballot[cmd->grp], &cmd->ballot) <= 0
