@@ -9,8 +9,8 @@ typedef int (*ht_keyequ_fun)(ht_key_t *, ht_key_t *);
 
 typedef GHashTable htable_t;
 
-#define htable_init(keyequ_fun) \
-    g_hash_table_new(NULL, (GEqualFunc) (keyequ_fun))
+#define htable_init(keyhash_fun, keyequ_fun) \
+    g_hash_table_new((GHashFunc) (keyhash_fun), (GEqualFunc) (keyequ_fun))
 
 #define htable_free(ht) \
     g_hash_table_destroy((ht))

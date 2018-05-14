@@ -33,6 +33,10 @@ int midequ(m_uid_t *m1, m_uid_t *m2) {
     return *m1 == *m2;
 }
 
+unsigned int midhash(m_uid_t *m) {
+    return ((*m + *m)*(*m + *m + 1))/2 + *m;
+}
+
 //TODO Make helper functions to create enveloppes in clean and nice looking way
 //TODO Following pointers makes it a lot harder to read the code, try to find some simplification
 //         e.g. properly defined macros could help,
@@ -326,7 +330,7 @@ struct amcast *amcast_init(delivery_cb_fun delivery_cb) {
     amcast->msgs_size = MSGS_DEFAULT_SIZE;
     amcast->msgs = malloc(sizeof(struct amcast_msg *) * MSGS_DEFAULT_SIZE);
     memset(amcast->msgs, 0, sizeof(struct amcast_msg *) * MSGS_DEFAULT_SIZE);
-    amcast->h_msgs = htable_init(midequ);
+    amcast->h_msgs = htable_init(midhash, midequ);
     //EXTRA FIELDS (NOT IN SPEC)
     amcast->committed_gts = pqueue_init((pq_pricmp_fun) paircmp);
     amcast->pending_lts = pqueue_init((pq_pricmp_fun) paircmp);
