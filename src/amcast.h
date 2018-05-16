@@ -19,6 +19,7 @@ struct amcast_msg {
     message_t msg;
     //EXTRA FIELDS - ACCEPT COUNTERS
     unsigned int accept_totalcount;
+    unsigned int *accept_groupcount;
     g_uid_t accept_max_lts;
     //EXTRA FIELDS - ACCEPT_ACK COUNTERS
     unsigned int groups_count;

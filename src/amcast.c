@@ -100,7 +100,8 @@ static void handle_accept(struct node *node, xid_t sid, accept_t *cmd) {
                   && !(paircmp(&node->amcast->ballot, &cmd->ballot) == 0) )) {
 	//TODO Carefully try to see when it's the best time to reset this counter
 	//     Probably upon a leader change
-	if (paircmp(&msg->lballot[cmd->grp], &default_pair) == 0) {
+	if (msg->accept_groupcount[cmd->grp] == 0) {
+            msg->accept_groupcount[cmd->grp] += 1;
             msg->accept_totalcount += 1;
             if(paircmp(&msg->accept_max_lts, &cmd->lts) < 0)
                 msg->accept_max_lts = cmd->lts;
@@ -311,6 +312,7 @@ static struct amcast_msg *init_amcast_msg(struct groups *groups, unsigned int cl
     msg->msg = *cmd;
     //EXTRA FIELDS - ACCEPT COUNTERS
     msg->accept_totalcount = 0;
+    msg->accept_groupcount = malloc(sizeof(unsigned int) * groups->groups_count);
     msg->accept_max_lts = default_pair;
     //EXTRA FIELDS - ACCEPT_ACK COUNTERS
     msg->groups_count = groups->groups_count;
@@ -319,6 +321,7 @@ static struct amcast_msg *init_amcast_msg(struct groups *groups, unsigned int cl
     msg->accept_ack_groupcount = malloc(sizeof(unsigned int) * groups->groups_count);
     msg->accept_ack_counts = malloc(sizeof(unsigned int) * cluster_size);
     //Init the several arrays
+    memset(msg->accept_groupcount, 0, sizeof(unsigned int) * groups->groups_count);
     memset(msg->accept_ack_counts, 0, sizeof(unsigned int) * cluster_size);
     for(unsigned int *i = groups->node_counts; i<groups->node_counts + groups->groups_count; i++) {
         msg->lballot[i-groups->node_counts] = default_pair;
@@ -350,6 +353,7 @@ struct amcast *amcast_init(delivery_cb_fun delivery_cb) {
 static int free_amcast_msg(struct amcast_msg *msg) {
     free(msg->lballot);
     free(msg->lts);
+    free(msg->accept_groupcount);
     free(msg->accept_ack_groupready);
     free(msg->accept_ack_groupcount);
     free(msg->accept_ack_counts);
