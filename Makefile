@@ -35,4 +35,4 @@ $(SRC_DIR)/%.o: %.c
 	$(CC) $(CFLAGS) -c $< $(VERBOSE)
 
 clean:
-	rm -f $(TEST_DIR)/*.o $(SRC_DIR)/*.o $(TARGET)
+	rm -f $(TEST_DIR)/*.o $(SRC_DIR)/*.o $(BENCH_DIR)/*.o $(OBJS) $(TARGET)
