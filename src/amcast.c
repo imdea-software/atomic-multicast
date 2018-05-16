@@ -115,6 +115,10 @@ static void handle_accept(struct node *node, xid_t sid, accept_t *cmd) {
                    &msg->lts[node->comm->groups[node->id]]);
             pqueue_push(node->amcast->pending_lts, &cmd->mid, &cmd->lts);
         }
+    if(node->amcast->status == LEADER
+       && paircmp(&msg->lballot[cmd->grp], &default_pair) != 0
+       && paircmp(&msg->lballot[cmd->grp], &cmd->ballot) < 0)
+        reset_accept_ack_counters(msg, node->groups, node->comm->cluster_size);
     msg->lballot[cmd->grp] = cmd->ballot;
     msg->lts[cmd->grp] = cmd->lts;
     if(msg->accept_totalcount != msg->msg.destgrps_count)
@@ -147,18 +151,25 @@ static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
         struct amcast_msg *msg = NULL;
         if((msg = htable_lookup(node->amcast->h_msgs, &cmd->mid)) == NULL)
             exit(EXIT_FAILURE);
-        //TODO Cache messages instead of resending to yourself
-        //It seems ACCEPT_ACKS are sometime recevied before gts is initialized
-        if(paircmp(&msg->gts, &default_pair) == 0) {
-            printf("[%d] {%u} Re-sending ACCEPT_ACK command from %d!\n", node->id, cmd->mid, sid);
-            struct enveloppe retry = { .sid = sid, .cmd_type = ACCEPT_ACK, .cmd.accept_ack = *cmd };
-            send_to_peer(node, &retry, node->id);
-            return;
-        }
         //Check whether the local ballot and the received one are equal
+        //  It seems ACCEPT_ACKS are sometime recevied before gts is initialized
+        //  so just update local ballots number if lesser than the received ones
+        //  and mark the counters to be reset
+        int updated_components = 0;
         for(xid_t i=0; i<node->groups->groups_count; i++)
-            if(paircmp(&msg->lballot[i], &cmd->ballot[i]) != 0)
-                return;
+            switch(paircmp(&msg->lballot[i], &cmd->ballot[i])) {
+                case -1:
+                    if(paircmp(&msg->lballot[i], &default_pair) != 0)
+                        updated_components++;
+                    msg->lballot[i] = cmd->ballot[i];
+                    break;
+                case 0:
+                    break;
+                default:
+                    return;
+            }
+        if(updated_components > 0)
+            reset_accept_ack_counters(msg, node->groups, node->comm->cluster_size);
         if(msg->accept_ack_counts[sid] < 1) {
             msg->accept_ack_counts[sid] += 1;
             msg->accept_ack_groupcount[cmd->grp] += 1;
