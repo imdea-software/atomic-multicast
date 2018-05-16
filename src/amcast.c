@@ -43,6 +43,7 @@ unsigned int midhash(m_uid_t *m) {
 //         or sub-functions using only the useful structure fields passed as arguments
 
 static struct amcast_msg *init_amcast_msg(struct groups *groups, unsigned int cluster_size, message_t *cmd);
+static void reset_accept_ack_counters(struct amcast_msg *msg, struct groups *groups, unsigned int cluster_size);
 
 static void handle_multicast(struct node *node, xid_t sid, message_t *cmd) {
     printf("[%u] {%u} We got MULTICAST command from %u!\n", node->id, cmd->mid, sid);
@@ -370,4 +371,11 @@ int amcast_free(struct amcast *amcast) {
             free_amcast_msg(*msg);
     free(amcast);
     return 0;
+}
+
+static void reset_accept_ack_counters(struct amcast_msg *msg, struct groups *groups, unsigned int cluster_size) {
+    msg->accept_ack_totalcount = 0;
+    memset(msg->accept_ack_groupready, 0, sizeof(unsigned int) * groups->groups_count);
+    memset(msg->accept_ack_groupcount, 0, sizeof(unsigned int) * groups->groups_count);
+    memset(msg->accept_ack_counts, 0, sizeof(unsigned int) * cluster_size);
 }
