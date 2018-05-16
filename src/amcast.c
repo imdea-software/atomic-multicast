@@ -225,13 +225,6 @@ static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
 	            },
 	        };
                 send_to_group(node, &rep, node->comm->groups[node->id]);
-                //RESET counter variables
-                memset(msg->accept_ack_counts,
-                            0, sizeof(unsigned int) * node->comm->cluster_size);
-                for(int i=0; i<node->groups->groups_count; i++) {
-                    msg->accept_ack_groupready[i] = 0;
-                    msg->accept_ack_groupcount[i] = 0;
-	        }
             }
         }
     }
