@@ -181,6 +181,7 @@ static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
 	//TODO A lot of possible improvements in the delivery pattern
         int try_next = 1;
         while(try_next && pqueue_size(node->amcast->committed_gts) > 0) {
+            struct amcast_msg *i_msg = NULL, *j_msg = NULL;
             try_next = 0;
             m_uid_t *i;
             if((i = pqueue_peek(node->amcast->committed_gts)) == NULL) {
@@ -189,10 +190,18 @@ static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
             }
             if(node->amcast->msgs[*i]->phase == COMMITTED
                && node->amcast->msgs[*i]->delivered == FALSE) {
+            if((i_msg = htable_lookup(node->amcast->h_msgs, i)) == NULL) {
+                printf("Failed to find gts peeked msg\n");
+                return;
+            }
                 m_uid_t *j = pqueue_peek(node->amcast->pending_lts);
                 if(j != NULL && paircmp(&node->amcast->msgs[*j]->lts[node->comm->groups[node->id]],
                                         &node->amcast->msgs[*i]->gts) < 0
                              && node->amcast->msgs[*j]->phase != COMMITTED) {
+                if(j != NULL && (j_msg = htable_lookup(node->amcast->h_msgs, j)) == NULL) {
+                    printf("Failed to find lts peeked msg\n");
+                    return;
+                }
                     return;
                 }
                 if((i = pqueue_pop(node->amcast->committed_gts)) == NULL) {
