@@ -55,7 +55,16 @@ void write_report(struct node *node, struct stats *stats, FILE *stream) {
                         gts.time, gts.id,
                         msg->msg.destgrps_count,
                         destgrps);
-        //TODO Write to another file the payload of this message
+        //Write to another file the payload of this message
+        FILE *payload_out;
+        char filename[40];
+        sprintf(filename, "./log/payload_%u.%d.log", mid, node->id);
+        if((payload_out = fopen(filename, "w")) == NULL) {
+            printf("ERROR: Can not open payload file for message %u\n", mid);
+            exit(EXIT_FAILURE);
+        }
+        fwrite("coucou", sizeof(char), strlen("coucou"), payload_out);
+        fclose(payload_out);
     }
 }
 
