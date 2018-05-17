@@ -159,6 +159,10 @@ static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
         for(xid_t i=0; i<node->groups->groups_count; i++)
             switch(paircmp(&msg->lballot[i], &cmd->ballot[i])) {
                 case -1:
+                    //Reject commands with higher ballot numbers if already locally initialized
+                    if(paircmp(&msg->lts[i], &default_pair) != 0)
+                        return;
+                    //Only mark for reset if update from non-null value
                     if(paircmp(&msg->lballot[i], &default_pair) != 0)
                         updated_components++;
                     msg->lballot[i] = cmd->ballot[i];
