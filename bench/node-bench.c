@@ -17,6 +17,7 @@
 #include "amcast.h"
 
 #define CONF_SEPARATOR "\t"
+#define LOG_SEPARATOR "\t"
 #define NUMBER_OF_MESSAGES 100000
 #define NODES_PER_GROUP 3
 #define INITIAL_LEADER_IN_GROUP 0
@@ -29,7 +30,33 @@ struct stats {
 } stats;
 
 //TODO write to file the execution log
-void write_report(struct stats *stats) {
+void write_report(struct node *node, struct stats *stats, FILE *stream) {
+    for(int i=0; i<stats->delivered; i++) {
+        //Retrieve measures & the message's context
+        struct amcast_msg *msg = stats->msgs[i];
+        struct timespec ts = stats->tv[i];
+        //Retrieve the message's gts
+        g_uid_t gts = msg->gts;
+        //Write to a string the destination groups
+        char *destgrps = malloc(sizeof(char) * (1 + 1 + (12 + 1) * msg->msg.destgrps_count) + 1);
+        int idx = 0;
+        idx = sprintf(destgrps+idx, "(%d", msg->msg.destgrps[0]);
+        for(int i=0; i<msg->msg.destgrps_count - 1; i++)
+            idx = sprintf(destgrps+idx, ",%d", msg->msg.destgrps[i]);
+        idx = sprintf(destgrps+idx, ",%d)", msg->msg.destgrps[msg->msg.destgrps_count-1]);
+        //Write to a file the line corresponding to this message
+        fprintf(stream, "(%u,%d)" LOG_SEPARATOR
+                        "%lld.%.9ld" LOG_SEPARATOR
+                        "(%u,%d)" LOG_SEPARATOR
+                        "%u" LOG_SEPARATOR
+                        "%s" "\n",
+                        msg->msg.mid.time, msg->msg.mid.id,
+                        (long long)ts.tv_sec, ts.tv_nsec,
+                        gts.time, gts.id,
+                        msg->msg.destgrps_count,
+                        destgrps);
+        //TODO Write to another file the payload of this message
+    }
 }
 
 //Record useful info regarding the delivered message
@@ -41,13 +68,13 @@ void delivery_cb(struct node *node, struct amcast_msg *msg, void *cb_arg) {
         kill(getpid(), SIGHUP);
 }
 
-void run_amcast_node(struct cluster_config *config, xid_t node_id) {
+struct node *run_amcast_node(struct cluster_config *config, xid_t node_id) {
     struct node *n = node_init(config, node_id, &delivery_cb, NULL);
     //TODO Do no configure the protocol manually like this
     n->amcast->status = (node_id % NODES_PER_GROUP == INITIAL_LEADER_IN_GROUP) ? LEADER : FOLLOWER;
     n->amcast->ballot.id = n->comm->groups[node_id] * NODES_PER_GROUP;
     node_start(n);
-    node_free(n);
+    return(n);
 }
 
 void run_client_node(struct cluster_config *config, xid_t client_id) {
@@ -158,6 +185,8 @@ int main(int argc, char *argv[]) {
         printf("USAGE: node-bench [node_id] [number_of_nodes] [number_of_groups] [isClient?]\n");
         exit(EXIT_FAILURE);
     }
+    FILE *logfile;
+    struct node *node;
 
     //Init node & cluster config
     struct cluster_config *config = malloc(sizeof(struct cluster_config));
@@ -171,11 +200,20 @@ int main(int argc, char *argv[]) {
         return EXIT_SUCCESS;
     }
 
-    run_amcast_node(config, node_id);
+    node = run_amcast_node(config, node_id);
 
-    write_report(&stats);
+    //Open logfile for editing
+    char filename[40];
+    sprintf(filename, "./log/report.%d.log", node_id);
+    if((logfile = fopen(filename, "w")) == NULL) {
+        puts("ERROR: Can not open logfile");
+        exit(EXIT_FAILURE);
+    }
+
+    write_report(node, &stats, logfile);
 
     //Clean and exit
+    node_free(node);
     free_cluster_config(config);
     return EXIT_SUCCESS;
 }
