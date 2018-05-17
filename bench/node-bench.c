@@ -49,22 +49,16 @@ void write_report(struct node *node, struct stats *stats, FILE *stream) {
                         "%lld.%.9ld" LOG_SEPARATOR
                         "(%u,%d)" LOG_SEPARATOR
                         "%u" LOG_SEPARATOR
+                        "%s" LOG_SEPARATOR
+                        "%u" LOG_SEPARATOR
                         "%s" "\n",
                         msg->msg.mid.time, msg->msg.mid.id,
                         (long long)ts.tv_sec, ts.tv_nsec,
                         gts.time, gts.id,
                         msg->msg.destgrps_count,
-                        destgrps);
-        //Write to another file the payload of this message
-        FILE *payload_out;
-        char filename[40];
-        sprintf(filename, "./log/payload_%u.%d.log", mid, node->id);
-        if((payload_out = fopen(filename, "w")) == NULL) {
-            printf("ERROR: Can not open payload file for message %u\n", mid);
-            exit(EXIT_FAILURE);
-        }
-        fwrite("coucou", sizeof(char), strlen("coucou"), payload_out);
-        fclose(payload_out);
+                        destgrps,
+                        msg->msg.value.len,
+                        msg->msg.value.val);
     }
 }
 
@@ -108,7 +102,7 @@ void run_client_node(struct cluster_config *config, xid_t client_id) {
             .destgrps_count = config->groups_count,
             .destgrps = {0, 1},
             .value = {
-                .len = sizeof("coucou"),
+                .len = strlen("coucou"),
                 .val = "coucou"
             }
 	    },
@@ -222,6 +216,7 @@ int main(int argc, char *argv[]) {
     write_report(node, &stats, logfile);
 
     //Clean and exit
+    fclose(logfile);
     node_free(node);
     free_cluster_config(config);
     return EXIT_SUCCESS;
