@@ -47,7 +47,7 @@ static struct amcast_msg *init_amcast_msg(struct groups *groups, unsigned int cl
 static void handle_multicast(struct node *node, xid_t sid, message_t *cmd) {
     printf("[%u] {%u} We got MULTICAST command from %u!\n", node->id, cmd->mid, sid);
     if (node->amcast->status == LEADER) {
-        struct amcast_msg *msg;
+        struct amcast_msg *msg = NULL;
         if((msg = htable_lookup(node->amcast->h_msgs, &cmd->mid)) == NULL) {
             if(node->amcast->msgs_count >= node->amcast->msgs_size) {
                 node->amcast->msgs_size *= 2;
@@ -83,7 +83,7 @@ static void handle_multicast(struct node *node, xid_t sid, message_t *cmd) {
 
 static void handle_accept(struct node *node, xid_t sid, accept_t *cmd) {
     printf("[%u] {%u} We got ACCEPT command from %u!\n", node->id, cmd->mid, sid);
-    struct amcast_msg *msg;
+    struct amcast_msg *msg = NULL;
     if((msg = htable_lookup(node->amcast->h_msgs, &cmd->mid)) == NULL) {
         if(node->amcast->msgs_count >= node->amcast->msgs_size) {
             node->amcast->msgs_size *= 2;
@@ -142,7 +142,7 @@ static void handle_accept(struct node *node, xid_t sid, accept_t *cmd) {
 static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
     printf("[%u] {%u} We got ACCEPT_ACK command from %u!\n", node->id, cmd->mid, sid);
     if (node->amcast->status == LEADER) {
-        struct amcast_msg *msg = node->amcast->msgs[cmd->mid];
+        struct amcast_msg *msg = NULL;
         if((msg = htable_lookup(node->amcast->h_msgs, &cmd->mid)) == NULL)
             exit(EXIT_FAILURE);
         //TODO Cache messages instead of resending to yourself
@@ -228,7 +228,7 @@ static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
 
 static void handle_deliver(struct node *node, xid_t sid, deliver_t *cmd) {
     printf("[%u] {%u} We got DELIVER command from %u with gts: (%u,%u)!\n", node->id, cmd->mid, sid, cmd->gts.time, cmd->gts.id);
-    struct amcast_msg *msg = node->amcast->msgs[cmd->mid];
+    struct amcast_msg *msg = NULL;
     if((msg = htable_lookup(node->amcast->h_msgs, &cmd->mid)) == NULL)
         exit(EXIT_FAILURE);
     if (node->amcast->status == FOLLOWER
