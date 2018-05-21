@@ -9,6 +9,7 @@
 #include "cluster.h"
 //TODO fix: do not compile when adding this include
 //#include "amcast.h"
+#include "amcast_types.h"
 
 struct groups {
     unsigned int	groups_count;
