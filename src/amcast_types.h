@@ -18,6 +18,9 @@ typedef struct pair p_uid_t;
 typedef struct pair g_uid_t;
 typedef struct pair m_uid_t;
 
+struct amcast;
+struct amcast_msg;
+
 //OPERATIONS
 int paircmp(struct pair *p1, struct pair *p2);
 int pairequ(struct pair *p1, struct pair *p2);

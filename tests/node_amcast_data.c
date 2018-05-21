@@ -27,7 +27,7 @@ pid_t pids[NUMBER_OF_NODES];
 //    Do local checks during protocol execution (in this callback),
 //    Then write them to parent thread,
 //    Finally do global checks
-void delivery_cb(struct node *node, m_uid_t mid) {
+void delivery_cb(struct node *node, struct amcast_msg *msg) {
 }
 
 int envcmp(struct enveloppe *env1, struct enveloppe *env2) {

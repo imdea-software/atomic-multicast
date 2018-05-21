@@ -218,7 +218,7 @@ static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
                 try_next = 1;
                 (*i_msg)->delivered = TRUE;
                 if(node->amcast->delivery_cb)
-                    node->amcast->delivery_cb(node, (*i_msg)->msg.mid);
+                    node->amcast->delivery_cb(node, *i_msg);
                 struct enveloppe rep = {
 	            .sid = node->id,
 	            .cmd_type = DELIVER,
@@ -252,7 +252,7 @@ static void handle_deliver(struct node *node, xid_t sid, deliver_t *cmd) {
             node->amcast->clock = msg->gts.time;
         msg->delivered = TRUE;
         if(node->amcast->delivery_cb)
-            node->amcast->delivery_cb(node, cmd->mid);
+            node->amcast->delivery_cb(node, msg);
     }
 }
 

@@ -45,7 +45,7 @@ struct node {
     struct amcast	*amcast;
 };
 
-typedef void (*delivery_cb_fun)(struct node *node, m_uid_t mid);
+typedef void (*delivery_cb_fun)(struct node *node, struct amcast_msg *msg);
 
 struct 	node 	*node_init	(struct cluster_config *conf, xid_t id, delivery_cb_fun delivery_cb);
 int 		node_free	(struct node *node);
