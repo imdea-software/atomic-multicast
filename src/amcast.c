@@ -374,7 +374,8 @@ struct amcast *amcast_init(delivery_cb_fun delivery_cb) {
     return amcast;
 }
 
-static int free_amcast_msg(struct amcast_msg *msg) {
+//Function prototype to be called by htable_foreach()
+static int free_amcast_msg(m_uid_t *mid, struct amcast_msg *msg, void *arg) {
     free(msg->lballot);
     free(msg->lts);
     free(msg->accept_groupcount);
@@ -388,10 +389,8 @@ static int free_amcast_msg(struct amcast_msg *msg) {
 int amcast_free(struct amcast *amcast) {
     pqueue_free(amcast->committed_gts);
     pqueue_free(amcast->pending_lts);
+    htable_foreach(amcast->h_msgs, (GHFunc) free_amcast_msg, NULL);
     htable_free(amcast->h_msgs);
-    for(struct amcast_msg **msg = amcast->msgs; msg < amcast->msgs + amcast->msgs_count; msg++)
-        if(*msg)
-            free_amcast_msg(*msg);
     free(amcast);
     return 0;
 }
