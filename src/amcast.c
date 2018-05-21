@@ -10,6 +10,10 @@
 
 
 int paircmp(struct pair *p1, struct pair *p2) {
+    if(p1 == NULL || p2 == NULL) {
+        puts("ERROR: paircmp called with null pointer");
+        exit(EXIT_FAILURE);
+    }
     if(p1->time < p2->time)
         return -1;
     if(p1->time > p2->time)
@@ -28,12 +32,18 @@ int paircmp(struct pair *p1, struct pair *p2) {
 struct pair default_pair = { .time = 0, .id = -1};
 
 int midequ(m_uid_t *m1, m_uid_t *m2) {
-    if(m1 == NULL || m2 == NULL)
+    if(m1 == NULL || m2 == NULL) {
+        puts("ERROR: pairequ called with null pointer");
         exit(EXIT_FAILURE);
+    }
     return *m1 == *m2;
 }
 
 unsigned int midhash(m_uid_t *m) {
+    if(m == NULL) {
+        puts("ERROR: pairhash called with null pointer");
+        exit(EXIT_FAILURE);
+    }
     return ((*m + *m)*(*m + *m + 1))/2 + *m;
 }
 
@@ -149,8 +159,10 @@ static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
     printf("[%u] {%u} We got ACCEPT_ACK command from %u!\n", node->id, cmd->mid, sid);
     if (node->amcast->status == LEADER) {
         struct amcast_msg *msg = NULL;
-        if((msg = htable_lookup(node->amcast->h_msgs, &cmd->mid)) == NULL)
+        if((msg = htable_lookup(node->amcast->h_msgs, &cmd->mid)) == NULL) {
+            puts("ERROR: Could not find this mid in h_msgs");
             exit(EXIT_FAILURE);
+        }
         //Check whether the local ballot and the received one are equal
         //  It seems ACCEPT_ACKS are sometime recevied before gts is initialized
         //  so just update local ballots number if lesser than the received ones
@@ -248,8 +260,10 @@ static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
 static void handle_deliver(struct node *node, xid_t sid, deliver_t *cmd) {
     printf("[%u] {%u} We got DELIVER command from %u with gts: (%u,%u)!\n", node->id, cmd->mid, sid, cmd->gts.time, cmd->gts.id);
     struct amcast_msg *msg = NULL;
-    if((msg = htable_lookup(node->amcast->h_msgs, &cmd->mid)) == NULL)
+    if((msg = htable_lookup(node->amcast->h_msgs, &cmd->mid)) == NULL) {
+        puts("ERROR: Could not find this mid in h_msgs");
         exit(EXIT_FAILURE);
+    }
     if (node->amcast->status == FOLLOWER
             && paircmp(&node->amcast->ballot, &cmd->ballot) == 0
             && msg->delivered == FALSE) {
