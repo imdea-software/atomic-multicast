@@ -7,8 +7,6 @@
 #include "message.h"
 #include "pqueue.h"
 
-#define MSGS_DEFAULT_SIZE 100
-
 
 struct amcast_msg {
     phase_t phase;
@@ -36,9 +34,6 @@ struct amcast {
     p_uid_t ballot;
     p_uid_t aballot;
     clk_t clock;
-    uint32_t msgs_count;
-    uint32_t msgs_size;
-    struct amcast_msg **msgs;
     htable_t *h_msgs;
     //EXTRA FIELDS (NOT IN SPEC)
     pqueue_t *committed_gts;
