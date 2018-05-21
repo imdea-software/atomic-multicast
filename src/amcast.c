@@ -68,8 +68,7 @@ static void handle_multicast(struct node *node, xid_t sid, message_t *cmd) {
             node->amcast->clock++;
             msg->lts[node->comm->groups[node->id]].time = node->amcast->clock;
             msg->lts[node->comm->groups[node->id]].id = node->comm->groups[node->id];
-            pqueue_push(node->amcast->pending_lts, &cmd->mid,
-			    &msg->lts[node->comm->groups[node->id]]);
+            pqueue_push(node->amcast->pending_lts, &msg, &msg->lts[node->comm->groups[node->id]]);
         }
         struct enveloppe rep = {
 	    .sid = node->id,
@@ -111,7 +110,7 @@ static void handle_accept(struct node *node, xid_t sid, accept_t *cmd) {
                               &cmd->lts) < 0) {
             pqueue_remove(node->amcast->pending_lts,
                    &msg->lts[node->comm->groups[node->id]]);
-            pqueue_push(node->amcast->pending_lts, &cmd->mid, &cmd->lts);
+            pqueue_push(node->amcast->pending_lts, &msg, &cmd->lts);
         }
     if(node->amcast->status == LEADER
        && paircmp(&msg->lballot[cmd->grp], &default_pair) != 0
@@ -192,51 +191,42 @@ static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
         if(msg->phase != COMMITTED) {
             pqueue_remove(node->amcast->pending_lts,
                           &msg->lts[node->comm->groups[node->id]]);
-            pqueue_push(node->amcast->committed_gts, &cmd->mid, &msg->gts);
+            pqueue_push(node->amcast->committed_gts, &msg, &msg->gts);
         }
         msg->phase = COMMITTED;
 	//TODO A lot of possible improvements in the delivery pattern
         int try_next = 1;
         while(try_next && pqueue_size(node->amcast->committed_gts) > 0) {
-            struct amcast_msg *i_msg = NULL, *j_msg = NULL;
+            struct amcast_msg **i_msg = NULL, **j_msg = NULL;
             try_next = 0;
-            m_uid_t *i;
-            if((i = pqueue_peek(node->amcast->committed_gts)) == NULL) {
+            if((i_msg = pqueue_peek(node->amcast->committed_gts)) == NULL) {
                 printf("Failed to peek - %u\n", pqueue_size(node->amcast->committed_gts));
                 return;
             }
-            if((i_msg = htable_lookup(node->amcast->h_msgs, i)) == NULL) {
-                printf("Failed to find gts peeked msg\n");
-                return;
-            }
-            if(i_msg->phase == COMMITTED
-               && i_msg->delivered == FALSE) {
-                m_uid_t *j = pqueue_peek(node->amcast->pending_lts);
-                if(j != NULL && (j_msg = htable_lookup(node->amcast->h_msgs, j)) == NULL) {
-                    printf("Failed to find lts peeked msg\n");
+            if((*i_msg)->phase == COMMITTED
+               && (*i_msg)->delivered == FALSE) {
+                j_msg = pqueue_peek(node->amcast->pending_lts);
+                if(j_msg != NULL && paircmp(&(*j_msg)->lts[node->comm->groups[node->id]],
+                                        &(*i_msg)->gts) < 0
+                             && (*j_msg)->phase != COMMITTED) {
                     return;
                 }
-                if(j_msg != NULL && paircmp(&j_msg->lts[node->comm->groups[node->id]],
-                                        &i_msg->gts) < 0
-                             && j_msg->phase != COMMITTED) {
-                    return;
-                }
-                if((i = pqueue_pop(node->amcast->committed_gts)) == NULL) {
+                if((i_msg = pqueue_pop(node->amcast->committed_gts)) == NULL) {
 		    printf("Failed to pop - %u\n", pqueue_size(node->amcast->committed_gts));
                     return;
                 }
                 try_next = 1;
-                i_msg->delivered = TRUE;
+                (*i_msg)->delivered = TRUE;
                 if(node->amcast->delivery_cb)
-                    node->amcast->delivery_cb(node, *i);
+                    node->amcast->delivery_cb(node, (*i_msg)->msg.mid);
                 struct enveloppe rep = {
 	            .sid = node->id,
 	            .cmd_type = DELIVER,
 	            .cmd.deliver = {
-	                .mid = *i,
+	                .mid = (*i_msg)->msg.mid,
 		        .ballot = node->amcast->ballot,
-		        .lts = i_msg->lts[node->comm->groups[node->id]],
-		        .gts = i_msg->gts
+		        .lts = (*i_msg)->lts[node->comm->groups[node->id]],
+		        .gts = (*i_msg)->gts
 	            },
 	        };
                 send_to_group(node, &rep, node->comm->groups[node->id]);
