@@ -31,20 +31,20 @@ int paircmp(struct pair *p1, struct pair *p2) {
 }
 struct pair default_pair = { .time = 0, .id = -1};
 
-int midequ(m_uid_t *m1, m_uid_t *m2) {
-    if(m1 == NULL || m2 == NULL) {
+int pairequ(struct pair *p1, struct pair *p2) {
+    if(p1 == NULL || p2 == NULL) {
         puts("ERROR: pairequ called with null pointer");
         exit(EXIT_FAILURE);
     }
-    return *m1 == *m2;
+    return p1->time == p2->time && p1->id == p2->id;
 }
 
-unsigned int midhash(m_uid_t *m) {
-    if(m == NULL) {
+unsigned int pairhash(struct pair *p) {
+    if(p == NULL) {
         puts("ERROR: pairhash called with null pointer");
         exit(EXIT_FAILURE);
     }
-    return ((*m + *m)*(*m + *m + 1))/2 + *m;
+    return ((p->time + p->id + 1)*(p->time + p->id + 2))/2 + p->id;
 }
 
 //TODO Make helper functions to create enveloppes in clean and nice looking way
@@ -56,7 +56,7 @@ static struct amcast_msg *init_amcast_msg(struct groups *groups, unsigned int cl
 static void reset_accept_ack_counters(struct amcast_msg *msg, struct groups *groups, unsigned int cluster_size);
 
 static void handle_multicast(struct node *node, xid_t sid, message_t *cmd) {
-    printf("[%u] {%u} We got MULTICAST command from %u!\n", node->id, cmd->mid, sid);
+    printf("[%u] {%u,%d} We got MULTICAST command from %u!\n", node->id, cmd->mid.time, cmd->mid.id, sid);
     if (node->amcast->status == LEADER) {
         struct amcast_msg *msg = NULL;
         if((msg = htable_lookup(node->amcast->h_msgs, &cmd->mid)) == NULL) {
@@ -93,7 +93,7 @@ static void handle_multicast(struct node *node, xid_t sid, message_t *cmd) {
 }
 
 static void handle_accept(struct node *node, xid_t sid, accept_t *cmd) {
-    printf("[%u] {%u} We got ACCEPT command from %u!\n", node->id, cmd->mid, sid);
+    printf("[%u] {%u,%d} We got ACCEPT command from %u!\n", node->id, cmd->mid.time, cmd->mid.id, sid);
     struct amcast_msg *msg = NULL;
     if((msg = htable_lookup(node->amcast->h_msgs, &cmd->mid)) == NULL) {
         if(node->amcast->msgs_count >= node->amcast->msgs_size) {
@@ -156,7 +156,7 @@ static void handle_accept(struct node *node, xid_t sid, accept_t *cmd) {
 }
 
 static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
-    printf("[%u] {%u} We got ACCEPT_ACK command from %u!\n", node->id, cmd->mid, sid);
+    printf("[%u] {%u,%d} We got ACCEPT_ACK command from %u!\n", node->id, cmd->mid.time, cmd->mid.id, sid);
     if (node->amcast->status == LEADER) {
         struct amcast_msg *msg = NULL;
         if((msg = htable_lookup(node->amcast->h_msgs, &cmd->mid)) == NULL) {
@@ -258,7 +258,8 @@ static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
 }
 
 static void handle_deliver(struct node *node, xid_t sid, deliver_t *cmd) {
-    printf("[%u] {%u} We got DELIVER command from %u with gts: (%u,%u)!\n", node->id, cmd->mid, sid, cmd->gts.time, cmd->gts.id);
+    printf("[%u] {%u,%d} We got DELIVER command from %u with gts: (%u,%u)!\n",
+            node->id, cmd->mid.time, cmd->mid.id, sid, cmd->gts.time, cmd->gts.id);
     struct amcast_msg *msg = NULL;
     if((msg = htable_lookup(node->amcast->h_msgs, &cmd->mid)) == NULL) {
         puts("ERROR: Could not find this mid in h_msgs");
@@ -365,7 +366,7 @@ struct amcast *amcast_init(delivery_cb_fun delivery_cb) {
     amcast->msgs_size = MSGS_DEFAULT_SIZE;
     amcast->msgs = malloc(sizeof(struct amcast_msg *) * MSGS_DEFAULT_SIZE);
     memset(amcast->msgs, 0, sizeof(struct amcast_msg *) * MSGS_DEFAULT_SIZE);
-    amcast->h_msgs = htable_init(midhash, midequ);
+    amcast->h_msgs = htable_init(pairhash, pairequ);
     //EXTRA FIELDS (NOT IN SPEC)
     amcast->committed_gts = pqueue_init((pq_pricmp_fun) paircmp);
     amcast->pending_lts = pqueue_init((pq_pricmp_fun) paircmp);

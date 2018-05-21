@@ -28,7 +28,7 @@ int envcmp(struct enveloppe *env1, struct enveloppe *env2) {
         out++;
     if (env1->cmd_type != env2->cmd_type)
         out++;
-    if (env1->cmd.multicast.mid != env2->cmd.multicast.mid)
+    if (paircmp(&env1->cmd.multicast.mid, &env2->cmd.multicast.mid) != 0)
         out++;
     if (env1->cmd.multicast.destgrps_count != env2->cmd.multicast.destgrps_count) {
         out++;
@@ -94,7 +94,7 @@ int main(int argc, char *argv[]) {
 	    .sid = -1,
 	    .cmd_type = MULTICAST,
 	    .cmd.multicast = {
-	        .mid = 1,
+	        .mid = {0,0},
 		.destgrps_count = 2,
 		.destgrps = {0, 1},
 		.value = {
