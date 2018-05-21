@@ -350,10 +350,6 @@ struct amcast *amcast_init(delivery_cb_fun delivery_cb) {
     amcast->ballot = default_pair;
     amcast->aballot = default_pair;
     amcast->clock = 0;
-    amcast->msgs_count = 0;
-    amcast->msgs_size = MSGS_DEFAULT_SIZE;
-    amcast->msgs = malloc(sizeof(struct amcast_msg *) * MSGS_DEFAULT_SIZE);
-    memset(amcast->msgs, 0, sizeof(struct amcast_msg *) * MSGS_DEFAULT_SIZE);
     amcast->h_msgs = htable_init(pairhash, pairequ);
     //EXTRA FIELDS (NOT IN SPEC)
     amcast->committed_gts = pqueue_init((pq_pricmp_fun) paircmp);
