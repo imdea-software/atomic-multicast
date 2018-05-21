@@ -104,14 +104,6 @@ static void handle_accept(struct node *node, xid_t sid, accept_t *cmd) {
             if(paircmp(&msg->accept_max_lts, &cmd->lts) < 0)
                 msg->accept_max_lts = cmd->lts;
 	}
-        if(node->amcast->status == LEADER
-                   && cmd->grp == node->comm->groups[node->id]
-                   && paircmp(&msg->lts[node->comm->groups[node->id]],
-                              &cmd->lts) < 0) {
-            pqueue_remove(node->amcast->pending_lts,
-                   &msg->lts[node->comm->groups[node->id]]);
-            pqueue_push(node->amcast->pending_lts, &msg, &cmd->lts);
-        }
     if(node->amcast->status == LEADER
        && paircmp(&msg->lballot[cmd->grp], &default_pair) != 0
        && paircmp(&msg->lballot[cmd->grp], &cmd->ballot) < 0)
