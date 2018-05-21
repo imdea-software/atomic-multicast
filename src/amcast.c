@@ -43,6 +43,7 @@ unsigned int midhash(m_uid_t *m) {
 //         or sub-functions using only the useful structure fields passed as arguments
 
 static struct amcast_msg *init_amcast_msg(struct groups *groups, unsigned int cluster_size, message_t *cmd);
+static void reset_accept_ack_counters(struct amcast_msg *msg, struct groups *groups, unsigned int cluster_size);
 
 static void handle_multicast(struct node *node, xid_t sid, message_t *cmd) {
     printf("[%u] {%u} We got MULTICAST command from %u!\n", node->id, cmd->mid, sid);
@@ -100,7 +101,8 @@ static void handle_accept(struct node *node, xid_t sid, accept_t *cmd) {
                   && !(paircmp(&node->amcast->ballot, &cmd->ballot) == 0) )) {
 	//TODO Carefully try to see when it's the best time to reset this counter
 	//     Probably upon a leader change
-	if (paircmp(&msg->lballot[cmd->grp], &default_pair) == 0) {
+	if (msg->accept_groupcount[cmd->grp] == 0) {
+            msg->accept_groupcount[cmd->grp] += 1;
             msg->accept_totalcount += 1;
             if(paircmp(&msg->accept_max_lts, &cmd->lts) < 0)
                 msg->accept_max_lts = cmd->lts;
@@ -113,6 +115,10 @@ static void handle_accept(struct node *node, xid_t sid, accept_t *cmd) {
                    &msg->lts[node->comm->groups[node->id]]);
             pqueue_push(node->amcast->pending_lts, &cmd->mid, &cmd->lts);
         }
+    if(node->amcast->status == LEADER
+       && paircmp(&msg->lballot[cmd->grp], &default_pair) != 0
+       && paircmp(&msg->lballot[cmd->grp], &cmd->ballot) < 0)
+        reset_accept_ack_counters(msg, node->groups, node->comm->cluster_size);
     msg->lballot[cmd->grp] = cmd->ballot;
     msg->lts[cmd->grp] = cmd->lts;
     if(msg->accept_totalcount != msg->msg.destgrps_count)
@@ -145,18 +151,29 @@ static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
         struct amcast_msg *msg = NULL;
         if((msg = htable_lookup(node->amcast->h_msgs, &cmd->mid)) == NULL)
             exit(EXIT_FAILURE);
-        //TODO Cache messages instead of resending to yourself
-        //It seems ACCEPT_ACKS are sometime recevied before gts is initialized
-        if(paircmp(&msg->gts, &default_pair) == 0) {
-            printf("[%d] {%u} Re-sending ACCEPT_ACK command from %d!\n", node->id, cmd->mid, sid);
-            struct enveloppe retry = { .sid = sid, .cmd_type = ACCEPT_ACK, .cmd.accept_ack = *cmd };
-            send_to_peer(node, &retry, node->id);
-            return;
-        }
         //Check whether the local ballot and the received one are equal
+        //  It seems ACCEPT_ACKS are sometime recevied before gts is initialized
+        //  so just update local ballots number if lesser than the received ones
+        //  and mark the counters to be reset
+        int updated_components = 0;
         for(xid_t i=0; i<node->groups->groups_count; i++)
-            if(paircmp(&msg->lballot[i], &cmd->ballot[i]) != 0)
-                return;
+            switch(paircmp(&msg->lballot[i], &cmd->ballot[i])) {
+                case -1:
+                    //Reject commands with higher ballot numbers if already locally initialized
+                    if(paircmp(&msg->lts[i], &default_pair) != 0)
+                        return;
+                    //Only mark for reset if update from non-null value
+                    if(paircmp(&msg->lballot[i], &default_pair) != 0)
+                        updated_components++;
+                    msg->lballot[i] = cmd->ballot[i];
+                    break;
+                case 0:
+                    break;
+                default:
+                    return;
+            }
+        if(updated_components > 0)
+            reset_accept_ack_counters(msg, node->groups, node->comm->cluster_size);
         if(msg->accept_ack_counts[sid] < 1) {
             msg->accept_ack_counts[sid] += 1;
             msg->accept_ack_groupcount[cmd->grp] += 1;
@@ -223,13 +240,6 @@ static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
 	            },
 	        };
                 send_to_group(node, &rep, node->comm->groups[node->id]);
-                //RESET counter variables
-                memset(msg->accept_ack_counts,
-                            0, sizeof(unsigned int) * node->comm->cluster_size);
-                for(int i=0; i<node->groups->groups_count; i++) {
-                    msg->accept_ack_groupready[i] = 0;
-                    msg->accept_ack_groupcount[i] = 0;
-	        }
             }
         }
     }
@@ -311,6 +321,7 @@ static struct amcast_msg *init_amcast_msg(struct groups *groups, unsigned int cl
     msg->msg = *cmd;
     //EXTRA FIELDS - ACCEPT COUNTERS
     msg->accept_totalcount = 0;
+    msg->accept_groupcount = malloc(sizeof(unsigned int) * groups->groups_count);
     msg->accept_max_lts = default_pair;
     //EXTRA FIELDS - ACCEPT_ACK COUNTERS
     msg->groups_count = groups->groups_count;
@@ -319,6 +330,7 @@ static struct amcast_msg *init_amcast_msg(struct groups *groups, unsigned int cl
     msg->accept_ack_groupcount = malloc(sizeof(unsigned int) * groups->groups_count);
     msg->accept_ack_counts = malloc(sizeof(unsigned int) * cluster_size);
     //Init the several arrays
+    memset(msg->accept_groupcount, 0, sizeof(unsigned int) * groups->groups_count);
     memset(msg->accept_ack_counts, 0, sizeof(unsigned int) * cluster_size);
     for(unsigned int *i = groups->node_counts; i<groups->node_counts + groups->groups_count; i++) {
         msg->lballot[i-groups->node_counts] = default_pair;
@@ -350,6 +362,7 @@ struct amcast *amcast_init(delivery_cb_fun delivery_cb) {
 static int free_amcast_msg(struct amcast_msg *msg) {
     free(msg->lballot);
     free(msg->lts);
+    free(msg->accept_groupcount);
     free(msg->accept_ack_groupready);
     free(msg->accept_ack_groupcount);
     free(msg->accept_ack_counts);
@@ -366,4 +379,11 @@ int amcast_free(struct amcast *amcast) {
             free_amcast_msg(*msg);
     free(amcast);
     return 0;
+}
+
+static void reset_accept_ack_counters(struct amcast_msg *msg, struct groups *groups, unsigned int cluster_size) {
+    msg->accept_ack_totalcount = 0;
+    memset(msg->accept_ack_groupready, 0, sizeof(unsigned int) * groups->groups_count);
+    memset(msg->accept_ack_groupcount, 0, sizeof(unsigned int) * groups->groups_count);
+    memset(msg->accept_ack_counts, 0, sizeof(unsigned int) * cluster_size);
 }
