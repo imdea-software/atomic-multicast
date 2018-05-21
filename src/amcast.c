@@ -68,6 +68,7 @@ static void handle_multicast(struct node *node, xid_t sid, message_t *cmd) {
             node->amcast->clock++;
             msg->lts[node->comm->groups[node->id]].time = node->amcast->clock;
             msg->lts[node->comm->groups[node->id]].id = node->comm->groups[node->id];
+            msg->lballot[node->comm->groups[node->id]] = node->amcast->ballot;
             pqueue_push(node->amcast->pending_lts, &msg, &msg->lts[node->comm->groups[node->id]]);
         }
         struct enveloppe rep = {
