@@ -60,13 +60,7 @@ static void handle_multicast(struct node *node, xid_t sid, message_t *cmd) {
     if (node->amcast->status == LEADER) {
         struct amcast_msg *msg = NULL;
         if((msg = htable_lookup(node->amcast->h_msgs, &cmd->mid)) == NULL) {
-            if(node->amcast->msgs_count >= node->amcast->msgs_size) {
-                node->amcast->msgs_size *= 2;
-                node->amcast->msgs = realloc(node->amcast->msgs,
-                            sizeof(struct amcast_msg *) * node->amcast->msgs_size);
-            }
             msg = init_amcast_msg(node->groups, node->comm->cluster_size, cmd);
-            node->amcast->msgs[node->amcast->msgs_count++] = msg;
             htable_insert(node->amcast->h_msgs, &cmd->mid, msg);
         }
         if(msg->phase == START) {
@@ -96,13 +90,7 @@ static void handle_accept(struct node *node, xid_t sid, accept_t *cmd) {
     printf("[%u] {%u,%d} We got ACCEPT command from %u!\n", node->id, cmd->mid.time, cmd->mid.id, sid);
     struct amcast_msg *msg = NULL;
     if((msg = htable_lookup(node->amcast->h_msgs, &cmd->mid)) == NULL) {
-        if(node->amcast->msgs_count >= node->amcast->msgs_size) {
-            node->amcast->msgs_size *= 2;
-            node->amcast->msgs = realloc(node->amcast->msgs,
-                        sizeof(struct amcast_msg *) * node->amcast->msgs_size);
-        }
         msg = init_amcast_msg(node->groups, node->comm->cluster_size, &cmd->msg);
-        node->amcast->msgs[node->amcast->msgs_count++] = msg;
         htable_insert(node->amcast->h_msgs, &cmd->mid, msg);
     }
     if ((node->amcast->status == LEADER || node->amcast->status == FOLLOWER)
