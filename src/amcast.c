@@ -60,13 +60,7 @@ static void handle_multicast(struct node *node, xid_t sid, message_t *cmd) {
     if (node->amcast->status == LEADER) {
         struct amcast_msg *msg = NULL;
         if((msg = htable_lookup(node->amcast->h_msgs, &cmd->mid)) == NULL) {
-            if(node->amcast->msgs_count >= node->amcast->msgs_size) {
-                node->amcast->msgs_size *= 2;
-                node->amcast->msgs = realloc(node->amcast->msgs,
-                            sizeof(struct amcast_msg *) * node->amcast->msgs_size);
-            }
             msg = init_amcast_msg(node->groups, node->comm->cluster_size, cmd);
-            node->amcast->msgs[node->amcast->msgs_count++] = msg;
             htable_insert(node->amcast->h_msgs, &cmd->mid, msg);
         }
         if(msg->phase == START) {
@@ -96,13 +90,7 @@ static void handle_accept(struct node *node, xid_t sid, accept_t *cmd) {
     printf("[%u] {%u,%d} We got ACCEPT command from %u!\n", node->id, cmd->mid.time, cmd->mid.id, sid);
     struct amcast_msg *msg = NULL;
     if((msg = htable_lookup(node->amcast->h_msgs, &cmd->mid)) == NULL) {
-        if(node->amcast->msgs_count >= node->amcast->msgs_size) {
-            node->amcast->msgs_size *= 2;
-            node->amcast->msgs = realloc(node->amcast->msgs,
-                        sizeof(struct amcast_msg *) * node->amcast->msgs_size);
-        }
         msg = init_amcast_msg(node->groups, node->comm->cluster_size, &cmd->msg);
-        node->amcast->msgs[node->amcast->msgs_count++] = msg;
         htable_insert(node->amcast->h_msgs, &cmd->mid, msg);
     }
     if ((node->amcast->status == LEADER || node->amcast->status == FOLLOWER)
@@ -362,10 +350,6 @@ struct amcast *amcast_init(delivery_cb_fun delivery_cb) {
     amcast->ballot = default_pair;
     amcast->aballot = default_pair;
     amcast->clock = 0;
-    amcast->msgs_count = 0;
-    amcast->msgs_size = MSGS_DEFAULT_SIZE;
-    amcast->msgs = malloc(sizeof(struct amcast_msg *) * MSGS_DEFAULT_SIZE);
-    memset(amcast->msgs, 0, sizeof(struct amcast_msg *) * MSGS_DEFAULT_SIZE);
     amcast->h_msgs = htable_init(pairhash, pairequ);
     //EXTRA FIELDS (NOT IN SPEC)
     amcast->committed_gts = pqueue_init((pq_pricmp_fun) paircmp);
@@ -374,7 +358,8 @@ struct amcast *amcast_init(delivery_cb_fun delivery_cb) {
     return amcast;
 }
 
-static int free_amcast_msg(struct amcast_msg *msg) {
+//Function prototype to be called by htable_foreach()
+static int free_amcast_msg(m_uid_t *mid, struct amcast_msg *msg, void *arg) {
     free(msg->lballot);
     free(msg->lts);
     free(msg->accept_groupcount);
@@ -388,10 +373,8 @@ static int free_amcast_msg(struct amcast_msg *msg) {
 int amcast_free(struct amcast *amcast) {
     pqueue_free(amcast->committed_gts);
     pqueue_free(amcast->pending_lts);
+    htable_foreach(amcast->h_msgs, (GHFunc) free_amcast_msg, NULL);
     htable_free(amcast->h_msgs);
-    for(struct amcast_msg **msg = amcast->msgs; msg < amcast->msgs + amcast->msgs_count; msg++)
-        if(*msg)
-            free_amcast_msg(*msg);
     free(amcast);
     return 0;
 }
