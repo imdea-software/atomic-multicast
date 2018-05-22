@@ -39,9 +39,10 @@ struct amcast {
     pqueue_t *committed_gts;
     pqueue_t *pending_lts;
     delivery_cb_fun delivery_cb;
+    void *cb_arg;
 };
 
-struct amcast *amcast_init();
+struct amcast *amcast_init(delivery_cb_fun delivery_cb, void *cb_arg);
 int amcast_free(struct amcast *amcast);
 void dispatch_amcast_command(struct node *node, struct enveloppe *env);
 

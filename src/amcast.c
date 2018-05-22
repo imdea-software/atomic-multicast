@@ -222,7 +222,7 @@ static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
                 try_next = 1;
                 (*i_msg)->delivered = TRUE;
                 if(node->amcast->delivery_cb)
-                    node->amcast->delivery_cb(node, *i_msg);
+                    node->amcast->delivery_cb(node, *i_msg, node->amcast->cb_arg);
                 struct enveloppe rep = {
 	            .sid = node->id,
 	            .cmd_type = DELIVER,
@@ -256,7 +256,7 @@ static void handle_deliver(struct node *node, xid_t sid, deliver_t *cmd) {
             node->amcast->clock = msg->gts.time;
         msg->delivered = TRUE;
         if(node->amcast->delivery_cb)
-            node->amcast->delivery_cb(node, msg);
+            node->amcast->delivery_cb(node, msg, node->amcast->cb_arg);
     }
 }
 
@@ -338,7 +338,7 @@ static struct amcast_msg *init_amcast_msg(struct groups *groups, unsigned int cl
     return msg;
 }
 
-struct amcast *amcast_init(delivery_cb_fun delivery_cb) {
+struct amcast *amcast_init(delivery_cb_fun delivery_cb, void *cb_arg) {
     struct amcast *amcast = malloc(sizeof(struct amcast));
     amcast->status = INIT;
     amcast->ballot = default_pair;
@@ -349,6 +349,7 @@ struct amcast *amcast_init(delivery_cb_fun delivery_cb) {
     amcast->committed_gts = pqueue_init((pq_pricmp_fun) paircmp);
     amcast->pending_lts = pqueue_init((pq_pricmp_fun) paircmp);
     amcast->delivery_cb = delivery_cb;
+    amcast->cb_arg = cb_arg;
     return amcast;
 }
 

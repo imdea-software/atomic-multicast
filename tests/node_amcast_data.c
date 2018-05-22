@@ -27,7 +27,7 @@ pid_t pids[NUMBER_OF_NODES];
 //    Do local checks during protocol execution (in this callback),
 //    Then write them to parent thread,
 //    Finally do global checks
-void delivery_cb(struct node *node, struct amcast_msg *msg) {
+void delivery_cb(struct node *node, struct amcast_msg *msg, void* cb_arg) {
 }
 
 int envcmp(struct enveloppe *env1, struct enveloppe *env2) {
@@ -80,7 +80,7 @@ int main(int argc, char *argv[]) {
 
     //Let's now create the nodes
     if (id != -1) {
-        struct node *n = node_init(&conf, id, delivery_cb);
+        struct node *n = node_init(&conf, id, delivery_cb, NULL);
 	//Let's give them some AMCAST ROLES and fake proper states
         n->amcast->status = (id == 0 || id == 3) ? LEADER : FOLLOWER;
         n->amcast->ballot.id = (id < 3) ? 0 : 3;

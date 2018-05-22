@@ -39,7 +39,7 @@ void* node_create_run(void* arg) {
     pthread_barrier_t *pth_barrier = ((struct arg *) arg)->barrier;
 
     pthread_barrier_wait(pth_barrier);
-    nodes[id] = node_init(conf, id, NULL);
+    nodes[id] = node_init(conf, id, NULL, NULL);
     status[id] = 1;
 
     pthread_barrier_wait(pth_barrier);
