@@ -61,7 +61,7 @@ static void handle_multicast(struct node *node, xid_t sid, message_t *cmd) {
         struct amcast_msg *msg = NULL;
         if((msg = htable_lookup(node->amcast->h_msgs, &cmd->mid)) == NULL) {
             msg = init_amcast_msg(node->groups, node->comm->cluster_size, cmd);
-            htable_insert(node->amcast->h_msgs, &cmd->mid, msg);
+            htable_insert(node->amcast->h_msgs, &msg->msg.mid, msg);
         }
         if(msg->phase == START) {
             msg->phase = PROPOSED;
@@ -91,7 +91,7 @@ static void handle_accept(struct node *node, xid_t sid, accept_t *cmd) {
     struct amcast_msg *msg = NULL;
     if((msg = htable_lookup(node->amcast->h_msgs, &cmd->mid)) == NULL) {
         msg = init_amcast_msg(node->groups, node->comm->cluster_size, &cmd->msg);
-        htable_insert(node->amcast->h_msgs, &cmd->mid, msg);
+        htable_insert(node->amcast->h_msgs, &msg->msg.mid, msg);
     }
     if ((node->amcast->status == LEADER || node->amcast->status == FOLLOWER)
             && paircmp(&msg->lballot[cmd->grp], &cmd->ballot) <= 0
