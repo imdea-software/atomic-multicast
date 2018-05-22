@@ -27,7 +27,7 @@ struct stats {
     long size;
     struct timespec tv[NUMBER_OF_MESSAGES];
     struct amcast_msg *msgs[NUMBER_OF_MESSAGES];
-} stats;
+};
 
 //TODO write to file the execution log
 void write_report(struct node *node, struct stats *stats, FILE *stream) {
@@ -64,15 +64,16 @@ void write_report(struct node *node, struct stats *stats, FILE *stream) {
 
 //Record useful info regarding the delivered message
 void delivery_cb(struct node *node, struct amcast_msg *msg, void *cb_arg) {
-    clock_gettime(CLOCK_MONOTONIC, stats.tv + stats.delivered);
-    stats.msgs[stats.delivered] = msg;
-    stats.delivered++;
-    if(stats.delivered >= NUMBER_OF_MESSAGES)
+    struct stats *stats = (struct stats *) cb_arg;
+    clock_gettime(CLOCK_MONOTONIC, stats->tv + stats->delivered);
+    stats->msgs[stats->delivered] = msg;
+    stats->delivered++;
+    if(stats->delivered >= stats->size)
         kill(getpid(), SIGHUP);
 }
 
-struct node *run_amcast_node(struct cluster_config *config, xid_t node_id) {
-    struct node *n = node_init(config, node_id, &delivery_cb, NULL);
+struct node *run_amcast_node(struct cluster_config *config, xid_t node_id, void *dev_cb_arg) {
+    struct node *n = node_init(config, node_id, &delivery_cb, dev_cb_arg);
     //TODO Do no configure the protocol manually like this
     n->amcast->status = (node_id % NODES_PER_GROUP == INITIAL_LEADER_IN_GROUP) ? LEADER : FOLLOWER;
     n->amcast->ballot.id = n->comm->groups[node_id] * NODES_PER_GROUP;
@@ -190,6 +191,7 @@ int main(int argc, char *argv[]) {
     }
     FILE *logfile;
     struct node *node;
+    struct stats *stats = malloc(sizeof(struct stats));
 
     //Init node & cluster config
     struct cluster_config *config = malloc(sizeof(struct cluster_config));
@@ -197,13 +199,16 @@ int main(int argc, char *argv[]) {
     init_cluster_config(config, atoi(argv[2]), atoi(argv[3]));
     read_cluster_config_from_stdin(config);
 
+    //Get client_count & init stats struct
+    stats->delivered = 0;
+    stats->size = NUMBER_OF_MESSAGES;
     //CLIENT NODE PATTERN
     if(atoi(argv[4])) {
         run_client_node(config, node_id);
         return EXIT_SUCCESS;
     }
 
-    node = run_amcast_node(config, node_id);
+    node = run_amcast_node(config, node_id, stats);
 
     //Open logfile for editing
     char filename[40];
@@ -213,11 +218,12 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    write_report(node, &stats, logfile);
+    write_report(node, stats, logfile);
 
     //Clean and exit
     fclose(logfile);
     node_free(node);
     free_cluster_config(config);
+    free(stats);
     return EXIT_SUCCESS;
 }
