@@ -39,12 +39,23 @@ int pairequ(struct pair *p1, struct pair *p2) {
     return p1->time == p2->time && p1->id == p2->id;
 }
 
-unsigned int pairhash(struct pair *p) {
+//Bijective mapping, but values could quickly get higher than max uint32_t value
+unsigned int pairhash_cantor(struct pair *p) {
     if(p == NULL) {
         puts("ERROR: pairhash called with null pointer");
         exit(EXIT_FAILURE);
     }
     return ((p->time + p->id + 1)*(p->time + p->id + 2))/2 + p->id;
+}
+
+unsigned int pairhash(struct pair *p) {
+    if(p == NULL) {
+        puts("ERROR: pairhash called with null pointer");
+        exit(EXIT_FAILURE);
+    }
+    unsigned int res = p->time;
+    res ^= p->id + 0x9e3779b9 + (res<<6) + (res>>2);
+    return res;
 }
 
 //TODO Make helper functions to create enveloppes in clean and nice looking way
@@ -333,7 +344,7 @@ struct amcast *amcast_init(delivery_cb_fun delivery_cb) {
     amcast->ballot = default_pair;
     amcast->aballot = default_pair;
     amcast->clock = 0;
-    amcast->h_msgs = htable_init(pairhash, pairequ);
+    amcast->h_msgs = htable_init(pairhash_cantor, pairequ);
     //EXTRA FIELDS (NOT IN SPEC)
     amcast->committed_gts = pqueue_init((pq_pricmp_fun) paircmp);
     amcast->pending_lts = pqueue_init((pq_pricmp_fun) paircmp);
