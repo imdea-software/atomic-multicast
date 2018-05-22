@@ -25,8 +25,8 @@
 struct stats {
     long delivered;
     long size;
-    struct timespec tv[NUMBER_OF_MESSAGES];
-    struct amcast_msg *msgs[NUMBER_OF_MESSAGES];
+    struct timespec *tv;
+    struct amcast_msg **msgs;
 };
 
 //TODO write to file the execution log
@@ -185,8 +185,9 @@ int free_cluster_config(struct cluster_config *config) {
 }
 
 int main(int argc, char *argv[]) {
-    if(argc != 5) {
-        printf("USAGE: node-bench [node_id] [number_of_nodes] [number_of_groups] [isClient?]\n");
+    if(argc != 6) {
+        printf("USAGE: node-bench [node_id] [number_of_nodes]"
+                "[number_of_groups] [number_of_clients] [isClient?] \n");
         exit(EXIT_FAILURE);
     }
     FILE *logfile;
@@ -201,9 +202,13 @@ int main(int argc, char *argv[]) {
 
     //Get client_count & init stats struct
     stats->delivered = 0;
-    stats->size = NUMBER_OF_MESSAGES;
+    stats->size = NUMBER_OF_MESSAGES * atoi(argv[4]);
+    stats->tv = malloc(sizeof(struct timespec) * stats->size);
+    stats->msgs = malloc(sizeof(struct amcast_msg *) * stats->size);
+    memset(stats->tv, 0, sizeof(struct timespec) * stats->size);
+    memset(stats->msgs, 0, sizeof(struct amcast_msg *) * stats->size);
     //CLIENT NODE PATTERN
-    if(atoi(argv[4])) {
+    if(atoi(argv[5])) {
         run_client_node(config, node_id);
         return EXIT_SUCCESS;
     }
@@ -224,6 +229,8 @@ int main(int argc, char *argv[]) {
     fclose(logfile);
     node_free(node);
     free_cluster_config(config);
+    free(stats->tv);
+    free(stats->msgs);
     free(stats);
     return EXIT_SUCCESS;
 }
