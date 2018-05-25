@@ -4,8 +4,8 @@ TEST_DIR = tests
 BENCH_DIR = bench
 
 CC      = gcc
-CFLAGS  = -O2 -Wall -g -I$(INC_DIR) -I$(SRC_DIR) -I/usr/include/glib-2.0 -I/usr/lib/glib-2.0/include
-LDFLAGS = -levent -lglib-2.0
+CFLAGS  = -O2 -Wall -g -I$(INC_DIR) -I$(SRC_DIR) `pkg-config --cflags libevent glib-2.0`
+LDFLAGS = `pkg-config --libs libevent glib-2.0`
 LDFLAGS_TEST = $(LDFLAGS) -lpthread -levent_pthreads
 VERBOSE =
 TARGET  = $(TEST_DIR)/node_init_free $(TEST_DIR)/node_connect $(TEST_DIR)/node_messages $(TEST_DIR)/node_amcast_data $(TEST_DIR)/pqueue_unit $(BENCH_DIR)/node-bench
