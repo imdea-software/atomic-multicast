@@ -139,10 +139,8 @@ static void handle_accept(struct node *node, xid_t sid, accept_t *cmd) {
 	};
 	memcpy(rep.cmd.accept_ack.ballot, msg->lballot,
 			sizeof(p_uid_t) * node->groups->groups_count);
-        //send_to_destgrps(node, &rep, node->amcast->msgs[cmd->mid]->msg.destgrps,
-        //                 node->amcast->msgs[cmd->mid]->msg.destgrps_count);
-        send_to_peer(node, &rep, 0);
-        send_to_peer(node, &rep, 3);
+        for(xid_t *grp = msg->msg.destgrps; grp < msg->msg.destgrps + msg->msg.destgrps_count; grp++)
+            send_to_peer(node, &rep, msg->lballot[*grp].id);
     }
 }
 
