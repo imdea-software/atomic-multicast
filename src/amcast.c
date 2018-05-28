@@ -218,9 +218,6 @@ static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
                     return;
                 }
                 try_next = 1;
-                (*i_msg)->delivered = TRUE;
-                if(node->amcast->delivery_cb)
-                    node->amcast->delivery_cb(node, *i_msg, node->amcast->cb_arg);
                 struct enveloppe rep = {
 	            .sid = node->id,
 	            .cmd_type = DELIVER,
@@ -245,7 +242,7 @@ static void handle_deliver(struct node *node, xid_t sid, deliver_t *cmd) {
         puts("ERROR: Could not find this mid in h_msgs");
         exit(EXIT_FAILURE);
     }
-    if (node->amcast->status == FOLLOWER
+    if (node->amcast->status == FOLLOWER || node->amcast->status == LEADER
             && paircmp(&node->amcast->ballot, &cmd->ballot) == 0
             && msg->delivered == FALSE) {
         msg->lts[node->comm->groups[node->id]] = cmd->lts;
