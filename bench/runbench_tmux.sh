@@ -1,0 +1,43 @@
+#!/bin/sh
+
+SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
+
+AMCAST_TMUX_SESSION="AMCAST"
+
+AMCAST_DIR=`dirname ${SCRIPTPATH}`
+AMCAST_BIN="${AMCAST_DIR}/bench/node-bench"
+AMCAST_DEPLOY=""
+
+AMCAST_BENCH_CLUSTER_CONF="${AMCAST_DIR}/bench/cluster.conf"
+AMCAST_BENCH_NUMBER_OF_GROUPS=5
+AMCAST_BENCH_NUMBER_OF_NODES=15
+AMCAST_BENCH_NUMBER_OF_CLIENTS=2
+
+run_nodes() {
+    NODES_COUNT=$1
+    IS_CLIENT=$2
+
+    NODE_IDS=`seq 0 $((${NODES_COUNT} - 1))`
+    [ $IS_CLIENT -eq 0 ] && TMUX_WINDOW_NAME_PREFIX=server_ || TMUX_WINDOW_NAME_PREFIX=client_
+
+    for id in ${NODE_IDS} ; do
+        tmux new-window -n ${TMUX_WINDOW_NAME_PREFIX}${id}
+        tmux send-keys "${AMCAST_DEPLOY} ${AMCAST_BIN}\
+                            ${id}\
+                            ${AMCAST_BENCH_NUMBER_OF_NODES}\
+                            ${AMCAST_BENCH_NUMBER_OF_GROUPS}\
+                            ${AMCAST_BENCH_NUMBER_OF_CLIENTS}\
+                            $IS_CLIENT < ${AMCAST_BENCH_CLUSTER_CONF}" Enter
+    done
+}
+
+
+tmux -2 new-session -d -s $AMCAST_TMUX_SESSION
+
+run_nodes $AMCAST_BENCH_NUMBER_OF_NODES 0
+
+sleep 1
+
+run_nodes $AMCAST_BENCH_NUMBER_OF_CLIENTS 1
+
+tmux -2 attach-session -t $AMCAST_TMUX_SESSION
