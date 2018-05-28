@@ -6,6 +6,8 @@
 #include "types.h"
 
 #define MAX_NUMBER_OF_GROUPS 10
+//#define MAX_PAYLOAD_LEN 156
+#define MAX_PAYLOAD_LEN 20
 
 //DATATYPES
 typedef enum { START, PROPOSED, ACCEPTED, COMMITTED } phase_t;
@@ -29,7 +31,7 @@ unsigned int pairhash(struct pair *p);
 //CLIENT_CMD_TYPES
 typedef struct payload {
     unsigned int	len;
-    char		*val;
+    char		val[MAX_PAYLOAD_LEN];
 } payload_t;
 
 typedef struct message {

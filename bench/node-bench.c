@@ -16,140 +16,69 @@
 #include "node.h"
 #include "amcast.h"
 
-#define NUMBER_OF_MESSAGES 100000
-#define NUMBER_OF_CHILDREN 2
 #define CONF_SEPARATOR "\t"
+#define LOG_SEPARATOR "\t"
+#define NUMBER_OF_MESSAGES 100000
 #define NODES_PER_GROUP 3
 #define INITIAL_LEADER_IN_GROUP 0
 
-pid_t pids[2];
-int pid_idx;
-
 struct stats {
     long delivered;
-    double msg_per_sec;
-    struct timespec avg_latency;
-    struct timespec min_latency;
-    struct timespec max_latency;
-    struct timespec last_tv;
-    struct timespec first_tv;
-} stats;
+    long size;
+    struct timespec *tv;
+    struct amcast_msg **msgs;
+};
 
-sem_t *delivered, *finished;
-char sem_dev_name[20], sem_fin_name[20];
-
-static int tspcmp(struct timespec *tv1, struct timespec *tv2) {
-    if(!tv1 || !tv2) {
-        puts("Error: un-initialized timespec structs");
-        exit(EXIT_FAILURE);
+//TODO write to file the execution log
+void write_report(struct node *node, struct stats *stats, FILE *stream) {
+    for(int i=0; i<stats->delivered; i++) {
+        //Retrieve measures & the message's context
+        struct amcast_msg *msg = stats->msgs[i];
+        struct timespec ts = stats->tv[i];
+        //Retrieve the message's gts
+        g_uid_t gts = msg->gts;
+        //Write to a string the destination groups
+        char *destgrps = malloc(sizeof(char) * (1 + 1 + (12 + 1) * msg->msg.destgrps_count) + 1);
+        int idx = 0;
+        idx = sprintf(destgrps+idx, "(%d", msg->msg.destgrps[0]);
+        for(int i=0; i<msg->msg.destgrps_count - 1; i++)
+            idx = sprintf(destgrps+idx, ",%d", msg->msg.destgrps[i]);
+        idx = sprintf(destgrps+idx, ",%d)", msg->msg.destgrps[msg->msg.destgrps_count-1]);
+        //Write to a file the line corresponding to this message
+        fprintf(stream, "(%u,%d)" LOG_SEPARATOR
+                        "%lld.%.9ld" LOG_SEPARATOR
+                        "(%u,%d)" LOG_SEPARATOR
+                        "%u" LOG_SEPARATOR
+                        "%s" LOG_SEPARATOR
+                        "%u" LOG_SEPARATOR
+                        "%s" "\n",
+                        msg->msg.mid.time, msg->msg.mid.id,
+                        (long long)ts.tv_sec, ts.tv_nsec,
+                        gts.time, gts.id,
+                        msg->msg.destgrps_count,
+                        destgrps,
+                        msg->msg.value.len,
+                        msg->msg.value.val);
     }
-    if(tv1->tv_sec < tv2->tv_sec || ( tv1->tv_sec == tv2->tv_sec && tv1->tv_nsec < tv2->tv_nsec))
-        return -1;
-    if(tv1->tv_sec > tv2->tv_sec || ( tv1->tv_sec == tv2->tv_sec && tv1->tv_nsec > tv2->tv_nsec))
-        return 1;
-    return 0;
-}
-static void tspdiff(struct timespec *end, struct timespec *start, struct timespec *diff) {
-    if(!end || !start || !diff) {
-        puts("Error: un-initialized timespec structs");
-        exit(EXIT_FAILURE);
-    }
-    diff->tv_sec = end->tv_sec - start->tv_sec;
-    diff->tv_nsec = end->tv_nsec - start->tv_nsec;
-    if(diff->tv_nsec < 0) {
-        diff->tv_sec -= 1;
-        diff->tv_nsec = 1e9 + diff->tv_nsec;
-    }
 }
 
-
-//TODO Find out whether directly computing stats
-//     might not be faster than sending the required data
-//     for parallel execution.
-
-//TODO Decide whether to compute stats incrementally or to generate a report
-//     at the end of the run and then let a script merge and compute the stats from all nodes
-
-//TODO Wait for the node process msg delivery notice
-//    Semaphore Producer-Consummer
-//    FIFO for data exchange if needed
-void update_stats(struct stats *stats) {
-    struct timespec tv, latency;
-    clock_gettime(CLOCK_MONOTONIC, &tv);
-    tspdiff(&tv, &stats->last_tv, &latency);
-    if(stats->delivered++ == 0) {
-        stats->first_tv = tv;
-        stats->last_tv = tv;
-        stats->min_latency = latency;
-        //stats->max_latency = latency;
-        //stats->avg_latency = latency;
-        return;
-    }
-
-    if(tspcmp(&latency, &stats->min_latency) < 0)
-        stats->min_latency = latency;
-    if(tspcmp(&latency, &stats->max_latency) > 0)
-        stats->max_latency = latency;
-    stats->avg_latency.tv_sec =
-        stats->avg_latency.tv_sec + ((latency.tv_sec - stats->avg_latency.tv_sec) / (stats->delivered - 1));
-    stats->avg_latency.tv_nsec =
-        stats->avg_latency.tv_nsec + ((latency.tv_nsec - stats->avg_latency.tv_nsec) / (stats->delivered - 1));
-    stats->last_tv = tv;
-}
-
-void report_stats(struct stats *stats) {
-    struct timespec complete_duration;
-    tspdiff(&stats->last_tv, &stats->first_tv, &complete_duration);
-    stats->msg_per_sec = stats->delivered / (complete_duration.tv_sec + complete_duration.tv_nsec * 1e-9);
-
-    printf("AverageLatency=%fms MinLatency=%fms MaxLatency=%fms "
-            "MsgPerSec=%fmsg/sec Duration=%lfsec "
-            "TotalMsgReceived=%ldmsg\n",
-        stats->avg_latency.tv_sec * 1e3 + stats->avg_latency.tv_nsec * 1e-6,
-        stats->min_latency.tv_sec * 1e3 + stats->min_latency.tv_nsec * 1e-6,
-        stats->max_latency.tv_sec * 1e3 + stats->max_latency.tv_nsec * 1e-6,
-        stats->msg_per_sec,
-        complete_duration.tv_sec + complete_duration.tv_nsec * 1e-9,
-        stats->delivered);
-}
-
-void wait_for_delivery(struct stats *stats) {
-    if(!delivered)
-        delivered = sem_open(sem_dev_name, 0);
-    if(!finished)
-        finished = sem_open(sem_fin_name, 0);
-    do {
-        sem_wait(delivered);
-        update_stats(stats);
-        if(stats->delivered >= NUMBER_OF_MESSAGES) {
-            report_stats(stats);
-            sem_post(finished);
-        }
-    } while(1);
-}
-
-//TODO Wait for the stats process to tell the parent when to close
-void wait_until_all_messages_delivered() {
-    if(!finished)
-        finished = sem_open(sem_fin_name, 0);
-    sem_wait(finished);
-}
-
-//TODO Let the stats process know when a new message is delivered
-//     and maybe pass some data to it about the message through a FIFO for instance
+//Record useful info regarding the delivered message
 void delivery_cb(struct node *node, struct amcast_msg *msg, void *cb_arg) {
-    if(!delivered)
-        delivered = sem_open(sem_dev_name, 0);
-    sem_post(delivered);
+    struct stats *stats = (struct stats *) cb_arg;
+    clock_gettime(CLOCK_MONOTONIC, stats->tv + stats->delivered);
+    stats->msgs[stats->delivered] = msg;
+    stats->delivered++;
+    if(stats->delivered >= stats->size)
+        kill(getpid(), SIGHUP);
 }
 
-void run_amcast_node(struct cluster_config *config, xid_t node_id) {
-    struct node *n = node_init(config, node_id, &delivery_cb, NULL);
+struct node *run_amcast_node(struct cluster_config *config, xid_t node_id, void *dev_cb_arg) {
+    struct node *n = node_init(config, node_id, &delivery_cb, dev_cb_arg);
     //TODO Do no configure the protocol manually like this
     n->amcast->status = (node_id % NODES_PER_GROUP == INITIAL_LEADER_IN_GROUP) ? LEADER : FOLLOWER;
     n->amcast->ballot.id = n->comm->groups[node_id] * NODES_PER_GROUP;
     node_start(n);
-    node_free(n);
+    return(n);
 }
 
 void run_client_node(struct cluster_config *config, xid_t client_id) {
@@ -172,13 +101,14 @@ void run_client_node(struct cluster_config *config, xid_t client_id) {
 	    .cmd.multicast = {
 	        .mid = {-1, client_id},
             .destgrps_count = config->groups_count,
-            .destgrps = {0, 1},
             .value = {
-                .len = sizeof("coucou"),
+                .len = strlen("coucou"),
                 .val = "coucou"
             }
 	    },
 	};
+    for(int i=0; i<env.cmd.multicast.destgrps_count; i++)
+        env.cmd.multicast.destgrps[i] = i;
     for(int j=0; j<NUMBER_OF_MESSAGES; j++) {
         env.cmd.multicast.mid.time = j;
 	    for(int i=0; i<config->groups_count; i++) {
@@ -256,10 +186,14 @@ int free_cluster_config(struct cluster_config *config) {
 }
 
 int main(int argc, char *argv[]) {
-    if(argc != 5) {
-        printf("USAGE: node-bench [node_id] [number_of_nodes] [number_of_groups] [isClient?]\n");
+    if(argc != 6) {
+        printf("USAGE: node-bench [node_id] [number_of_nodes]"
+                "[number_of_groups] [number_of_clients] [isClient?] \n");
         exit(EXIT_FAILURE);
     }
+    FILE *logfile;
+    struct node *node;
+    struct stats *stats = malloc(sizeof(struct stats));
 
     //Init node & cluster config
     struct cluster_config *config = malloc(sizeof(struct cluster_config));
@@ -267,73 +201,37 @@ int main(int argc, char *argv[]) {
     init_cluster_config(config, atoi(argv[2]), atoi(argv[3]));
     read_cluster_config_from_stdin(config);
 
+    //Get client_count & init stats struct
+    stats->delivered = 0;
+    stats->size = NUMBER_OF_MESSAGES * atoi(argv[4]);
+    stats->tv = malloc(sizeof(struct timespec) * stats->size);
+    stats->msgs = malloc(sizeof(struct amcast_msg *) * stats->size);
+    memset(stats->tv, 0, sizeof(struct timespec) * stats->size);
+    memset(stats->msgs, 0, sizeof(struct amcast_msg *) * stats->size);
     //CLIENT NODE PATTERN
-    if(atoi(argv[4])) {
+    if(atoi(argv[5])) {
         run_client_node(config, node_id);
         return EXIT_SUCCESS;
     }
 
-    memset(&stats, 0, sizeof(struct stats));
+    node = run_amcast_node(config, node_id, stats);
 
-    //Semaphore init pattern - generate names specific to this node_id to avoid collisions
-    sprintf(sem_dev_name, "/delivered_%d", node_id);
-    sprintf(sem_fin_name, "/finished_%d", node_id);
-    sem_unlink(sem_dev_name);
-    sem_unlink(sem_fin_name);
-    if ((finished = sem_open(sem_fin_name, O_CREAT, S_IRWXU|S_IRWXG|S_IRWXO, 0)) == SEM_FAILED) {
-        int errsv = errno;
-        if(errsv == EEXIST)
-            finished = sem_open(sem_fin_name, 0);
-        if(finished == SEM_FAILED)
-            perror("Sem finished");
-    }
-    if ((delivered = sem_open(sem_dev_name, O_CREAT, S_IRWXU|S_IRWXG|S_IRWXO, 0)) == SEM_FAILED) {
-        int errsv = errno;
-        if(errsv == EEXIST)
-            delivered = sem_open(sem_dev_name, 0);
-        if(delivered == SEM_FAILED)
-            perror("Sem delivered");
+    //Open logfile for editing
+    char filename[40];
+    sprintf(filename, "./log/report.%d.log", node_id);
+    if((logfile = fopen(filename, "w")) == NULL) {
+        puts("ERROR: Can not open logfile");
+        exit(EXIT_FAILURE);
     }
 
-    //Let's create some child processes...
-    pid_idx = -1;
-    for(int i=0; i<NUMBER_OF_CHILDREN; i++) {
-        if ((pids[i] = fork()) < 0)
-            error_at_line(EXIT_FAILURE, pids[i], __FILE__, __LINE__, "fctname");
-        if (pids[i] == 0) {
-            pid_idx = i;
-            break;
-        }
-    }
-
-    //... and let them work for you!
-    switch(pid_idx) {
-        //Node process
-        case 0:
-            run_amcast_node(config, node_id);
-            break;
-        //Stats process
-        case 1:
-            wait_for_delivery(&stats);
-            break;
-        //Parent process
-        case -1:
-            wait_until_all_messages_delivered();
-            //... and kill them when they're done
-            for(pid_t *child=pids; child<pids+NUMBER_OF_CHILDREN; child++) {
-                kill(*child, SIGHUP);
-                waitpid(*child, NULL, 0);
-            }
-            break;
-        //Error
-        default:
-            printf("Error: wrong process id, should not happen\n");
-            exit(EXIT_FAILURE);
-    }
+    write_report(node, stats, logfile);
 
     //Clean and exit
-    sem_close(delivered);
-    sem_close(finished);
+    fclose(logfile);
+    node_free(node);
     free_cluster_config(config);
+    free(stats->tv);
+    free(stats->msgs);
+    free(stats);
     return EXIT_SUCCESS;
 }
