@@ -115,9 +115,12 @@ void read_cb(struct bufferevent *bev, void *ptr) {
     while (evbuffer_get_length(in_buf) >= sizeof(struct enveloppe)) {
         struct enveloppe env;
         read_enveloppe(bev, &env);
-        //TODO Have a dedicated cmd_type for receive tests
-        if(env.cmd_type == MULTICAST)
+        //TODO Have to way to identify clients (atm only bev pointer)
+        //     So that this can be put in the dispatch sequence
+        if(env.cmd_type == TESTREPLY) {
             write_enveloppe(bev, &env);
+            return;
+        }
         dispatch_message(node, &env);
     }
 }

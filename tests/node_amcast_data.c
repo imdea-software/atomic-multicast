@@ -126,14 +126,7 @@ int main(int argc, char *argv[]) {
             env.cmd.multicast.mid.time = j;
 	    for(int i=0; i<2; i++) {
                 xid_t peer_id = i*3;
-	        struct enveloppe rep;
                 send(sock[peer_id], &env, sizeof(env), 0);
-                recv(sock[peer_id], &rep, sizeof(rep), 0);
-                //Let's check the integrity of delivered messages
-	        int ret;
-                if ((ret = envcmp(&env, &rep)) != 0)
-                    printf("[%u] Failed : the copy received"
-		           "back from %u is different: %u errors\n", -1, peer_id, ret);
 	    }
 	}
         //Close the connections

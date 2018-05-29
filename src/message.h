@@ -9,6 +9,7 @@
 
 
 typedef enum cmd_type {
+    TESTREPLY,
     //AMCAST COMMANDS
     MULTICAST,
     ACCEPT,

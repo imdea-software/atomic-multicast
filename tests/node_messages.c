@@ -92,7 +92,7 @@ int main(int argc, char *argv[]) {
         //Let's send some messages
         struct enveloppe env = {
 	    .sid = -1,
-	    .cmd_type = MULTICAST,
+	    .cmd_type = TESTREPLY,
 	    .cmd.multicast = {
 	        .mid = {0,0},
 		.destgrps_count = 2,

@@ -113,9 +113,7 @@ void run_client_node(struct cluster_config *config, xid_t client_id) {
         env.cmd.multicast.mid.time = j;
 	    for(int i=0; i<config->groups_count; i++) {
             xid_t peer_id = i*NODES_PER_GROUP+INITIAL_LEADER_IN_GROUP;
-	        struct enveloppe rep;
             send(sock[peer_id], &env, sizeof(env), 0);
-            recv(sock[peer_id], &rep, sizeof(rep), 0);
 	    }
 	}
     //Close the connections
