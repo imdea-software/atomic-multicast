@@ -172,13 +172,14 @@ void run_client_node(struct cluster_config *config, xid_t client_id) {
 	    .cmd.multicast = {
 	        .mid = {-1, client_id},
             .destgrps_count = config->groups_count,
-            .destgrps = {0, 1},
             .value = {
                 .len = sizeof("coucou"),
                 .val = "coucou"
             }
 	    },
 	};
+    for(int i=0; i<env.cmd.multicast.destgrps_count; i++)
+        env.cmd.multicast.destgrps[i] = i;
     for(int j=0; j<NUMBER_OF_MESSAGES; j++) {
         env.cmd.multicast.mid.time = j;
 	    for(int i=0; i<config->groups_count; i++) {
