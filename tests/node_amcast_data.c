@@ -14,6 +14,7 @@
 #include "tests.h"
 #include "amcast.h"
 
+
 // Everything is done manually here, quite normal since we want
 // some checks in the early stages of the project ; a real use
 // case of the lib will be checked when the public interfaces
@@ -23,35 +24,39 @@
 xid_t id;
 pid_t pids[NUMBER_OF_NODES];
 
+
+int msgcmp(message_t *msg1, message_t *msg2) {
+    if(msg1 == NULL || msg2 == NULL)
+        return 1;
+    int out = 0;
+    if (msg1->destgrps_count != msg2->destgrps_count) {
+        out++;
+        for (int i=0; i<msg1->destgrps_count && i<msg2->destgrps_count; i++) {
+            if (msg1->destgrps[i] != msg2->destgrps[i])
+                out++;
+        }
+    }
+    if (msg1->value.len != msg2->value.len) {
+        out++;
+	if (strcmp(msg1->value.val, msg2->value.val) != 0)
+            out++;
+    }
+
+    return out;
+}
+
 //TODO Use the delivery callback to check correctness:
 //    Do local checks during protocol execution (in this callback),
 //    Then write them to parent thread,
 //    Finally do global checks
 void delivery_cb(struct node *node, struct amcast_msg *msg, void* cb_arg) {
-}
-
-int envcmp(struct enveloppe *env1, struct enveloppe *env2) {
-    int out = 0;
-    if (env1->sid != env2->sid)
-        out++;
-    if (env1->cmd_type != env2->cmd_type)
-        out++;
-    if (paircmp(&env1->cmd.multicast.mid, &env2->cmd.multicast.mid) != 0)
-        out++;
-    if (env1->cmd.multicast.destgrps_count != env2->cmd.multicast.destgrps_count) {
-        out++;
-        for (int i=0; i<env1->cmd.multicast.destgrps_count; i++) {
-            if (env1->cmd.multicast.destgrps[i] != env2->cmd.multicast.destgrps[i])
-                out++;
-        }
-    }
-    if (env1->cmd.multicast.value.len != env2->cmd.multicast.value.len) {
-        out++;
-	if (strcmp(env1->cmd.multicast.value.val, env2->cmd.multicast.value.val) != 0)
-            out++;
-    }
-
-    return out;
+    //printf("[%u] {%u,%d} DELIVERED\n", node->id, msg->msg.mid.time, msg->msg.mid.id);
+    //Let's check the integrity of delivered messages
+    message_t *rep = (message_t *) cb_arg;
+    int ret;
+    if ((ret = msgcmp(&msg->msg, rep)) != 0)
+        printf("[%u] {%u, %d} Failed: the copy received is different: %u errors\n",
+                node->id, msg->msg.mid.time, msg->msg.mid.id, ret);
 }
 
 //Scenario:
@@ -78,9 +83,23 @@ int main(int argc, char *argv[]) {
         id = atoi(argv[1]);
     }
 
+    struct enveloppe env = {
+        .sid = -1,
+        .cmd_type = MULTICAST,
+        .cmd.multicast = {
+            .mid = {0, 0},
+            .destgrps_count = 2,
+            .destgrps = {0, 1},
+            .value = {
+                .len = strlen("coucou"),
+                .val = "coucou"
+            }
+        },
+    };
+
     //Let's now create the nodes
     if (id != -1) {
-        struct node *n = node_init(&conf, id, delivery_cb, NULL);
+        struct node *n = node_init(&conf, id, delivery_cb, &env.cmd.multicast);
 	//Let's give them some AMCAST ROLES and fake proper states
         n->amcast->status = (id == 0 || id == 3) ? LEADER : FOLLOWER;
         n->amcast->ballot.id = (id < 3) ? 0 : 3;
@@ -108,20 +127,7 @@ int main(int argc, char *argv[]) {
             };
             connect(sock[peer_id], (struct sockaddr *) &addr, sizeof(addr));
 	}
-        //Let's send some messages
-        struct enveloppe env = {
-	    .sid = -1,
-	    .cmd_type = MULTICAST,
-	    .cmd.multicast = {
-	        .mid = {0, 0},
-		.destgrps_count = 2,
-		.destgrps = {0, 1},
-		.value = {
-		    .len = sizeof("coucou"),
-		    .val = "coucou"
-		}
-	    },
-	};
+    //Let's send some messages
 	for(int j=0; j<50; j++) {
             env.cmd.multicast.mid.time = j;
 	    for(int i=0; i<2; i++) {
