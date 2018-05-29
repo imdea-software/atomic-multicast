@@ -59,6 +59,7 @@ void write_report(struct node *node, struct stats *stats, FILE *stream) {
                         destgrps,
                         msg->msg.value.len,
                         msg->msg.value.val);
+        free(destgrps);
     }
 }
 
