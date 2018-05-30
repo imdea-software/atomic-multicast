@@ -217,7 +217,7 @@ int main(int argc, char *argv[]) {
 
     //Open logfile for editing
     char filename[40];
-    sprintf(filename, "./log/report.%d.log", node_id);
+    sprintf(filename, "/tmp/report.%d.log", node_id);
     if((logfile = fopen(filename, "w")) == NULL) {
         puts("ERROR: Can not open logfile");
         exit(EXIT_FAILURE);
