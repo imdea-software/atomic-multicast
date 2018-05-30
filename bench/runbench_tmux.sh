@@ -22,12 +22,12 @@ run_nodes() {
 
     for id in ${NODE_IDS} ; do
         tmux new-window -n ${TMUX_WINDOW_NAME_PREFIX}${id}
-        tmux send-keys "${AMCAST_DEPLOY} ${AMCAST_BIN}\
-                            ${id}\
-                            ${AMCAST_BENCH_NUMBER_OF_NODES}\
-                            ${AMCAST_BENCH_NUMBER_OF_GROUPS}\
-                            ${AMCAST_BENCH_NUMBER_OF_CLIENTS}\
-                            $IS_CLIENT < ${AMCAST_BENCH_CLUSTER_CONF}" Enter
+        tmux send-keys "${AMCAST_DEPLOY} ${AMCAST_BIN} \
+            ${id} \
+            ${AMCAST_BENCH_NUMBER_OF_NODES} \
+            ${AMCAST_BENCH_NUMBER_OF_GROUPS} \
+            ${AMCAST_BENCH_NUMBER_OF_CLIENTS} \
+            $IS_CLIENT < ${AMCAST_BENCH_CLUSTER_CONF}" Enter
     done
 }
 
