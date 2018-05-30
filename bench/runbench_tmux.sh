@@ -21,6 +21,11 @@ run_nodes() {
     [ $IS_CLIENT -eq 0 ] && TMUX_WINDOW_NAME_PREFIX=server_ || TMUX_WINDOW_NAME_PREFIX=client_
 
     for id in ${NODE_IDS} ; do
+        N_LINE_IN_CONF=$(( 3 + $id + ( $IS_CLIENT * $AMCAST_BENCH_NUMBER_OF_NODES ) ))
+
+        AMCAST_SSH_HOST=`sed -n ${N_LINE_IN_CONF}p ${AMCAST_BENCH_CLUSTER_CONF} | cut -f3`
+        AMCAST_DEPLOY="ssh ${AMCAST_SSH_USER}@${AMCAST_SSH_HOST}"
+
         tmux new-window -n ${TMUX_WINDOW_NAME_PREFIX}${id}
         tmux send-keys "${AMCAST_DEPLOY} ${AMCAST_BIN} \
             ${id} \
