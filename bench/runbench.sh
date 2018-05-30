@@ -26,7 +26,8 @@ run_nodes() {
         AMCAST_DEPLOY="ssh ${AMCAST_SSH_USER}@${AMCAST_SSH_HOST}"
 
         AMCAST_CMD=( ${AMCAST_DEPLOY} "${AMCAST_BIN} ${id} ${AMCAST_BENCH_NUMBER_OF_NODES} ${AMCAST_BENCH_NUMBER_OF_GROUPS} ${AMCAST_BENCH_NUMBER_OF_CLIENTS} $IS_CLIENT < ${AMCAST_BENCH_CLUSTER_CONF}")
-        "${AMCAST_CMD[@]}" &
+        AMCAST_RETRIEVE_REPORT_CMD=( ${AMCAST_DEPLOY} "mkdir -p ~/log && cp -v /tmp/report* ~/log/ && rm /tmp/report*" )
+        "${AMCAST_CMD[@]}" && [ $IS_CLIENT -eq 0 ] && "${AMCAST_RETRIEVE_REPORT_CMD[@]}" &
         AMCAST_FORKED_PIDS[${id}]=$!
     done
 }
