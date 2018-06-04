@@ -15,7 +15,9 @@ class Experiment:
             raise OSError("No such directory")
         for filename in os.listdir(dir_path):
             file_path = dir_path + filename
-            self._importExpReportFile(file_path)
+            #TODO Retrieve group id from filename aswell
+            node_id = int(filename.split(".")[1])
+            self._importExpReportFile(file_path, node_id)
             print(filename, "imported")
 
     def check(self):
@@ -60,9 +62,7 @@ class Experiment:
     def plot(self):
         return
 
-    def _importExpReportFile(self, file_path):
-        #TODO Retrieve group id from filename aswell
-        node_id = int(file_path.split("/")[-1].split(".")[1])
+    def _importExpReportFile(self, file_path, node_id):
         with open(file_path) as report_file:
             reader = csv.DictReader(report_file, fieldnames=["mid", "ts_start, "ts_end", "gts", "ngrp", "grps", "pl_l", "pl_v"], dialect="excel-tab")
             for row in reader:
