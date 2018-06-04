@@ -13,9 +13,10 @@ class Experiment:
     def importExpDir(self, dir_path):
         if not os.path.isdir(dir_path):
             raise OSError("No such directory")
-        for file_path in os.listdir(dir_path):
-            self._importExpReportFile(dir_path + file_path)
-            print(file_path, "imported")
+        for filename in os.listdir(dir_path):
+            file_path = dir_path + filename
+            self._importExpReportFile(file_path)
+            print(filename, "imported")
 
     def check(self):
         #Check whether the number of messages is OK
