@@ -3,6 +3,7 @@ import csv
 import pdb
 
 class Experiment:
+    columns=["mid", "ts_start", "ts_end", "gts", "ngrp", "destgrps", "pl_l", "pl_v"]
 
     def __init__(self, exp_msg_count):
         self._stats={}
@@ -64,7 +65,7 @@ class Experiment:
 
     def _importExpReportFile(self, file_path, node_id):
         with open(file_path) as report_file:
-            reader = csv.DictReader(report_file, fieldnames=["mid", "ts_start, "ts_end", "gts", "ngrp", "grps", "pl_l", "pl_v"], dialect="excel-tab")
+            reader = csv.DictReader(report_file, fieldnames=self._columns, dialect="excel-tab")
             for row in reader:
                 self._data.setdefault(eval(row.get("gts")), {}).setdefault(node_id, {}).update( { k: eval(v) if k != "pl_v" else v for k, v in row.items() } )
                 self._ts_ordered_data.setdefault(node_id, {}).setdefault(eval(row.get("ts_end")), {}).update( { k: eval(v) if k != "pl_v" else v for k,v in row.items() } )
