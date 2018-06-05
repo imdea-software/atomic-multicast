@@ -12,7 +12,7 @@ class Experiment:
         self._df={}
         self._total_msg_count=exp_msg_count
 
-    def importExpDir(self, dir_path):
+    def importDir(self, dir_path):
         if not os.path.isdir(dir_path):
             raise OSError("No such directory")
         for filename in os.listdir(dir_path):
@@ -22,7 +22,7 @@ class Experiment:
             self._df[node_id] = pd.read_table(file_path, names=self.columns)
             print(filename, "imported")
 
-    def checkDF(self):
+    def check(self):
         big_df = pd.concat(self._df, names=["nid"]).drop(columns=["ts_start", "ts_end"]).reset_index(level=["nid"])
         #Check for each node whether the number of messages is OK
         if not big_df.groupby("nid")["mid"].count().eq(self._total_msg_count).all():
@@ -39,7 +39,7 @@ class Experiment:
         return True
 
     #With only one time capture per msg, the stats are not relevent
-    def computeStatsDf(self):
+    def computeStats(self):
         for nid,df in self._df.items():
             #Create a new df from this node data df by droping irrelevent columns and sorting by ts
             stats = self._df[nid].drop(columns=['ngrp','destgrps','pl_l','pl_v']).sort_values(by=['gts','mid']).reset_index(level=0, drop=True)
@@ -58,11 +58,11 @@ class Experiment:
 
 if __name__ == "__main__":
     exp = Experiment(200000)
-    exp.importExpDir("/home/anatole/log/")
+    exp.importDir("/home/anatole/log/")
 
-    if not exp.checkDF():
+    if not exp.check():
         raise Exception("FAILURE: report files are not consistent")
 
-    exp.computeStatsDf()
+    exp.computeStats()
 
     pdb.set_trace()
