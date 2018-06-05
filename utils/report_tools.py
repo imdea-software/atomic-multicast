@@ -2,12 +2,16 @@ import os
 import csv
 import pdb
 
+import pandas as pd
+import matplotlib.pyplot as plt
+
 class Experiment:
     columns=["mid", "ts_start", "ts_end", "gts", "ngrp", "destgrps", "pl_l", "pl_v"]
 
     def __init__(self, exp_msg_count):
         self._stats={}
         self._data={}
+        self._df={}
         self._ts_ordered_data={}
         self._total_msg_count=exp_msg_count
 
@@ -19,6 +23,7 @@ class Experiment:
             #TODO Retrieve group id from filename aswell
             node_id = int(filename.split(".")[1])
             self._importExpReportFile(file_path, node_id)
+            self._df[node_id] = pd.read_table(file_path, names=self.columns)
             print(filename, "imported")
 
     def check(self):
@@ -33,6 +38,22 @@ class Experiment:
             all_msg_data = [ { k: v for k,v in node.items() if k in ["mid", "gts", "ngrp", "grps", "pl_l", "pl_v"] } for node in msg.values() ]
             if all_msg_data and not all_msg_data.count(all_msg_data[0]) == len(all_msg_data):
                 return False
+        return True
+
+    def checkDF(self):
+        big_df = pd.concat(self._df, names=["nid"]).drop(columns=["ts_start", "ts_end"]).reset_index(level=["nid"])
+        #Check for each node whether the number of messages is OK
+        if not big_df.groupby("nid")["mid"].count().eq(self._total_msg_count).all():
+                return False
+        #Check for each node whether the number of distinct gts is OK
+        if not big_df.groupby("nid")["gts"].nunique().eq(self._total_msg_count).all():
+                return False
+        #Check whether msg data is the same for all nodes involved
+        if not big_df.drop("nid", axis=1).groupby("mid").nunique().eq(1).all().all():
+            return False
+        #TODO Check whether the number of groups is OK
+        #TODO Check whether all groups are in destgrp(msg)
+        #TODO Check whether the number of nodes for that group is OK
         return True
 
     def computeStats(self):
@@ -58,6 +79,20 @@ class Experiment:
                     cur_stats["lat_avg"] = prev_stats("lat_avg") + ((cur_stats["lat"] - prev_stats("lat_avg")) / (cur_stats["ind"]))
                     cur_stats["msg_per_sec"] = ( cur_stats["ind"] ) / ( msg.get("ts_end") - first_ts[nid] )
                 prev = msg
+
+    #With only one time capture per msg, the stats are not relevent
+    def computeStatsDf(self):
+        for nid,df in self._df.items():
+            #Create a new df from this node data df by droping irrelevent columns and sorting by ts
+            stats = self._df[nid].drop(columns=['ngrp','destgrps','pl_l','pl_v']).sort_values(by=['gts','mid']).reset_index(level=0, drop=True)
+            #Add extra latency column as the diff of a row's ts with previous one's ts
+            stats["lat"] = stats['ts_end'] - stats['ts_start']
+            stats["lat_min"], stats["lat_max"], stats["lat_avg"] = stats["lat"].expanding().min() , stats["lat"].expanding().max(), stats["lat"].expanding().mean()
+            #Add extra throughput column as row's index divided by SUM(lat) up to that row
+            ts_exp_start = stats["ts_start"].min()
+            stats["msgps"] = stats.index / ( stats["ts_end"] - ts_exp_start )
+            #Add this new df to _stats container
+            self._stats[nid] = stats
         return
 
     def plot(self):
