@@ -35,7 +35,7 @@ class Experiment:
                 return False
         return True
 
-    def compute_stats(self):
+    def computeStats(self):
         gts_ordered_data = sorted(self._data.items())
         ts_ordered_data = { k: v for k,v in self._data.items() }
         first_ts={}
@@ -77,6 +77,6 @@ if __name__ == "__main__":
     if not exp.check():
         raise Exception("FAILURE: report files are not consistent")
 
-    exp.compute_stats()
+    exp.computeStats()
 
     pdb.set_trace()
