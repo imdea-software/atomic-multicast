@@ -25,7 +25,7 @@
 struct stats {
     long delivered;
     long size;
-    struct timespec *tv;
+    struct timespec *tv_dev;
     struct amcast_msg **msgs;
 };
 
@@ -34,7 +34,7 @@ void write_report(struct node *node, struct stats *stats, FILE *stream) {
     for(int i=0; i<stats->delivered; i++) {
         //Retrieve measures & the message's context
         struct amcast_msg *msg = stats->msgs[i];
-        struct timespec ts = stats->tv[i];
+        struct timespec ts_end = stats->tv_dev[i];
         //Retrieve the message's gts
         g_uid_t gts = msg->gts;
         //Write to a string the destination groups
@@ -53,7 +53,7 @@ void write_report(struct node *node, struct stats *stats, FILE *stream) {
                         "%u" LOG_SEPARATOR
                         "%s" "\n",
                         msg->msg.mid.time, msg->msg.mid.id,
-                        (long long)ts.tv_sec, ts.tv_nsec,
+                        (long long)ts_end.tv_sec, ts_end.tv_nsec,
                         gts.time, gts.id,
                         msg->msg.destgrps_count,
                         destgrps,
@@ -66,7 +66,7 @@ void write_report(struct node *node, struct stats *stats, FILE *stream) {
 //Record useful info regarding the delivered message
 void delivery_cb(struct node *node, struct amcast_msg *msg, void *cb_arg) {
     struct stats *stats = (struct stats *) cb_arg;
-    clock_gettime(CLOCK_MONOTONIC, stats->tv + stats->delivered);
+    clock_gettime(CLOCK_MONOTONIC, stats->tv_dev + stats->delivered);
     stats->msgs[stats->delivered] = msg;
     stats->delivered++;
     if(stats->delivered >= stats->size)
@@ -203,9 +203,9 @@ int main(int argc, char *argv[]) {
     //Get client_count & init stats struct
     stats->delivered = 0;
     stats->size = NUMBER_OF_MESSAGES * atoi(argv[4]);
-    stats->tv = malloc(sizeof(struct timespec) * stats->size);
+    stats->tv_dev = malloc(sizeof(struct timespec) * stats->size);
     stats->msgs = malloc(sizeof(struct amcast_msg *) * stats->size);
-    memset(stats->tv, 0, sizeof(struct timespec) * stats->size);
+    memset(stats->tv_dev, 0, sizeof(struct timespec) * stats->size);
     memset(stats->msgs, 0, sizeof(struct amcast_msg *) * stats->size);
     //CLIENT NODE PATTERN
     if(atoi(argv[5])) {
@@ -229,7 +229,7 @@ int main(int argc, char *argv[]) {
     fclose(logfile);
     node_free(node);
     free_cluster_config(config);
-    free(stats->tv);
+    free(stats->tv_dev);
     free(stats->msgs);
     free(stats);
     return EXIT_SUCCESS;
