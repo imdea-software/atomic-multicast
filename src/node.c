@@ -136,13 +136,13 @@ static int free_node_events(struct node_events *events) {
     return 0;
 }
 
-struct node *node_init(struct cluster_config *conf, xid_t id, delivery_cb_fun delivery_cb, void *dev_cb_arg) {
+struct node *node_init(struct cluster_config *conf, xid_t id, msginit_cb_fun msginit_cb, void *ini_cb_arg, delivery_cb_fun delivery_cb, void *dev_cb_arg) {
     struct node *node = malloc(sizeof(struct node));
     node->id = id;
     node->groups = init_groups(conf);
     node->comm = init_node_comm(conf);
     node->events = init_node_events(node->comm, id);
-    node->amcast = amcast_init(NULL, NULL, delivery_cb, dev_cb_arg);
+    node->amcast = amcast_init(msginit_cb, ini_cb_arg, delivery_cb, dev_cb_arg);
     return node;
 }
 

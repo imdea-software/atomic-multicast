@@ -23,7 +23,7 @@ int main(int argc, char *argv[]) {
     //Let's now create the nodes
     struct node *nodes[NUMBER_OF_NODES];
     for(int i=0; i<NUMBER_OF_NODES; i++) {
-        nodes[i] = node_init(&conf, conf.id[i], NULL, NULL);
+        nodes[i] = node_init(&conf, conf.id[i], NULL, NULL, NULL, NULL);
     }
     //Let's check whether the structures are well populated
     for(int i=0; i<NUMBER_OF_NODES; i++) {

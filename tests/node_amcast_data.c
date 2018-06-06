@@ -99,7 +99,7 @@ int main(int argc, char *argv[]) {
 
     //Let's now create the nodes
     if (id != -1) {
-        struct node *n = node_init(&conf, id, delivery_cb, &env.cmd.multicast);
+        struct node *n = node_init(&conf, id, NULL, NULL, delivery_cb, &env.cmd.multicast);
 	//Let's give them some AMCAST ROLES and fake proper states
         n->amcast->status = (id == 0 || id == 3) ? LEADER : FOLLOWER;
         n->amcast->ballot.id = (id < 3) ? 0 : 3;
