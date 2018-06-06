@@ -64,18 +64,27 @@ void write_report(struct node *node, struct stats *stats, FILE *stream) {
     }
 }
 
+//Record useful info regarding the initiated message
+void msginit_cb(struct node *node, struct amcast_msg *msg, void *cb_arg) {
+    struct timespec *tv_ini = malloc(sizeof(struct timespec));
+    clock_gettime(CLOCK_MONOTONIC, tv_ini);
+    msg->shared_cb_arg = tv_ini;
+}
+
 //Record useful info regarding the delivered message
 void delivery_cb(struct node *node, struct amcast_msg *msg, void *cb_arg) {
     struct stats *stats = (struct stats *) cb_arg;
     clock_gettime(CLOCK_MONOTONIC, stats->tv_dev + stats->delivered);
+    stats->tv_ini[stats->delivered] = *((struct timespec *) msg->shared_cb_arg);
     stats->msgs[stats->delivered] = msg;
     stats->delivered++;
+    free(msg->shared_cb_arg);
     if(stats->delivered >= stats->size)
         kill(getpid(), SIGHUP);
 }
 
 struct node *run_amcast_node(struct cluster_config *config, xid_t node_id, void *dev_cb_arg) {
-    struct node *n = node_init(config, node_id, NULL, NULL, &delivery_cb, dev_cb_arg);
+    struct node *n = node_init(config, node_id, msginit_cb, NULL, &delivery_cb, dev_cb_arg);
     //TODO Do no configure the protocol manually like this
     n->amcast->status = (node_id % NODES_PER_GROUP == INITIAL_LEADER_IN_GROUP) ? LEADER : FOLLOWER;
     n->amcast->ballot.id = n->comm->groups[node_id] * NODES_PER_GROUP;
