@@ -142,7 +142,7 @@ struct node *node_init(struct cluster_config *conf, xid_t id, delivery_cb_fun de
     node->groups = init_groups(conf);
     node->comm = init_node_comm(conf);
     node->events = init_node_events(node->comm, id);
-    node->amcast = amcast_init(delivery_cb, dev_cb_arg);
+    node->amcast = amcast_init(NULL, NULL, delivery_cb, dev_cb_arg);
     return node;
 }
 
