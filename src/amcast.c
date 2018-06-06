@@ -251,7 +251,7 @@ static void handle_deliver(struct node *node, xid_t sid, deliver_t *cmd) {
             node->amcast->clock = msg->gts.time;
         msg->delivered = TRUE;
         if(node->amcast->delivery_cb)
-            node->amcast->delivery_cb(node, msg, node->amcast->cb_arg);
+            node->amcast->delivery_cb(node, msg, node->amcast->dev_cb_arg);
     }
 }
 
@@ -333,7 +333,7 @@ static struct amcast_msg *init_amcast_msg(struct groups *groups, unsigned int cl
     return msg;
 }
 
-struct amcast *amcast_init(delivery_cb_fun delivery_cb, void *cb_arg) {
+struct amcast *amcast_init(delivery_cb_fun delivery_cb, void *dev_cb_arg) {
     struct amcast *amcast = malloc(sizeof(struct amcast));
     amcast->status = INIT;
     amcast->ballot = default_pair;
@@ -344,7 +344,7 @@ struct amcast *amcast_init(delivery_cb_fun delivery_cb, void *cb_arg) {
     amcast->committed_gts = pqueue_init((pq_pricmp_fun) paircmp);
     amcast->pending_lts = pqueue_init((pq_pricmp_fun) paircmp);
     amcast->delivery_cb = delivery_cb;
-    amcast->cb_arg = cb_arg;
+    amcast->dev_cb_arg = dev_cb_arg;
     return amcast;
 }
 
