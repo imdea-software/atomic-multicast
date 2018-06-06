@@ -25,6 +25,7 @@
 struct stats {
     long delivered;
     long size;
+    struct timespec *tv_ini;
     struct timespec *tv_dev;
     struct amcast_msg **msgs;
 };
@@ -203,8 +204,10 @@ int main(int argc, char *argv[]) {
     //Get client_count & init stats struct
     stats->delivered = 0;
     stats->size = NUMBER_OF_MESSAGES * atoi(argv[4]);
+    stats->tv_ini = malloc(sizeof(struct timespec) * stats->size);
     stats->tv_dev = malloc(sizeof(struct timespec) * stats->size);
     stats->msgs = malloc(sizeof(struct amcast_msg *) * stats->size);
+    memset(stats->tv_ini, 0, sizeof(struct timespec) * stats->size);
     memset(stats->tv_dev, 0, sizeof(struct timespec) * stats->size);
     memset(stats->msgs, 0, sizeof(struct amcast_msg *) * stats->size);
     //CLIENT NODE PATTERN
@@ -229,6 +232,7 @@ int main(int argc, char *argv[]) {
     fclose(logfile);
     node_free(node);
     free_cluster_config(config);
+    free(stats->tv_ini);
     free(stats->tv_dev);
     free(stats->msgs);
     free(stats);
