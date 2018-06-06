@@ -72,6 +72,9 @@ static void handle_multicast(struct node *node, xid_t sid, message_t *cmd) {
         struct amcast_msg *msg = NULL;
         if((msg = htable_lookup(node->amcast->h_msgs, &cmd->mid)) == NULL) {
             msg = init_amcast_msg(node->groups, node->comm->cluster_size, cmd);
+            //Run msginit callback
+            if(node->amcast->msginit_cb)
+                node->amcast->msginit_cb(node, msg, node->amcast->ini_cb_arg);
             htable_insert(node->amcast->h_msgs, &msg->msg.mid, msg);
         }
         if(msg->phase == START) {
@@ -102,6 +105,9 @@ static void handle_accept(struct node *node, xid_t sid, accept_t *cmd) {
     struct amcast_msg *msg = NULL;
     if((msg = htable_lookup(node->amcast->h_msgs, &cmd->mid)) == NULL) {
         msg = init_amcast_msg(node->groups, node->comm->cluster_size, &cmd->msg);
+        //Run msginit callback
+        if(node->amcast->msginit_cb)
+            node->amcast->msginit_cb(node, msg, node->amcast->ini_cb_arg);
         htable_insert(node->amcast->h_msgs, &msg->msg.mid, msg);
     }
     if ((node->amcast->status == LEADER || node->amcast->status == FOLLOWER)
@@ -251,7 +257,7 @@ static void handle_deliver(struct node *node, xid_t sid, deliver_t *cmd) {
             node->amcast->clock = msg->gts.time;
         msg->delivered = TRUE;
         if(node->amcast->delivery_cb)
-            node->amcast->delivery_cb(node, msg, node->amcast->cb_arg);
+            node->amcast->delivery_cb(node, msg, node->amcast->dev_cb_arg);
     }
 }
 
@@ -333,7 +339,7 @@ static struct amcast_msg *init_amcast_msg(struct groups *groups, unsigned int cl
     return msg;
 }
 
-struct amcast *amcast_init(delivery_cb_fun delivery_cb, void *cb_arg) {
+struct amcast *amcast_init(msginit_cb_fun msginit_cb, void *ini_cb_arg, delivery_cb_fun delivery_cb, void *dev_cb_arg) {
     struct amcast *amcast = malloc(sizeof(struct amcast));
     amcast->status = INIT;
     amcast->ballot = default_pair;
@@ -343,8 +349,10 @@ struct amcast *amcast_init(delivery_cb_fun delivery_cb, void *cb_arg) {
     //EXTRA FIELDS (NOT IN SPEC)
     amcast->committed_gts = pqueue_init((pq_pricmp_fun) paircmp);
     amcast->pending_lts = pqueue_init((pq_pricmp_fun) paircmp);
+    amcast->msginit_cb = msginit_cb;
     amcast->delivery_cb = delivery_cb;
-    amcast->cb_arg = cb_arg;
+    amcast->ini_cb_arg = ini_cb_arg;
+    amcast->dev_cb_arg = dev_cb_arg;
     return amcast;
 }
 

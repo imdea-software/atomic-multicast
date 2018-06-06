@@ -38,11 +38,13 @@ struct amcast {
     //EXTRA FIELDS (NOT IN SPEC)
     pqueue_t *committed_gts;
     pqueue_t *pending_lts;
+    msginit_cb_fun msginit_cb;
     delivery_cb_fun delivery_cb;
-    void *cb_arg;
+    void *dev_cb_arg;
+    void *ini_cb_arg;
 };
 
-struct amcast *amcast_init(delivery_cb_fun delivery_cb, void *cb_arg);
+struct amcast *amcast_init(msginit_cb_fun msginit_cb, void *ini_cb_arg, delivery_cb_fun delivery_cb, void *dev_cb_arg);
 int amcast_free(struct amcast *amcast);
 void dispatch_amcast_command(struct node *node, struct enveloppe *env);
 
