@@ -35,6 +35,7 @@ void write_report(struct node *node, struct stats *stats, FILE *stream) {
     for(int i=0; i<stats->delivered; i++) {
         //Retrieve measures & the message's context
         struct amcast_msg *msg = stats->msgs[i];
+        struct timespec ts_start = stats->tv_ini[i];
         struct timespec ts_end = stats->tv_dev[i];
         //Retrieve the message's gts
         g_uid_t gts = msg->gts;
@@ -48,12 +49,14 @@ void write_report(struct node *node, struct stats *stats, FILE *stream) {
         //Write to a file the line corresponding to this message
         fprintf(stream, "(%u,%d)" LOG_SEPARATOR
                         "%lld.%.9ld" LOG_SEPARATOR
+                        "%lld.%.9ld" LOG_SEPARATOR
                         "(%u,%d)" LOG_SEPARATOR
                         "%u" LOG_SEPARATOR
                         "%s" LOG_SEPARATOR
                         "%u" LOG_SEPARATOR
                         "%s" "\n",
                         msg->msg.mid.time, msg->msg.mid.id,
+                        (long long)ts_start.tv_sec, ts_start.tv_nsec,
                         (long long)ts_end.tv_sec, ts_end.tv_nsec,
                         gts.time, gts.id,
                         msg->msg.destgrps_count,
