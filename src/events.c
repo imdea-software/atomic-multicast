@@ -202,7 +202,7 @@ void event_cb(struct bufferevent *bev, short events, void *ptr) {
         struct enveloppe init = { .sid = node->id, .cmd_type = INIT_NODE };
         write_enveloppe(bev, &init);
     } else if (events & (BEV_EVENT_EOF|BEV_EVENT_ERROR)) {
-        printf("[%u] Connection lost to node %u\n", node->id, peer_id);
+        //printf("[%u] Connection lost to node %u\n", node->id, peer_id);
         bufferevent_disable(bev, EV_WRITE);
         close_connection(node, peer_id);
         //TODO Have nodes tell each other when they exit normally
