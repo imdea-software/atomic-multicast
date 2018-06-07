@@ -136,6 +136,12 @@ void run_client_node(struct cluster_config *config, xid_t client_id) {
             send(sock[peer_id], &env, sizeof(env), 0);
 	    }
 	}
+    //Avoid closing connections too soon (which cause the bufferevent to be deleted on the other side)
+    int sig;
+    sigset_t signal_set;
+    sigemptyset(&signal_set);
+    sigaddset(&signal_set, SIGHUP);
+    sigwait(&signal_set, &sig);
     //Close the connections
 	for(int i=0; i<config->groups_count; i++) {
             xid_t peer_id = i*NODES_PER_GROUP+INITIAL_LEADER_IN_GROUP;
