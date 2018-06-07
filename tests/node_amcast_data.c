@@ -14,6 +14,7 @@
 #include "tests.h"
 #include "amcast.h"
 
+#define NUMBER_OF_MESSAGES 50
 
 // Everything is done manually here, quite normal since we want
 // some checks in the early stages of the project ; a real use
@@ -24,6 +25,7 @@
 xid_t id;
 pid_t pids[NUMBER_OF_NODES];
 
+unsigned long delivered;
 
 int msgcmp(message_t *msg1, message_t *msg2) {
     if(msg1 == NULL || msg2 == NULL)
@@ -54,9 +56,13 @@ void delivery_cb(struct node *node, struct amcast_msg *msg, void* cb_arg) {
     //Let's check the integrity of delivered messages
     message_t *rep = (message_t *) cb_arg;
     int ret;
-    if ((ret = msgcmp(&msg->msg, rep)) != 0)
+    if ((ret = msgcmp(&msg->msg, rep)) != 0) {
         printf("[%u] {%u, %d} Failed: the copy received is different: %u errors\n",
                 node->id, msg->msg.mid.time, msg->msg.mid.id, ret);
+	return;
+    }
+    delivered++;
+
 }
 
 //Scenario:
@@ -109,6 +115,9 @@ int main(int argc, char *argv[]) {
             printf("[%u] Failed to connect to the whole cluster"
 	           " (%u connected peers)\n", id, n->comm->accepted_count);
 	//TODO Put a barrier here, so that nodes are not being freed until they were all stopped
+	if(delivered != NUMBER_OF_MESSAGES)
+            printf("[%u] Failed to deliver all messages: %lu delivered \n",
+	           id, delivered);
         node_free(n);
     }
     //Let the main process do some stuffs e.g. be a client
@@ -128,7 +137,7 @@ int main(int argc, char *argv[]) {
             connect(sock[peer_id], (struct sockaddr *) &addr, sizeof(addr));
 	}
     //Let's send some messages
-	for(int j=0; j<50; j++) {
+	for(int j=0; j<NUMBER_OF_MESSAGES; j++) {
             env.cmd.multicast.mid.time = j;
 	    for(int i=0; i<2; i++) {
                 xid_t peer_id = i*3;
