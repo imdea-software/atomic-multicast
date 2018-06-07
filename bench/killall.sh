@@ -20,7 +20,7 @@ kill_nodes() {
 	AMCAST_SSH_USER="lefort_a"
 	AMCAST_SSH_HOST=`sed -n $(( 3 + $id + ( $IS_CLIENT * $AMCAST_BENCH_NUMBER_OF_NODES )  ))p ${AMCAST_BENCH_CLUSTER_CONF} | cut -f3`
         AMCAST_DEPLOY="ssh ${AMCAST_SSH_USER}@${AMCAST_SSH_HOST}"
-        AMCAST_CMD=( ${AMCAST_DEPLOY} "killall ${AMCAST_BIN}")
+        AMCAST_CMD=( ${AMCAST_DEPLOY} "rm /tmp/report.* ; killall -s 1 ${AMCAST_BIN}")
         "${AMCAST_CMD[@]}"
     done
 }
