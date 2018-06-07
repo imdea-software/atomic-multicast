@@ -103,6 +103,10 @@ static struct node_events *init_node_events(struct node_comm *comm, xid_t id) {
     events->reconnect_evs = malloc(comm->cluster_size * sizeof(struct event *));
     memset(events->reconnect_evs, 0, sizeof(struct event *) * comm->cluster_size);
     events->interrupt_ev = NULL;
+    //Add ev_cb_arg array
+    events->ev_cb_arg_count = comm->cluster_size;
+    events->ev_cb_arg = malloc(sizeof(struct cb_arg *) * comm->cluster_size);
+    memset(events->ev_cb_arg, 0, sizeof(struct cb_arg *) * events->ev_cb_arg_count);
     return events;
 }
 
@@ -127,6 +131,10 @@ static int configure_node_events(struct node *node) {
 }
 
 static int free_node_events(struct node_events *events) {
+    for(struct cb_arg **arg = events->ev_cb_arg; arg < events->ev_cb_arg + events->ev_cb_arg_count; arg++)
+        if(*arg != NULL)
+            free(*arg);
+    free(events->ev_cb_arg);
     if(events->interrupt_ev)
         event_free(events->interrupt_ev);
     evconnlistener_free(events->lev);

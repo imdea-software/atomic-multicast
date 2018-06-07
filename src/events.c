@@ -8,10 +8,12 @@
 static struct timeval reconnect_timeout = { 1, 0 };
 
 struct cb_arg *set_cb_arg(xid_t peer_id, struct node *node) {
-    struct cb_arg *arg = malloc(sizeof(struct cb_arg));
-    arg->peer_id = peer_id;
-    arg->node = node;
-    return arg;
+    if(node->events->ev_cb_arg[peer_id] == NULL) {
+	node->events->ev_cb_arg[peer_id] = malloc(sizeof(struct cb_arg));
+	node->events->ev_cb_arg[peer_id]->peer_id = peer_id;
+	node->events->ev_cb_arg[peer_id]->node = node;
+    }
+    return node->events->ev_cb_arg[peer_id];
 }
 int retrieve_cb_arg(xid_t *peer_id, struct node **node, struct cb_arg *arg) {
     *peer_id = arg->peer_id;
@@ -87,13 +89,19 @@ void accept_conn_cb(struct evconnlistener *lev, evutil_socket_t sock,
     else
         node->comm->a_bevs =
             realloc(node->comm->a_bevs, sizeof(struct bufferevent *) * node->comm->a_size);
+    //Add more ev_cb_arg structs
+    if(node->comm->cluster_size + node->comm->a_size > node->events->ev_cb_arg_count) {
+        node->events->ev_cb_arg = realloc(node->events->ev_cb_arg, sizeof(struct cb_arg *) * (node->events->ev_cb_arg_count * 2));
+	memset(node->events->ev_cb_arg + node->events->ev_cb_arg_count, 0, sizeof(struct cb_arg *) * node->events->ev_cb_arg_count);
+        node->events->ev_cb_arg_count *= 2;
+    }
     //Create a new bev & adjust its socket
     node->comm->a_bevs[node->comm->a_size - 1] = bufferevent_socket_new(node->events->base,
 		   -1, BEV_OPT_CLOSE_ON_FREE);
     struct bufferevent *bev = node->comm->a_bevs[node->comm->a_size - 1];
     bufferevent_setfd(bev, sock);
     //TODO Do not mess further with the bevs, they already should be correctly set from the connect loop
-    bufferevent_setcb(bev, read_cb, NULL, event_a_cb, set_cb_arg(node->comm->a_size, node));
+    bufferevent_setcb(bev, read_cb, NULL, event_a_cb, set_cb_arg(node->comm->cluster_size + node->comm->a_size - 1, node));
     bufferevent_enable(bev, EV_READ|EV_WRITE);
 }
 

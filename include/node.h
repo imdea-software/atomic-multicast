@@ -30,11 +30,15 @@ struct node_comm {
     struct bufferevent	**a_bevs;
 };
 
+#include "events.h"
+
 struct node_events {
     struct event_base	*base;
     struct evconnlistener *lev;
     struct event	*interrupt_ev;
     struct event	**reconnect_evs;
+    unsigned int	ev_cb_arg_count;
+    struct cb_arg	**ev_cb_arg;
 };
 
 struct node {
