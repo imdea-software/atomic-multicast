@@ -70,6 +70,7 @@ static int free_amcast_msg(m_uid_t *mid, struct amcast_msg *msg, void *arg);
 
 static void handle_multicast(struct node *node, xid_t sid, message_t *cmd) {
     //printf("[%u] {%u,%d} We got MULTICAST command from %u!\n", node->id, cmd->mid.time, cmd->mid.id, sid);
+    node->amcast->multicast++;
     if (node->amcast->status == LEADER) {
         struct amcast_msg *msg = NULL;
         if((msg = htable_lookup(node->amcast->h_msgs, &cmd->mid)) == NULL) {
@@ -107,6 +108,7 @@ static void handle_multicast(struct node *node, xid_t sid, message_t *cmd) {
 
 static void handle_accept(struct node *node, xid_t sid, accept_t *cmd) {
     //printf("[%u] {%u,%d} We got ACCEPT command from %u!\n", node->id, cmd->mid.time, cmd->mid.id, sid);
+    node->amcast->accept++;
     struct amcast_msg *msg = NULL;
     if((msg = htable_lookup(node->amcast->h_msgs, &cmd->mid)) == NULL) {
         msg = init_amcast_msg(node->groups, node->comm->cluster_size, &cmd->msg);
@@ -182,8 +184,10 @@ static void handle_accept(struct node *node, xid_t sid, accept_t *cmd) {
             },
         };
         memcpy(rep.cmd.accept_ack.ballot, msg->lballot, sizeof(p_uid_t) * node->groups->groups_count);
-        for(xid_t *grp = msg->msg.destgrps; grp < msg->msg.destgrps + msg->msg.destgrps_count; grp++)
+        for(xid_t *grp = msg->msg.destgrps; grp < msg->msg.destgrps + msg->msg.destgrps_count; grp++) {
             send_to_peer(node, &rep, msg->lballot[*grp].id);
+            node->amcast->sent++;
+        }
     }
     }
 }
@@ -224,6 +228,7 @@ static void handle_reaccept(struct node *node, xid_t sid, reaccept_t *cmd) {
 
 static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
     //printf("[%u] {%u,%d} We got ACCEPT_ACK command from %u supporting %u!\n", node->id, cmd->mid.time, cmd->mid.id, sid, cmd->ballot[cmd->grp].id);
+    node->amcast->accept_ack++;
     if (node->amcast->status == LEADER) {
         struct amcast_msg *msg = NULL;
         if((msg = htable_lookup(node->amcast->h_msgs, &cmd->mid)) == NULL) {
@@ -367,6 +372,7 @@ static void handle_deliver(struct node *node, xid_t sid, deliver_t *cmd) {
     if ((node->amcast->status == FOLLOWER || node->amcast->status == LEADER)
             && paircmp(&node->amcast->ballot, &cmd->ballot) == 0
             && paircmp(&cmd->gts, &node->amcast->gts_last_delivered[node->id]) > 0) {
+        node->amcast->deliver++;
         struct amcast_msg *msg = NULL;
         if((msg = htable_lookup(node->amcast->h_msgs, &cmd->mid)) == NULL) {
             puts("ERROR: Could not find this mid in h_msgs");

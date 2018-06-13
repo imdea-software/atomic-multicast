@@ -51,6 +51,8 @@ struct stats {
     message_t *msg;
 };
 
+struct timespec start, end;
+
 struct timeval nodelay = { .tv_sec = 0, .tv_usec = 0 };
 struct timeval five_seconds = { .tv_sec = 5, .tv_usec = 0 };
 struct timeval exit_node_timeout = { .tv_sec = 200, .tv_usec = 0 };
@@ -478,6 +480,7 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
         if(c->connected == c->nodes_count) {
             printf("[c-%u] Connection established to all nodes\n", c->id);
             if(c->sent == 0) {
+                clock_gettime(CLOCK_MONOTONIC, &start);
                 evtimer_add(c->submit_ev, &five_seconds);
             }
         }
@@ -499,6 +502,7 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
         if(c->connected == c->nodes_count) {
             printf("[c-%u] Connection established to all nodes\n", c->id);
             if(c->sent == 0) {
+                clock_gettime(CLOCK_MONOTONIC, &start);
                 evtimer_add(c->submit_ev, &five_seconds);
             }
         }
@@ -588,7 +592,9 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
     //Leaving
     //for(struct peer *peer=peers; peer<peers+config->size; peer++)
     //    printf("[c-%u] Received %u messages from %u\n", client.id, peer->received, peer->id);
-    //printf("[c-%u] Leaving with %u message sent\n", client.id, client.sent);
+    clock_gettime(CLOCK_MONOTONIC, &end);
+    struct timespec duration = { .tv_sec = end.tv_sec - start.tv_sec };
+    printf("[c-%u] Leaving with %u/%u message sent/received in %lu sec\n", client.id, client.sent, client.received, duration.tv_sec);
     //Free-up resources
     for(int i=0; i<config->size; i++)
         if(client.bev[i])
@@ -726,6 +732,7 @@ int main(int argc, char *argv[]) {
                 "[number_of_destgrps] [local_number_of_clients]\n");
         exit(EXIT_FAILURE);
     }
+    clock_gettime(CLOCK_MONOTONIC, &start);
 
     //Init node & cluster config
     struct cluster_config *config = malloc(sizeof(struct cluster_config));
@@ -782,6 +789,12 @@ int main(int argc, char *argv[]) {
         char filename[40];
         sprintf(filename, "/tmp/node.%d.log", node_id);
         log_to_file(stats, filename);
+
+        clock_gettime(CLOCK_MONOTONIC, &end);
+        struct timespec duration;
+        duration.tv_sec = end.tv_sec - start.tv_sec;
+        printf("[%u] DELIVERED %lu msg remaining %u in htable %u in pqeue. Exiting after %lu\n", node->id, stats->delivered, g_hash_table_size(node->amcast->h_msgs), pqueue_size(node->amcast->committed_gts), duration.tv_sec);
+        printf("[%u] RECEIVED %u multicast %u accept %u accept_ack %u deliver %u sent\n", node->id, node->amcast->multicast, node->amcast->accept, node->amcast->accept_ack, node->amcast->deliver, node->amcast->sent);
 
 	 node_free(node);
 	 free_stats(stats);

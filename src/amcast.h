@@ -46,6 +46,12 @@ struct amcast {
     //EXTRA FIELDS - NEWLEADER_SYNC_ACK COUNTERS
     unsigned int newleader_sync_ack_groupcount;
     unsigned int *newleader_sync_ack_count;
+    //DEBUG
+    unsigned int multicast;
+    unsigned int accept;
+    unsigned int accept_ack;
+    unsigned int deliver;
+    unsigned int sent;
     //EXTRA FIELDS (NOT IN SPEC)
     pqueue_t *delivered_gts;
     pqueue_t *committed_gts;
