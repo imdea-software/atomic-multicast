@@ -38,6 +38,7 @@ static int init_connection(struct node *node, xid_t peer_id) {
 		   -1, BEV_OPT_CLOSE_ON_FREE);
     struct bufferevent *bev = node->comm->bevs[peer_id];
     bufferevent_setcb(bev, read_cb, NULL, event_cb, set_cb_arg(peer_id, node));
+    bufferevent_setwatermark(bev, EV_READ, sizeof(struct enveloppe), 0);
     bufferevent_enable(bev, EV_READ|EV_WRITE);
     bufferevent_socket_connect(bev, (struct sockaddr *)node->comm->addrs+peer_id,
         sizeof(node->comm->addrs[peer_id]));
@@ -102,6 +103,7 @@ void accept_conn_cb(struct evconnlistener *lev, evutil_socket_t sock,
     bufferevent_setfd(bev, sock);
     //TODO Do not mess further with the bevs, they already should be correctly set from the connect loop
     bufferevent_setcb(bev, read_cb, NULL, event_a_cb, set_cb_arg(node->comm->cluster_size + node->comm->a_size - 1, node));
+    bufferevent_setwatermark(bev, EV_READ, sizeof(struct enveloppe), 0);
     bufferevent_enable(bev, EV_READ|EV_WRITE);
 }
 
