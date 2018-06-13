@@ -127,11 +127,14 @@ void read_cb(struct bufferevent *bev, void *ptr) {
         read_enveloppe(bev, &env);
         //TODO Have to way to identify clients (atm only bev pointer)
         //     So that this can be put in the dispatch sequence
-        if(env.cmd_type == TESTREPLY) {
-            write_enveloppe(bev, &env);
-            continue;
+        switch(env.cmd_type) {
+            case TESTREPLY:
+                write_enveloppe(bev, &env);
+                break;
+            default:
+                dispatch_message(node, &env);
+                break;
         }
-        dispatch_message(node, &env);
     }
 }
 
