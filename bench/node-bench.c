@@ -21,31 +21,33 @@
 #define NUMBER_OF_MESSAGES 100000
 #define NODES_PER_GROUP 3
 #define INITIAL_LEADER_IN_GROUP 0
+#define MEASURE_RESOLUTION 1 //Only save stats for 1 message out of MEASURE_RESOLUTION
 
 struct stats {
     long delivered;
+    long count;
     long size;
     struct timespec *tv_ini;
     struct timespec *tv_dev;
-    struct amcast_msg **msgs;
+    g_uid_t *gts;
+    message_t *msg;
 };
 
 //TODO write to file the execution log
 void write_report(struct node *node, struct stats *stats, FILE *stream) {
-    for(int i=0; i<stats->delivered; i++) {
+    for(int i=0; i<stats->count; i++) {
         //Retrieve measures & the message's context
-        struct amcast_msg *msg = stats->msgs[i];
+        message_t msg = stats->msg[i];
         struct timespec ts_start = stats->tv_ini[i];
         struct timespec ts_end = stats->tv_dev[i];
-        //Retrieve the message's gts
-        g_uid_t gts = msg->gts;
+        g_uid_t gts = stats->gts[i];
         //Write to a string the destination groups
-        char *destgrps = malloc(sizeof(char) * (1 + 1 + (12 + 1) * msg->msg.destgrps_count) + 1);
+        char *destgrps = malloc(sizeof(char) * (1 + 1 + (12 + 1) * msg.destgrps_count) + 1);
         int idx = 0;
-        idx = sprintf(destgrps+idx, "(%d", msg->msg.destgrps[0]);
-        for(int i=0; i<msg->msg.destgrps_count - 1; i++)
-            idx = sprintf(destgrps+idx, ",%d", msg->msg.destgrps[i]);
-        idx = sprintf(destgrps+idx, ",%d)", msg->msg.destgrps[msg->msg.destgrps_count-1]);
+        idx = sprintf(destgrps+idx, "(%d", msg.destgrps[0]);
+        for(int i=0; i<msg.destgrps_count - 1; i++)
+            idx = sprintf(destgrps+idx, ",%d", msg.destgrps[i]);
+        idx = sprintf(destgrps+idx, ",%d)", msg.destgrps[msg.destgrps_count-1]);
         //Write to a file the line corresponding to this message
         fprintf(stream, "(%u,%d)" LOG_SEPARATOR
                         "%lld.%.9ld" LOG_SEPARATOR
@@ -55,14 +57,14 @@ void write_report(struct node *node, struct stats *stats, FILE *stream) {
                         "%s" LOG_SEPARATOR
                         "%u" LOG_SEPARATOR
                         "%s" "\n",
-                        msg->msg.mid.time, msg->msg.mid.id,
+                        msg.mid.time, msg.mid.id,
                         (long long)ts_start.tv_sec, ts_start.tv_nsec,
                         (long long)ts_end.tv_sec, ts_end.tv_nsec,
                         gts.time, gts.id,
-                        msg->msg.destgrps_count,
+                        msg.destgrps_count,
                         destgrps,
-                        msg->msg.value.len,
-                        msg->msg.value.val);
+                        msg.value.len,
+                        msg.value.val);
         free(destgrps);
     }
 }
@@ -77,12 +79,16 @@ void msginit_cb(struct node *node, struct amcast_msg *msg, void *cb_arg) {
 //Record useful info regarding the delivered message
 void delivery_cb(struct node *node, struct amcast_msg *msg, void *cb_arg) {
     struct stats *stats = (struct stats *) cb_arg;
-    clock_gettime(CLOCK_MONOTONIC, stats->tv_dev + stats->delivered);
-    stats->tv_ini[stats->delivered] = *((struct timespec *) msg->shared_cb_arg);
-    stats->msgs[stats->delivered] = msg;
+    if( ((stats->delivered + 1) % MEASURE_RESOLUTION) == 0) {
+        clock_gettime(CLOCK_MONOTONIC, stats->tv_dev + stats->count);
+        stats->tv_ini[stats->count] = *((struct timespec *) msg->shared_cb_arg);
+        stats->gts[stats->count] = msg->gts;
+        stats->msg[stats->count] = msg->msg;
+        stats->count++;
+    }
     stats->delivered++;
     free(msg->shared_cb_arg);
-    if(stats->delivered >= stats->size)
+    if(stats->delivered >= stats->size * MEASURE_RESOLUTION )
         kill(getpid(), SIGHUP);
 }
 
@@ -215,13 +221,12 @@ int main(int argc, char *argv[]) {
 
     //Get client_count & init stats struct
     stats->delivered = 0;
-    stats->size = NUMBER_OF_MESSAGES * atoi(argv[4]);
+    stats->count = 0;
+    stats->size = ( NUMBER_OF_MESSAGES / MEASURE_RESOLUTION ) * atoi(argv[4]);
     stats->tv_ini = malloc(sizeof(struct timespec) * stats->size);
     stats->tv_dev = malloc(sizeof(struct timespec) * stats->size);
-    stats->msgs = malloc(sizeof(struct amcast_msg *) * stats->size);
-    memset(stats->tv_ini, 0, sizeof(struct timespec) * stats->size);
-    memset(stats->tv_dev, 0, sizeof(struct timespec) * stats->size);
-    memset(stats->msgs, 0, sizeof(struct amcast_msg *) * stats->size);
+    stats->gts = malloc(sizeof(g_uid_t) * stats->size);
+    stats->msg = malloc(sizeof(message_t) * stats->size);
     //CLIENT NODE PATTERN
     if(atoi(argv[5])) {
         run_client_node(config, node_id);
@@ -246,7 +251,8 @@ int main(int argc, char *argv[]) {
     free_cluster_config(config);
     free(stats->tv_ini);
     free(stats->tv_dev);
-    free(stats->msgs);
+    free(stats->gts);
+    free(stats->msg);
     free(stats);
     return EXIT_SUCCESS;
 }

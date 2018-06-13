@@ -65,6 +65,7 @@ unsigned int pairhash(struct pair *p) {
 
 static struct amcast_msg *init_amcast_msg(struct groups *groups, unsigned int cluster_size, message_t *cmd);
 static void reset_accept_ack_counters(struct amcast_msg *msg, struct groups *groups, unsigned int cluster_size);
+static int free_amcast_msg(m_uid_t *mid, struct amcast_msg *msg, void *arg);
 
 static void handle_multicast(struct node *node, xid_t sid, message_t *cmd) {
     //printf("[%u] {%u,%d} We got MULTICAST command from %u!\n", node->id, cmd->mid.time, cmd->mid.id, sid);
@@ -155,8 +156,8 @@ static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
     if (node->amcast->status == LEADER) {
         struct amcast_msg *msg = NULL;
         if((msg = htable_lookup(node->amcast->h_msgs, &cmd->mid)) == NULL) {
-            puts("ERROR: Could not find this mid in h_msgs");
-            exit(EXIT_FAILURE);
+            //TODO a bit unsafe, must check whether the message is already delivered
+            return;
         }
         //Check whether the local ballot and the received one are equal
         //  It seems ACCEPT_ACKS are sometime recevied before gts is initialized
@@ -258,6 +259,8 @@ static void handle_deliver(struct node *node, xid_t sid, deliver_t *cmd) {
         msg->delivered = TRUE;
         if(node->amcast->delivery_cb)
             node->amcast->delivery_cb(node, msg, node->amcast->dev_cb_arg);
+        htable_remove(node->amcast->h_msgs, &msg->msg.mid);
+        free_amcast_msg(NULL, msg, NULL);
     }
 }
 
