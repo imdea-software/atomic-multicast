@@ -129,13 +129,22 @@ void run_client_node(struct cluster_config *config, xid_t client_id) {
 	};
     for(int i=0; i<env.cmd.multicast.destgrps_count; i++)
         env.cmd.multicast.destgrps[i] = i;
+    struct timespec delay = { .tv_sec=1, .tv_nsec=0};
     for(int j=0; j<NUMBER_OF_MESSAGES; j++) {
+        if(j % 20000 == 0)
+	    nanosleep(&delay, NULL);
         env.cmd.multicast.mid.time = j;
 	    for(int i=0; i<config->groups_count; i++) {
             xid_t peer_id = i*NODES_PER_GROUP+INITIAL_LEADER_IN_GROUP;
             send(sock[peer_id], &env, sizeof(env), 0);
 	    }
 	}
+    //Avoid closing connections too soon (which cause the bufferevent to be deleted on the other side)
+    int sig;
+    sigset_t signal_set;
+    sigemptyset(&signal_set);
+    sigaddset(&signal_set, SIGHUP);
+    sigwait(&signal_set, &sig);
     //Close the connections
 	for(int i=0; i<config->groups_count; i++) {
             xid_t peer_id = i*NODES_PER_GROUP+INITIAL_LEADER_IN_GROUP;
