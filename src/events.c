@@ -129,7 +129,7 @@ void read_cb(struct bufferevent *bev, void *ptr) {
         //     So that this can be put in the dispatch sequence
         if(env.cmd_type == TESTREPLY) {
             write_enveloppe(bev, &env);
-            return;
+            continue;
         }
         dispatch_message(node, &env);
     }
