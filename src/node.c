@@ -64,11 +64,13 @@ static struct node_comm *init_node_comm(struct cluster_config *conf) {
     comm->cluster_size = size;
     comm->accepted_count = 0;
     comm->a_size = 0;
+    comm->c_size = 0;
     comm->addrs = addrs;
     comm->ids = ids;
     comm->groups = groups;
     comm->bevs = bevs;
     comm->a_bevs = NULL;
+    comm->c_bevs = NULL;
 
     return comm;
 };
@@ -83,6 +85,8 @@ static int free_node_comm(struct node_comm *comm) {
 	if(*bev)
 	    bufferevent_free(*bev);
     free(comm->a_bevs);
+    if(comm->c_bevs != NULL)
+        free(comm->c_bevs);
     free(comm->bevs);
     free(comm->ids);
     free(comm->groups);

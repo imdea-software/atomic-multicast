@@ -28,6 +28,12 @@ void send_to_peer(struct node *node, struct enveloppe *env, xid_t peer_id) {
     write_enveloppe(node->comm->bevs[peer_id], env);
 }
 
+void send_to_client(struct node *node, struct enveloppe *env, xid_t client_id) {
+    struct bufferevent *bev;
+    if( client_id < node->comm->c_size && (bev = node->comm->c_bevs[client_id]) != NULL )
+        write_enveloppe(bev, env);
+}
+
 //TODO Add a decent groups structure so that looping over all nodes is not required
 void send_to_group(struct node *node, struct enveloppe *env, xid_t group_id) {
     for(xid_t *peer = node->groups->members[group_id];

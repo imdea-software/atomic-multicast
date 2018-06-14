@@ -131,6 +131,17 @@ void read_cb(struct bufferevent *bev, void *ptr) {
             case TESTREPLY:
                 write_enveloppe(bev, &env);
                 break;
+            case INIT_CLIENT:
+                if(node->comm->c_size <= env.sid) {
+                    node->comm->c_bevs = realloc(node->comm->c_bevs, sizeof(struct bufferevent *) *
+                        ((env.sid < node->comm->c_size * 2) ?
+                            ( node->comm->c_size = (node->comm->c_size * 2) ) :
+                            ( node->comm->c_size = (env.sid + 1) )
+                        )
+                    );
+                }
+                node->comm->c_bevs[env.sid] = bev;
+                break;
             default:
                 dispatch_message(node, &env);
                 break;
