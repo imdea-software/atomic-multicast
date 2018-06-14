@@ -11,6 +11,8 @@
 #include <sys/stat.h>
 #include <semaphore.h>
 
+#include <event2/buffer.h>
+
 #include "types.h"
 #include "cluster.h"
 #include "node.h"
@@ -143,6 +145,140 @@ void run_client_node(struct cluster_config *config, xid_t client_id) {
             xid_t peer_id = i*NODES_PER_GROUP+INITIAL_LEADER_IN_GROUP;
             close(sock[peer_id]);
     }
+}
+
+void run_client_node_libevent(struct cluster_config *config, xid_t client_id) {
+    struct client {
+        xid_t id;
+        unsigned int groups_count;
+        unsigned int connected;
+        unsigned int sent;
+        struct event_base *base;
+        struct event *submit_value;
+        struct bufferevent **bev;
+        struct timeval delay;
+        struct enveloppe *ref_value;
+    } client;
+    struct peer {
+        unsigned int id;
+        unsigned int received;
+        struct client *c;
+    } *peers;
+    void submit_cb(evutil_socket_t fd, short flags, void *ptr) {
+        struct client *c = (struct client *) ptr;
+        c->ref_value->cmd.multicast.mid.time = c->sent++;
+        for(int i=0; i<c->groups_count; i++) {
+            id_t peer_id = i*NODES_PER_GROUP+INITIAL_LEADER_IN_GROUP;
+            if(bufferevent_write(c->bev[peer_id], c->ref_value, sizeof(*c->ref_value)) < 0)
+                    printf("[c-%u] Something bad happened (submit)\n", c->id);
+        }
+    }
+    void read_cb(struct bufferevent *bev, void *ptr) {
+        struct peer *p = (struct peer *) ptr;
+        struct client *c = p->c;
+
+        /* Do Some STUFFS */
+        struct evbuffer *in_buf = bufferevent_get_input(bev);
+        while (evbuffer_get_length(in_buf) >= sizeof(struct enveloppe)) {
+            struct enveloppe env;
+            bufferevent_read(bev, &env, sizeof(struct enveloppe));
+            switch(env.cmd_type) {
+                case DELIVER:
+                    p->received++;
+                    /* MCAST the next message */
+                    if(c->sent < NUMBER_OF_MESSAGES)
+                        //event_add(c->submit_value, &c->delay);
+                        submit_cb(0,0,c);
+                    break;
+                default:
+                    break;
+            }
+        }
+    }
+    void event_cb(struct bufferevent *bev, short events, void *ptr) {
+        struct peer *p = (struct peer *) ptr;
+        struct client *c = p->c;
+        if (events & BEV_EVENT_CONNECTED) {
+            c->connected++;
+            struct enveloppe init_client = { .sid = c->id, .cmd_type = INIT_CLIENT };
+            if(bufferevent_write(bev, &init_client, sizeof(init_client)) < 0)
+                printf("[c-%u] Something bad happened (init_client)\n", c->id);
+        }
+        else if (events & (BEV_EVENT_EOF|BEV_EVENT_ERROR))
+            c->connected--;
+        if(c->connected == c->groups_count) {
+            printf("[c-%u] Connection established to all groups\n", c->id);
+            if(c->sent == 0)
+                //event_add(c->submit_value, &c->delay);
+                submit_cb(0,0,c);
+        } else if(p->received < NUMBER_OF_MESSAGES) {
+            printf("[c-%u] Server %i left before all messages were sent: %u sent\n", c->id, p->id, c->sent);
+        }
+    }
+    void interrupt_cb(evutil_socket_t fd, short flags, void *ptr) {
+        struct event *interrupt_ev = (struct event *) ptr;
+        struct event_base *base = event_get_base(interrupt_ev);
+        event_del(interrupt_ev);
+        event_base_loopexit(base, NULL);
+    }
+    //SET-UP libevent
+    memset(&client, 0, sizeof(struct client));
+    client.id = client_id;
+    client.groups_count = config->groups_count;
+    client.base = event_base_new();
+    client.submit_value = event_new(client.base, -1, EV_TIMEOUT, submit_cb, &client);
+    client.bev = calloc(config->size, sizeof(struct bufferevent *));
+    peers = calloc(config->size, sizeof(struct peer));
+    //Connect with TCP to group LEADERS
+    for(int i=0; i<config->groups_count; i++) {
+        xid_t peer_id = i*NODES_PER_GROUP+INITIAL_LEADER_IN_GROUP;
+        peers[peer_id].c = &client;
+        peers[peer_id].id = peer_id;
+        client.bev[peer_id] = bufferevent_socket_new(client.base, -1, BEV_OPT_CLOSE_ON_FREE);
+        bufferevent_setcb(client.bev[peer_id], read_cb, NULL, event_cb, peers+peer_id);
+        bufferevent_setwatermark(client.bev[peer_id], EV_READ, sizeof(struct enveloppe), 0);
+        bufferevent_enable(client.bev[peer_id], EV_READ|EV_WRITE);
+        struct sockaddr_in addr = {
+            .sin_family = AF_INET,
+            .sin_port = htons(config->ports[peer_id]),
+            .sin_addr.s_addr = inet_addr(config->addresses[peer_id])
+        };
+        bufferevent_socket_connect(client.bev[peer_id], (struct sockaddr *) &addr, sizeof(addr));
+    }
+    //Prepare enveloppe template
+    struct enveloppe env = {
+        .sid = client_id,
+        .cmd_type = MULTICAST,
+        .cmd.multicast = {
+            .mid = {-1, client_id},
+            .destgrps_count = config->groups_count,
+            .value = {
+                .len = strlen("coucou"),
+                .val = "coucou"
+            }
+        },
+    };
+    for(int i=0; i<env.cmd.multicast.destgrps_count; i++)
+        env.cmd.multicast.destgrps[i] = i;
+    client.ref_value = &env;
+    //Set-up eventloop-exit
+    struct event *ev_exit = evsignal_new(client.base, SIGHUP, interrupt_cb, event_self_cbarg());
+    event_add(ev_exit, NULL);
+    //Start client
+    event_base_dispatch(client.base);
+    //Leaving
+    //for(struct peer *peer=peers; peer<peers+config->size; peer++)
+    //    printf("[c-%u] Received %u messages from %u\n", client.id, peer->received, peer->id);
+    //printf("[c-%u] Leaving with %u message sent\n", client.id, client.sent);
+    //Free-up resources
+    for(int i=0; i<config->size; i++)
+        if(client.bev[i])
+            bufferevent_free(client.bev[i]);
+    free(client.bev);
+    event_free(ev_exit);
+    event_free(client.submit_value);
+    event_base_free(client.base);
+    free(peers);
 }
 
 //TODO Should find a trick to avoid the ugly conditionals
