@@ -127,11 +127,25 @@ void read_cb(struct bufferevent *bev, void *ptr) {
         read_enveloppe(bev, &env);
         //TODO Have to way to identify clients (atm only bev pointer)
         //     So that this can be put in the dispatch sequence
-        if(env.cmd_type == TESTREPLY) {
-            write_enveloppe(bev, &env);
-            continue;
+        switch(env.cmd_type) {
+            case TESTREPLY:
+                write_enveloppe(bev, &env);
+                break;
+            case INIT_CLIENT:
+                if(node->comm->c_size <= env.sid) {
+                    node->comm->c_bevs = realloc(node->comm->c_bevs, sizeof(struct bufferevent *) *
+                        ((env.sid < node->comm->c_size * 2) ?
+                            ( node->comm->c_size = (node->comm->c_size * 2) ) :
+                            ( node->comm->c_size = (env.sid + 1) )
+                        )
+                    );
+                }
+                node->comm->c_bevs[env.sid] = bev;
+                break;
+            default:
+                dispatch_message(node, &env);
+                break;
         }
-        dispatch_message(node, &env);
     }
 }
 
