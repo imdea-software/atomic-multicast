@@ -81,10 +81,12 @@ static int free_node_comm(struct node_comm *comm) {
     for(struct bufferevent **bev = comm->bevs; bev< comm->bevs + comm->cluster_size; bev++)
 	if(*bev)
 	    bufferevent_free(*bev);
-    for(struct bufferevent **bev = comm->a_bevs; bev< comm->a_bevs + comm->a_size; bev++)
-	if(*bev)
-	    bufferevent_free(*bev);
-    free(comm->a_bevs);
+    if(comm->a_bevs != NULL) {
+        for(struct bufferevent **bev = comm->a_bevs; bev< comm->a_bevs + comm->a_size; bev++)
+        if(*bev)
+            bufferevent_free(*bev);
+        free(comm->a_bevs);
+    }
     if(comm->c_bevs != NULL)
         free(comm->c_bevs);
     free(comm->bevs);
