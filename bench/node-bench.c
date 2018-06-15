@@ -155,6 +155,7 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id) {
         unsigned int dests_count;
         unsigned int connected;
         unsigned int sent;
+        unsigned int received;
         struct event_base *base;
         struct bufferevent **bev;
         struct enveloppe *ref_value;
@@ -197,9 +198,12 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id) {
             switch(env.cmd_type) {
                 case DELIVER:
                     p->received++;
+                    c->received++;
                     /* MCAST the next message */
                     if(c->sent < NUMBER_OF_MESSAGES)
                         submit_cb(0,0,c);
+                    if(c->received >= NUMBER_OF_MESSAGES)
+                        kill(getpid(), SIGHUP);
                     break;
                 default:
                     break;
