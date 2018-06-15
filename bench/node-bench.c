@@ -154,9 +154,7 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id) {
         unsigned int connected;
         unsigned int sent;
         struct event_base *base;
-        struct event *submit_value;
         struct bufferevent **bev;
-        struct timeval delay;
         struct enveloppe *ref_value;
     } client;
     struct peer {
@@ -187,7 +185,6 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id) {
                     p->received++;
                     /* MCAST the next message */
                     if(c->sent < NUMBER_OF_MESSAGES)
-                        //event_add(c->submit_value, &c->delay);
                         submit_cb(0,0,c);
                     break;
                 default:
@@ -209,7 +206,6 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id) {
         if(c->connected == c->groups_count) {
             printf("[c-%u] Connection established to all groups\n", c->id);
             if(c->sent == 0)
-                //event_add(c->submit_value, &c->delay);
                 submit_cb(0,0,c);
         } else if(p->received < NUMBER_OF_MESSAGES) {
             printf("[c-%u] Server %i left before all messages were sent: %u sent\n", c->id, p->id, c->sent);
@@ -226,7 +222,6 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id) {
     client.id = client_id;
     client.groups_count = config->groups_count;
     client.base = event_base_new();
-    client.submit_value = event_new(client.base, -1, EV_TIMEOUT, submit_cb, &client);
     client.bev = calloc(config->size, sizeof(struct bufferevent *));
     peers = calloc(config->size, sizeof(struct peer));
     //Connect with TCP to group LEADERS
@@ -276,7 +271,6 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id) {
             bufferevent_free(client.bev[i]);
     free(client.bev);
     event_free(ev_exit);
-    event_free(client.submit_value);
     event_base_free(client.base);
     free(peers);
 }
