@@ -162,11 +162,14 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id) {
         unsigned int received;
         struct client *c;
     } *peers;
+    xid_t get_leader_from_group(xid_t g_id) {
+        return g_id * NODES_PER_GROUP + INITIAL_LEADER_IN_GROUP;
+    }
     void submit_cb(evutil_socket_t fd, short flags, void *ptr) {
         struct client *c = (struct client *) ptr;
         c->ref_value->cmd.multicast.mid.time = c->sent++;
         for(int i=0; i<c->groups_count; i++) {
-            id_t peer_id = i*NODES_PER_GROUP+INITIAL_LEADER_IN_GROUP;
+            xid_t peer_id = get_leader_from_group(i);
             if(bufferevent_write(c->bev[peer_id], c->ref_value, sizeof(*c->ref_value)) < 0)
                     printf("[c-%u] Something bad happened (submit)\n", c->id);
         }
@@ -226,7 +229,7 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id) {
     peers = calloc(config->size, sizeof(struct peer));
     //Connect with TCP to group LEADERS
     for(int i=0; i<config->groups_count; i++) {
-        xid_t peer_id = i*NODES_PER_GROUP+INITIAL_LEADER_IN_GROUP;
+        xid_t peer_id = get_leader_from_group(i);
         peers[peer_id].c = &client;
         peers[peer_id].id = peer_id;
         client.bev[peer_id] = bufferevent_socket_new(client.base, -1, BEV_OPT_CLOSE_ON_FREE);
