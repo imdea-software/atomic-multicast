@@ -21,6 +21,7 @@
 #define CONF_SEPARATOR "\t"
 #define LOG_SEPARATOR "\t"
 #define NUMBER_OF_MESSAGES 100000
+#define NUMBER_OF_TARGETS 2
 #define NODES_PER_GROUP 3
 #define INITIAL_LEADER_IN_GROUP 0
 #define MEASURE_RESOLUTION 1 //Only save stats for 1 message out of MEASURE_RESOLUTION
@@ -151,6 +152,7 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id) {
     struct client {
         xid_t id;
         unsigned int groups_count;
+        unsigned int dests_count;
         unsigned int connected;
         unsigned int sent;
         struct event_base *base;
@@ -167,7 +169,16 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id) {
     }
     void submit_cb(evutil_socket_t fd, short flags, void *ptr) {
         struct client *c = (struct client *) ptr;
+
+        /* Do some magic with the mcast message */
+        /* --> update mid.time */
         c->ref_value->cmd.multicast.mid.time = c->sent++;
+        /* --> select « random » destgrps */
+        xid_t g_dst_id = rand() % c->groups_count;
+        for(int i=0; i<c->ref_value->cmd.multicast.destgrps_count; i++)
+            c->ref_value->cmd.multicast.destgrps[i] = g_dst_id++ % c->groups_count;
+
+        /* Send it to current known leaders */
         for(int i=0; i<c->groups_count; i++) {
             xid_t peer_id = get_leader_from_group(i);
             if(bufferevent_write(c->bev[peer_id], c->ref_value, sizeof(*c->ref_value)) < 0)
@@ -220,10 +231,12 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id) {
         event_del(interrupt_ev);
         event_base_loopexit(base, NULL);
     }
+    srand(time(NULL));
     //SET-UP libevent
     memset(&client, 0, sizeof(struct client));
     client.id = client_id;
     client.groups_count = config->groups_count;
+    client.dests_count = NUMBER_OF_TARGETS;
     client.base = event_base_new();
     client.bev = calloc(config->size, sizeof(struct bufferevent *));
     peers = calloc(config->size, sizeof(struct peer));
@@ -249,15 +262,13 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id) {
         .cmd_type = MULTICAST,
         .cmd.multicast = {
             .mid = {-1, client_id},
-            .destgrps_count = config->groups_count,
+            .destgrps_count = client.dests_count,
             .value = {
                 .len = strlen("coucou"),
                 .val = "coucou"
             }
         },
     };
-    for(int i=0; i<env.cmd.multicast.destgrps_count; i++)
-        env.cmd.multicast.destgrps[i] = i;
     client.ref_value = &env;
     //Set-up eventloop-exit
     struct event *ev_exit = evsignal_new(client.base, SIGHUP, interrupt_cb, event_self_cbarg());
