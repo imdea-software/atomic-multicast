@@ -169,6 +169,8 @@ void event_cb(struct bufferevent *bev, short events, void *ptr) {
 	if (events & BEV_EVENT_EOF)
             node->comm->accepted_count -= 1;
         close_connection(node, peer_id);
+        //TODO Have nodes tell each other when they exit normally
+        //     so we can have a smarter reconnect pattern
         connect_to_node(node, peer_id);
     } else {
         printf("[%u] Event %d not handled", node->id, events);
