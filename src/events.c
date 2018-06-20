@@ -70,12 +70,8 @@ static void event_a_cb(struct bufferevent *bev, short events, void *ptr) {
 
     if (events & (BEV_EVENT_EOF|BEV_EVENT_ERROR)) {
         printf("[%u] Connection lost to %u-th accepted\n", node->id, a_id);
-	/*
-	 *if (node->comm->a_bevs[a_id])
-	 *   bufferevent_free(node->comm->a_bevs[a_id]);
-         *node->comm->a_bevs[a_id] = NULL;
-	 */
-	//node->comm->a_size --;
+        close_connection(node, peer_id);
+        //node->comm->a_size --;
     } else {
         printf("[%u] Event %d not handled", node->id, events);
     }
