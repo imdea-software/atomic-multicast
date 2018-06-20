@@ -196,3 +196,13 @@ void interrupt_cb(evutil_socket_t sock, short flags, void *ptr) {
     event_del(interrupt_ev);
     event_base_loopexit(base, NULL);
 }
+
+void termination_cb(evutil_socket_t sock, short flags, void *ptr) {
+    struct node *node = (struct node *) ptr;
+
+    event_del(node->events->interrupt_ev);
+    event_del(node->events->termination_ev);
+    evconnlistener_disable(node->events->lev);
+    for(int peer_id=0; peer_id< node->comm->cluster_size; peer_id++)
+        close_connection(node, peer_id);
+}
