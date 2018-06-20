@@ -46,8 +46,18 @@ static int init_connection(struct node *node, xid_t peer_id) {
 }
 
 static int close_connection(struct node *node, xid_t peer_id) {
-    bufferevent_free(node->comm->bevs[peer_id]);
-    node->comm->bevs[peer_id] = NULL;
+    struct bufferevent **bev = (peer_id < node->comm->cluster_size) ?
+	    node->comm->bevs+peer_id : node->comm->a_bevs + peer_id - node->comm->cluster_size;
+    if(*bev) {
+        if(evbuffer_get_length(bufferevent_get_input(*bev)))
+            read_cb(*bev, set_cb_arg(peer_id, node));
+        if(evbuffer_get_length(bufferevent_get_output(*bev))) {
+            bufferevent_setcb(*bev, NULL, close_cb, event_cb, set_cb_arg(peer_id, node));
+            bufferevent_disable(*bev, EV_READ);
+        } else
+            close_cb(*bev, NULL);
+	*bev = NULL;
+    }
     return 0;
 }
 
