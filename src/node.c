@@ -130,7 +130,7 @@ static int configure_node_events(struct node *node) {
     }
     //Set-up a signal event to exit the event-loop
     //TODO Add some protection to prevent use in case of multithreaded context
-    node->events->interrupt_ev = evsignal_new(node->events->base, SIGHUP, interrupt_cb,
+    node->events->interrupt_ev = evsignal_new(node->events->base, SIGINT, interrupt_cb,
                     event_self_cbarg());
     event_add(node->events->interrupt_ev, NULL);
     return 0;
