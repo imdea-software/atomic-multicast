@@ -54,8 +54,9 @@ static int close_connection(struct node *node, xid_t peer_id) {
 //Called when the status of a connection changes
 //TODO Find something useful to do in there
 static void event_a_cb(struct bufferevent *bev, short events, void *ptr) {
-    struct node *node = NULL; xid_t a_id;
-    retrieve_cb_arg(&a_id, &node, (struct cb_arg *) ptr);
+    struct node *node = NULL; xid_t peer_id;
+    retrieve_cb_arg(&peer_id, &node, (struct cb_arg *) ptr);
+    xid_t a_id = peer_id - node->comm->cluster_size;
 
     if (events & (BEV_EVENT_EOF|BEV_EVENT_ERROR)) {
         printf("[%u] Connection lost to %u-th accepted\n", node->id, a_id);
