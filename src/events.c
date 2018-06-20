@@ -169,6 +169,11 @@ void event_cb(struct bufferevent *bev, short events, void *ptr) {
     }
 }
 
+//Called after last write of a connection
+void close_cb(struct bufferevent *bev, void *ptr) {
+    bufferevent_free(bev);
+}
+
 void reconnect_cb(evutil_socket_t sock, short flags, void *ptr) {
     struct node *node = NULL; xid_t peer_id;
     retrieve_cb_arg(&peer_id, &node, (struct cb_arg *) ptr);

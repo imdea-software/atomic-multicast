@@ -26,5 +26,6 @@ void reconnect_cb(evutil_socket_t sock, short events, void *ptr);
 void interrupt_cb(evutil_socket_t sock, short events, void *ptr);
 void read_cb(struct bufferevent *bev, void *ptr);
 void event_cb(struct bufferevent *bev, short flags, void *ptr);
+void close_cb(struct bufferevent *bev, void *ptr);
 
 #endif
