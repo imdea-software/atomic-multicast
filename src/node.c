@@ -109,6 +109,7 @@ static struct node_events *init_node_events(struct node_comm *comm, xid_t id) {
     events->reconnect_evs = malloc(comm->cluster_size * sizeof(struct event *));
     memset(events->reconnect_evs, 0, sizeof(struct event *) * comm->cluster_size);
     events->interrupt_ev = NULL;
+    events->termination_ev = NULL;
     //Add ev_cb_arg array
     events->ev_cb_arg_count = comm->cluster_size;
     events->ev_cb_arg = malloc(sizeof(struct cb_arg *) * comm->cluster_size);
@@ -130,9 +131,12 @@ static int configure_node_events(struct node *node) {
     }
     //Set-up a signal event to exit the event-loop
     //TODO Add some protection to prevent use in case of multithreaded context
-    node->events->interrupt_ev = evsignal_new(node->events->base, SIGHUP, interrupt_cb,
+    node->events->interrupt_ev = evsignal_new(node->events->base, SIGINT, interrupt_cb,
                     event_self_cbarg());
     event_add(node->events->interrupt_ev, NULL);
+    //Set-up a signal event to gracefully (by starvation) terminate the event-loop
+    node->events->termination_ev = evsignal_new(node->events->base, SIGHUP, termination_cb, node);
+    event_add(node->events->termination_ev, NULL);
     return 0;
 }
 
@@ -141,6 +145,8 @@ static int free_node_events(struct node_events *events) {
         if(*arg != NULL)
             free(*arg);
     free(events->ev_cb_arg);
+    if(events->termination_ev)
+        event_free(events->termination_ev);
     if(events->interrupt_ev)
         event_free(events->interrupt_ev);
     evconnlistener_free(events->lev);

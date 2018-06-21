@@ -46,25 +46,32 @@ static int init_connection(struct node *node, xid_t peer_id) {
 }
 
 static int close_connection(struct node *node, xid_t peer_id) {
-    bufferevent_free(node->comm->bevs[peer_id]);
-    node->comm->bevs[peer_id] = NULL;
+    struct bufferevent **bev = (peer_id < node->comm->cluster_size) ?
+	    node->comm->bevs+peer_id : node->comm->a_bevs + peer_id - node->comm->cluster_size;
+    if(*bev) {
+        if(evbuffer_get_length(bufferevent_get_input(*bev)))
+            read_cb(*bev, set_cb_arg(peer_id, node));
+        if(evbuffer_get_length(bufferevent_get_output(*bev))) {
+            bufferevent_setcb(*bev, NULL, close_cb, event_cb, set_cb_arg(peer_id, node));
+            bufferevent_disable(*bev, EV_READ);
+        } else
+            close_cb(*bev, NULL);
+	*bev = NULL;
+    }
     return 0;
 }
 
 //Called when the status of a connection changes
 //TODO Find something useful to do in there
 static void event_a_cb(struct bufferevent *bev, short events, void *ptr) {
-    struct node *node = NULL; xid_t a_id;
-    retrieve_cb_arg(&a_id, &node, (struct cb_arg *) ptr);
+    struct node *node = NULL; xid_t peer_id;
+    retrieve_cb_arg(&peer_id, &node, (struct cb_arg *) ptr);
+    xid_t a_id = peer_id - node->comm->cluster_size;
 
     if (events & (BEV_EVENT_EOF|BEV_EVENT_ERROR)) {
         printf("[%u] Connection lost to %u-th accepted\n", node->id, a_id);
-	/*
-	 *if (node->comm->a_bevs[a_id])
-	 *   bufferevent_free(node->comm->a_bevs[a_id]);
-         *node->comm->a_bevs[a_id] = NULL;
-	 */
-	//node->comm->a_size --;
+        close_connection(node, peer_id);
+        //node->comm->a_size --;
     } else {
         printf("[%u] Event %d not handled", node->id, events);
     }
@@ -162,10 +169,17 @@ void event_cb(struct bufferevent *bev, short events, void *ptr) {
 	if (events & BEV_EVENT_EOF)
             node->comm->accepted_count -= 1;
         close_connection(node, peer_id);
+        //TODO Have nodes tell each other when they exit normally
+        //     so we can have a smarter reconnect pattern
         connect_to_node(node, peer_id);
     } else {
         printf("[%u] Event %d not handled", node->id, events);
     }
+}
+
+//Called after last write of a connection
+void close_cb(struct bufferevent *bev, void *ptr) {
+    bufferevent_free(bev);
 }
 
 void reconnect_cb(evutil_socket_t sock, short flags, void *ptr) {
@@ -181,4 +195,14 @@ void interrupt_cb(evutil_socket_t sock, short flags, void *ptr) {
 
     event_del(interrupt_ev);
     event_base_loopexit(base, NULL);
+}
+
+void termination_cb(evutil_socket_t sock, short flags, void *ptr) {
+    struct node *node = (struct node *) ptr;
+
+    event_del(node->events->interrupt_ev);
+    event_del(node->events->termination_ev);
+    evconnlistener_disable(node->events->lev);
+    for(int peer_id=0; peer_id< node->comm->cluster_size; peer_id++)
+        close_connection(node, peer_id);
 }
