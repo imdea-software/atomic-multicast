@@ -29,7 +29,7 @@ run_nodes() {
         AMCAST_CMD=( ${AMCAST_DEPLOY} "${AMCAST_BIN} ${id} ${AMCAST_BENCH_NUMBER_OF_NODES} ${AMCAST_BENCH_NUMBER_OF_GROUPS} ${AMCAST_BENCH_NUMBER_OF_CLIENTS} $IS_CLIENT < ${AMCAST_BENCH_CLUSTER_CONF}")
         AMCAST_RETRIEVE_REPORT_CMD=( ${AMCAST_DEPLOY} "mkdir -p ~/log && mv -v /tmp/report\.${id}\.log ~/log/" )
         "${AMCAST_CMD[@]}" && [ $IS_CLIENT -eq 0 ] && "${AMCAST_RETRIEVE_REPORT_CMD[@]}" &
-        [ $IS_CLIENT -eq 0 ] && AMCAST_FORKED_PIDS[${id}]=$!
+        AMCAST_FORKED_PIDS[${id}]=$!
     done
 }
 
@@ -48,5 +48,3 @@ sleep 1
 run_nodes $AMCAST_BENCH_NUMBER_OF_CLIENTS 1
 
 wait_for_termination $AMCAST_FORKED_PIDS
-
-ssh `tail -n 1 ${AMCAST_BENCH_CLUSTER_CONF} | cut -f3` killall -s 1 node-bench
