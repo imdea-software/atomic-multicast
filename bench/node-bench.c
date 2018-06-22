@@ -370,15 +370,17 @@ int main(int argc, char *argv[]) {
     read_cluster_config_from_stdin(config);
 
     //Get client_count & init stats struct
+    int client_count = atoi(argv[4]);
+    int is_client = atoi(argv[5]);
     stats->delivered = 0;
     stats->count = 0;
-    stats->size = ( NUMBER_OF_MESSAGES / MEASURE_RESOLUTION ) * atoi(argv[4]);
+    stats->size = ( NUMBER_OF_MESSAGES / MEASURE_RESOLUTION ) * ( is_client ? 1 : client_count );
     stats->tv_ini = malloc(sizeof(struct timespec) * stats->size);
     stats->tv_dev = malloc(sizeof(struct timespec) * stats->size);
     stats->gts = malloc(sizeof(g_uid_t) * stats->size);
     stats->msg = malloc(sizeof(message_t) * stats->size);
     //CLIENT NODE PATTERN
-    if(atoi(argv[5])) {
+    if(is_client) {
         run_client_node(config, node_id);
         return EXIT_SUCCESS;
     }
@@ -387,7 +389,7 @@ int main(int argc, char *argv[]) {
 
     //Open logfile for editing
     char filename[40];
-    sprintf(filename, "/tmp/report.%d.log", node_id);
+    sprintf(filename, "/tmp/%s.%d.log", (is_client ? "client" : "node"), node_id);
     if((logfile = fopen(filename, "w")) == NULL) {
         puts("ERROR: Can not open logfile");
         exit(EXIT_FAILURE);
@@ -397,7 +399,8 @@ int main(int argc, char *argv[]) {
 
     //Clean and exit
     fclose(logfile);
-    node_free(node);
+    if(!is_client)
+        node_free(node);
     free_cluster_config(config);
     free(stats->tv_ini);
     free(stats->tv_dev);
