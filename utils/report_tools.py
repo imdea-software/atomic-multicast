@@ -42,7 +42,7 @@ class Experiment:
     def computeStats(self):
         for nid,df in self._df.items():
             #Create a new df from this node data df by droping irrelevent columns and sorting by ts
-            stats = self._df[nid].drop(columns=['ngrp','destgrps','pl_l','pl_v']).sort_values(by=['gts','mid']).reset_index(level=0, drop=True)
+            stats = self._df[nid].drop(columns=['ngrp','destgrps','pl_l','pl_v']).applymap(lambda x: eval(x) if type(x) is str else x).sort_values(by=['gts','mid']).reset_index(level=0, drop=True)
             #Add extra latency column as the diff of a row's ts with previous one's ts
             stats["lat"] = stats['ts_end'] - stats['ts_start']
             stats["lat_min"], stats["lat_max"], stats["lat_avg"] = stats["lat"].expanding().min() , stats["lat"].expanding().max(), stats["lat"].expanding().mean()
