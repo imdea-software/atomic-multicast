@@ -170,18 +170,19 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id) {
     }
     void submit_cb(evutil_socket_t fd, short flags, void *ptr) {
         struct client *c = (struct client *) ptr;
-
         /* Do some magic with the mcast message */
         /* --> update mid.time */
         c->ref_value->cmd.multicast.mid.time = c->sent++;
-        /* --> select « random » destgrps */
-        xid_t g_dst_id = rand() % c->groups_count;
-        for(int i=0; i<c->ref_value->cmd.multicast.destgrps_count; i++)
-            c->ref_value->cmd.multicast.destgrps[i] = g_dst_id++ % c->groups_count;
+        /* --> select circular destgrps */
+        xid_t g_dst_id = (c->id + c->sent) % c->groups_count;
+        for(int i=0; i<c->ref_value->cmd.multicast.destgrps_count; i++) {
+            c->ref_value->cmd.multicast.destgrps[i] = g_dst_id;
+            g_dst_id = (g_dst_id + 1) % c->groups_count;
+	}
 
         /* Send it to current known leaders */
-        for(int i=0; i<c->groups_count; i++) {
-            xid_t peer_id = get_leader_from_group(i);
+        for(int i=0; i<c->ref_value->cmd.multicast.destgrps_count; i++) {
+            xid_t peer_id = get_leader_from_group(c->ref_value->cmd.multicast.destgrps[i]);
             if(bufferevent_write(c->bev[peer_id], c->ref_value, sizeof(*c->ref_value)) < 0)
                     printf("[c-%u] Something bad happened (submit)\n", c->id);
         }
@@ -235,7 +236,6 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id) {
         event_del(interrupt_ev);
         event_base_loopexit(base, NULL);
     }
-    srand(time(NULL));
     //SET-UP libevent
     memset(&client, 0, sizeof(struct client));
     client.id = client_id;
