@@ -49,6 +49,8 @@ class Experiment:
             #Add extra throughput column as row's index divided by SUM(lat) up to that row
             ts_exp_start = stats["ts_start"].min()
             stats["msgps"] = stats.index / ( stats["ts_end"] - ts_exp_start )
+            #Add extra time column as offset-ed ts_start for easier reading
+            stats["t"] = stats["ts_start"] - ts_exp_start
             #Add this new df to _stats container
             self._stats[nid] = stats
         return
