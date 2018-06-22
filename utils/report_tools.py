@@ -56,6 +56,14 @@ class Experiment:
         return
 
     def plot(self):
+        fig, axes = plt.subplots(len(self._stats.keys()), 2, figsize=(6,6))
+        for nid,stats in self._stats.items():
+            stats.plot(x="t", y=["lat", "lat_avg"], ax=axes[nid][0])
+            stats.plot(x="t", y=["msgps"], ax=axes[nid][1])
+            axes
+        axes[0][0].set_title("Latency (s)")
+        axes[0][1].set_title("Throughput (msg/s)")
+        plt.show()
         return
 
 if __name__ == "__main__":
@@ -66,5 +74,7 @@ if __name__ == "__main__":
         raise Exception("FAILURE: report files are not consistent")
 
     exp.computeStats()
+
+    exp.plot()
 
     pdb.set_trace()
