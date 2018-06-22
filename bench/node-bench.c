@@ -204,6 +204,12 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
             bufferevent_read(bev, &env, sizeof(struct enveloppe));
             switch(env.cmd_type) {
                 case DELIVER:
+                    if(env.cmd.deliver.mid.id != c->id) {
+                        printf("[c-%u] FAILURE: received deliver ack with wrong c-id %u\n",
+                                c->id, env.cmd.deliver.mid.id);
+                        exit(EXIT_FAILURE);
+                    }
+                    /* --> update deliver counts */
                     p->received++;
                     c->received++;
                     /* --> update stats struct */
