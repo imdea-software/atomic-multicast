@@ -37,7 +37,7 @@ struct stats {
 };
 
 //TODO write to file the execution log
-void write_report(struct node *node, struct stats *stats, FILE *stream) {
+void write_report(struct stats *stats, FILE *stream) {
     for(int i=0; i<stats->count; i++) {
         //Retrieve measures & the message's context
         message_t msg = stats->msg[i];
@@ -393,7 +393,7 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    write_report(node, stats, logfile);
+    write_report(stats, logfile);
 
     //Clean and exit
     fclose(logfile);
