@@ -148,7 +148,7 @@ void run_client_node(struct cluster_config *config, xid_t client_id) {
     }
 }
 
-void run_client_node_libevent(struct cluster_config *config, xid_t client_id) {
+void run_client_node_libevent(struct cluster_config *config, xid_t client_id, struct stats *stats) {
     struct client {
         xid_t id;
         unsigned int groups_count;
@@ -156,6 +156,7 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id) {
         unsigned int connected;
         unsigned int sent;
         unsigned int received;
+        struct stats *stats;
         struct event_base *base;
         struct bufferevent **bev;
         struct enveloppe *ref_value;
@@ -178,7 +179,12 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id) {
         for(int i=0; i<c->ref_value->cmd.multicast.destgrps_count; i++) {
             c->ref_value->cmd.multicast.destgrps[i] = g_dst_id;
             g_dst_id = (g_dst_id + 1) % c->groups_count;
-	}
+        }
+        /* --> update stats struct */
+        if( ((stats->delivered + 1) % MEASURE_RESOLUTION) == 0) {
+            stats->msg[c->ref_value->cmd.multicast.mid.time] = c->ref_value->cmd.multicast;
+            clock_gettime(CLOCK_MONOTONIC, stats->tv_ini + c->ref_value->cmd.multicast.mid.time);
+        }
 
         /* Send it to current known leaders */
         for(int i=0; i<c->ref_value->cmd.multicast.destgrps_count; i++) {
@@ -200,6 +206,13 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id) {
                 case DELIVER:
                     p->received++;
                     c->received++;
+                    /* --> update stats struct */
+                    if( ((stats->delivered + 1) % MEASURE_RESOLUTION) == 0) {
+                        clock_gettime(CLOCK_MONOTONIC, stats->tv_dev + env.cmd.deliver.mid.time);
+                        stats->gts[env.cmd.deliver.mid.time] = env.cmd.deliver.gts;
+                        stats->count++;
+                    }
+                    stats->delivered++;
                     /* MCAST the next message */
                     if(c->sent < NUMBER_OF_MESSAGES)
                         submit_cb(0,0,c);
@@ -241,6 +254,7 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id) {
     client.id = client_id;
     client.groups_count = config->groups_count;
     client.dests_count = NUMBER_OF_TARGETS;
+    client.stats = stats;
     client.base = event_base_new();
     client.bev = calloc(config->size, sizeof(struct bufferevent *));
     peers = calloc(config->size, sizeof(struct peer));
@@ -381,12 +395,10 @@ int main(int argc, char *argv[]) {
     stats->msg = malloc(sizeof(message_t) * stats->size);
     //CLIENT NODE PATTERN
     if(is_client) {
-        run_client_node(config, node_id);
-        return EXIT_SUCCESS;
+        run_client_node_libevent(config, node_id, stats);
+    } else {
+        node = run_amcast_node(config, node_id, stats);
     }
-
-    node = run_amcast_node(config, node_id, stats);
-
     //Open logfile for editing
     char filename[40];
     sprintf(filename, "/tmp/%s.%d.log", (is_client ? "client" : "node"), node_id);
