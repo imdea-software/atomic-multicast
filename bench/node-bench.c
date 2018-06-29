@@ -18,6 +18,9 @@
 #include "node.h"
 #include "amcast.h"
 
+#include "mcast.h"
+#include "message_mcast.h"
+
 #define CONF_SEPARATOR "\t"
 #define LOG_SEPARATOR "\t"
 #define NUMBER_OF_MESSAGES 100000
@@ -160,12 +163,18 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
         struct event_base *base;
         struct bufferevent **bev;
         struct enveloppe *ref_value;
+        mcast_message *ref_msg;
     } client;
     struct peer {
         unsigned int id;
         unsigned int received;
         struct client *c;
     } *peers;
+    struct custom_payload {
+        m_uid_t mid;
+        unsigned int len;
+        char val[MAX_PAYLOAD_LEN];
+    };
     xid_t get_leader_from_group(xid_t g_id) {
         return g_id * NODES_PER_GROUP + INITIAL_LEADER_IN_GROUP;
     }
@@ -192,6 +201,47 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
             if(bufferevent_write(c->bev[peer_id], c->ref_value, sizeof(*c->ref_value)) < 0)
                     printf("[c-%u] Something bad happened (submit)\n", c->id);
         }
+    }
+    void alt_submit_cb(evutil_socket_t fd, short flags, void *ptr) {
+        struct client *c = (struct client *) ptr;
+        /* Do some magic with the mcast message */
+        /* --> select starting group */
+        xid_t g_dst_id = (c->id + c->sent) % c->groups_count;
+        /* --> update origin group */
+        c->ref_msg->from_group = g_dst_id;
+        c->ref_msg->from_node = INITIAL_LEADER_IN_GROUP;
+        /* --> update msg uid */
+        c->ref_msg->uid = generate_uid(c->ref_msg->from_group, c->ref_msg->from_node, c->sent);
+        c->ref_value->cmd.multicast.mid.time = c->sent;
+        /* --> embed client mid in payload */
+        ((struct custom_payload *) c->ref_msg->value.mcast_value_val)->mid = c->ref_value->cmd.multicast.mid;
+        /* --> select circular destgrps */
+        for(int i=0; i<c->ref_msg->to_groups_len; i++) {
+            c->ref_msg->to_groups[i] = g_dst_id;
+            c->ref_value->cmd.multicast.destgrps[i] = g_dst_id;
+            g_dst_id = (g_dst_id + 1) % c->groups_count;
+        }
+        /* --> update stats struct */
+        if( ((stats->delivered + 1) % MEASURE_RESOLUTION) == 0) {
+            stats->msg[c->ref_value->cmd.multicast.mid.time] = c->ref_value->cmd.multicast;
+            clock_gettime(CLOCK_MONOTONIC, stats->tv_ini + c->sent);
+        }
+
+        c->sent++;
+
+        /* Send MCAST_CLIENT to leader of first group in dest groups */
+        xid_t peer_id = get_leader_from_group(c->ref_msg->from_group);
+        send_mcast_message(c->bev[peer_id], c->ref_msg);
+
+        /* Send MCAST_START to all nodes in dest groups */
+        /*
+        for(int i=0; i<c->ref_msg->to_groups_len; i++) {
+            xid_t peer_id = get_leader_from_group(c->ref_msg->to_groups[i]);
+            send_mcast_message(c->bev[peer_id], c->ref_msg);
+            send_mcast_message(c->bev[peer_id+1], c->ref_msg);
+            send_mcast_message(c->bev[peer_id+2], c->ref_msg);
+        }
+        */
     }
     void read_cb(struct bufferevent *bev, void *ptr) {
         struct peer *p = (struct peer *) ptr;
@@ -230,6 +280,39 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
             }
         }
     }
+    void alt_read_cb(struct bufferevent *bev, void *ptr) {
+        struct peer *p = (struct peer *) ptr;
+        struct client *c = p->c;
+        mcast_message msg;
+
+        /* Do Some STUFFS */
+        struct evbuffer *in_buf = bufferevent_get_input(bev);
+        while (recv_mcast_message(in_buf, &msg)) {
+            m_uid_t mid = ((struct custom_payload *) msg.value.mcast_value_val)->mid;
+            if(mid.id != c->id) {
+                printf("[c-%u] FAILURE: received deliver ack with wrong c-id %u\n",
+                       c->id, mid.id);
+                exit(EXIT_FAILURE);
+            }
+            /* --> update deliver counts */
+            p->received++;
+            c->received++;
+            /* --> update stats struct */
+            if( ((stats->delivered + 1) % MEASURE_RESOLUTION) == 0) {
+                clock_gettime(CLOCK_MONOTONIC, stats->tv_dev + mid.time);
+                stats->gts[mid.time].time = msg.timestamp;
+                stats->gts[mid.time].id = get_leader_from_group(msg.from_group);
+                stats->count++;
+            }
+            stats->delivered++;
+            mcast_message_content_free(&msg);
+            /* MCAST the next message */
+            if(c->sent < NUMBER_OF_MESSAGES)
+                alt_submit_cb(0,0,c);
+            if(c->received >= NUMBER_OF_MESSAGES)
+                kill(getpid(), SIGHUP);
+        }
+    }
     void event_cb(struct bufferevent *bev, short events, void *ptr) {
         struct peer *p = (struct peer *) ptr;
         struct client *c = p->c;
@@ -247,6 +330,24 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
                 submit_cb(0,0,c);
         } else if(p->received < NUMBER_OF_MESSAGES) {
             printf("[c-%u] Server %i left before all messages were sent: %u sent\n", c->id, p->id, c->sent);
+        }
+    }
+    void alt_event_cb(struct bufferevent *bev, short events, void *ptr) {
+        struct peer *p = (struct peer *) ptr;
+        struct client *c = p->c;
+        if (events & BEV_EVENT_CONNECTED) {
+            c->connected++;
+        }
+        else if (events & (BEV_EVENT_EOF|BEV_EVENT_ERROR)) {
+            c->connected--;
+            if(p->received < NUMBER_OF_MESSAGES) {
+                printf("[c-%u] Server %i left before all messages were sent: %u sent\n", c->id, p->id, c->sent);
+            }
+        }
+        if(c->connected == c->groups_count) {
+            printf("[c-%u] Connection established to all groups\n", c->id);
+            if(c->sent == 0)
+                alt_submit_cb(0,0,c);
         }
     }
     void interrupt_cb(evutil_socket_t fd, short flags, void *ptr) {
@@ -270,8 +371,9 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
         peers[peer_id].c = &client;
         peers[peer_id].id = peer_id;
         client.bev[peer_id] = bufferevent_socket_new(client.base, -1, BEV_OPT_CLOSE_ON_FREE);
-        bufferevent_setcb(client.bev[peer_id], read_cb, NULL, event_cb, peers+peer_id);
-        bufferevent_setwatermark(client.bev[peer_id], EV_READ, sizeof(struct enveloppe), 0);
+        //TODO CHANGETHIS: Have to edit those 2 lines to switch back to libevamcast
+        bufferevent_setcb(client.bev[peer_id], alt_read_cb, NULL, alt_event_cb, peers+peer_id);
+        //bufferevent_setwatermark(client.bev[peer_id], EV_READ, sizeof(struct enveloppe), 0);
         bufferevent_enable(client.bev[peer_id], EV_READ|EV_WRITE);
         struct sockaddr_in addr = {
             .sin_family = AF_INET,
@@ -294,6 +396,17 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
         },
     };
     client.ref_value = &env;
+    //Prepare mcast message template
+    mcast_message msg;
+    struct custom_payload val;
+    msg.type = MCAST_CLIENT;
+    msg.timestamp = 0;
+    msg.to_groups_len = env.cmd.multicast.destgrps_count;
+    val.len = env.cmd.multicast.value.len;
+    strcpy(val.val, env.cmd.multicast.value.val);
+    msg.value.mcast_value_len = sizeof(struct custom_payload) - MAX_PAYLOAD_LEN + val.len;
+    msg.value.mcast_value_val = (char *) &val;
+    client.ref_msg = &msg;
     //Set-up eventloop-exit
     struct event *ev_exit = evsignal_new(client.base, SIGHUP, interrupt_cb, event_self_cbarg());
     event_add(ev_exit, NULL);
