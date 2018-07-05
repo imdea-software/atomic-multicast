@@ -51,9 +51,9 @@ void write_report(struct stats *stats, FILE *stream) {
         char *destgrps = malloc(sizeof(char) * (1 + 1 + (12 + 1) * msg.destgrps_count) + 1);
         int idx = 0;
         idx = sprintf(destgrps+idx, "(%d", msg.destgrps[0]);
-        for(int i=0; i<msg.destgrps_count - 1; i++)
-            idx = sprintf(destgrps+idx, ",%d", msg.destgrps[i]);
-        idx = sprintf(destgrps+idx, ",%d)", msg.destgrps[msg.destgrps_count-1]);
+        for(int i=1; i<msg.destgrps_count; i++)
+            idx += sprintf(destgrps+idx, ",%d", msg.destgrps[i]);
+        idx = sprintf(destgrps+idx, ")");
         //Write to a file the line corresponding to this message
         fprintf(stream, "(%u,%d)" LOG_SEPARATOR
                         "%lld.%.9ld" LOG_SEPARATOR
