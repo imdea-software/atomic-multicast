@@ -101,7 +101,7 @@ static void event_a_cb(struct bufferevent *bev, short events, void *ptr) {
     retrieve_cb_arg(&peer_id, &node, (struct cb_arg *) ptr);
 
     if (events & (BEV_EVENT_EOF|BEV_EVENT_ERROR)) {
-        printf("[%u] Connection lost to %u-th accepted\n", node->id, peer_id);
+        //printf("[%u] Connection lost to %u-th accepted\n", node->id, peer_id);
         node->comm->accepted_count--;
         bufferevent_disable(bev, EV_WRITE);
         close_connection(node, peer_id);
@@ -197,7 +197,7 @@ void event_cb(struct bufferevent *bev, short events, void *ptr) {
     static int fully_connected = 0;
 
     if (events & BEV_EVENT_CONNECTED) {
-        printf("[%u] Connection established to node %u\n", node->id, peer_id);
+        //printf("[%u] Connection established to node %u\n", node->id, peer_id);
         node->comm->connected_count++;
         struct enveloppe init = { .sid = node->id, .cmd_type = INIT_NODE };
         write_enveloppe(bev, &init);
