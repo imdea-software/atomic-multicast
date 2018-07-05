@@ -94,7 +94,7 @@ void delivery_cb(struct node *node, struct amcast_msg *msg, void *cb_arg) {
     }
     stats->delivered++;
     free(msg->shared_cb_arg);
-    if(stats->delivered >= stats->size * MEASURE_RESOLUTION )
+    if(stats->count >= stats->size * MEASURE_RESOLUTION )
         kill(getpid(), SIGHUP);
 }
 
@@ -527,7 +527,10 @@ int main(int argc, char *argv[]) {
     int is_client = atoi(argv[5]);
     stats->delivered = 0;
     stats->count = 0;
-    stats->size = ( NUMBER_OF_MESSAGES / MEASURE_RESOLUTION ) * ( is_client ? 1 : client_count );
+    if(is_client)
+        stats->size = ( NUMBER_OF_MESSAGES / MEASURE_RESOLUTION ) / client_count;
+    else
+        stats->size = ( NUMBER_OF_MESSAGES / MEASURE_RESOLUTION ) * NUMBER_OF_TARGETS / config->groups_count;
     stats->tv_ini = malloc(sizeof(struct timespec) * stats->size);
     stats->tv_dev = malloc(sizeof(struct timespec) * stats->size);
     stats->gts = malloc(sizeof(g_uid_t) * stats->size);
