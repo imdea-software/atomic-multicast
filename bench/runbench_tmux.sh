@@ -27,7 +27,8 @@ run_nodes() {
         AMCAST_DEPLOY="ssh ${AMCAST_SSH_USER}@${AMCAST_SSH_HOST}"
 
         tmux new-window -n ${TMUX_WINDOW_NAME_PREFIX}${id}
-        tmux send-keys "${AMCAST_DEPLOY} ${AMCAST_BIN} \
+        tmux send-keys " ${AMCAST_DEPLOY}" Enter
+        tmux send-keys " ${AMCAST_BIN} \
             ${id} \
             ${AMCAST_BENCH_NUMBER_OF_NODES} \
             ${AMCAST_BENCH_NUMBER_OF_GROUPS} \
