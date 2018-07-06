@@ -56,6 +56,7 @@ typedef struct accept_ack {
     xid_t		grp;
     p_uid_t		ballot[MAX_NUMBER_OF_GROUPS];
     g_uid_t		gts;
+    g_uid_t		gts_last_delivered;
 } accept_ack_t;
 
 typedef struct deliver {
@@ -63,6 +64,7 @@ typedef struct deliver {
     p_uid_t		ballot;
     g_uid_t		lts;
     g_uid_t		gts;
+    g_uid_t		gts_inf_delivered;
 } deliver_t;
 
 typedef struct newleader {

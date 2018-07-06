@@ -141,6 +141,7 @@ static void handle_accept(struct node *node, xid_t sid, accept_t *cmd) {
 	    .cmd.accept_ack = {
 	        .mid = cmd->mid,
 		.grp = node->comm->groups[node->id],
+		.gts_last_delivered = node->amcast->gts_last_delivered[node->id],
 		.gts = msg->gts
 	    },
 	};
@@ -194,6 +195,9 @@ static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
             if(msg->accept_ack_groupready[cmd->grp]++ == 0)
                 msg->accept_ack_totalcount += 1;
         }
+        //Update latest_gts delivered if sender is in my group
+        if(cmd->grp == node->comm->groups[node->id])
+            node->amcast->gts_last_delivered[sid] = cmd->gts_last_delivered;
         if(msg->accept_ack_totalcount !=
 			msg->msg.destgrps_count)
             return;
@@ -203,6 +207,14 @@ static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
             pqueue_push(node->amcast->committed_gts, &msg, &msg->gts);
         }
         msg->phase = COMMITTED;
+        //Compute infimum of gts_last_delivered for my group
+        g_uid_t *inf_gts = node->amcast->gts_last_delivered+node->id;
+        for(xid_t *nid = node->groups->members[node->comm->groups[node->id]];
+                nid < node->groups->members[node->comm->groups[node->id]]
+                + node->groups->node_counts[node->comm->groups[node->id]];
+                nid++)
+            if(paircmp(node->amcast->gts_last_delivered+(*nid), inf_gts) < 0)
+                inf_gts = node->amcast->gts_last_delivered+(*nid);
 	//TODO A lot of possible improvements in the delivery pattern
         int try_next = 1;
         while(try_next && pqueue_size(node->amcast->committed_gts) > 0) {
@@ -232,6 +244,7 @@ static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
 	                .mid = (*i_msg)->msg.mid,
 		        .ballot = node->amcast->ballot,
 		        .lts = (*i_msg)->lts[node->comm->groups[node->id]],
+		        .gts_inf_delivered = *inf_gts,
 		        .gts = (*i_msg)->gts
 	            },
 	        };
@@ -257,10 +270,26 @@ static void handle_deliver(struct node *node, xid_t sid, deliver_t *cmd) {
         if(node->amcast->clock < msg->gts.time)
             node->amcast->clock = msg->gts.time;
         msg->delivered = TRUE;
+        node->amcast->gts_last_delivered[node->id] = msg->gts;
+        pqueue_push(node->amcast->delivered_gts, &msg, &msg->gts);
         if(node->amcast->delivery_cb)
             node->amcast->delivery_cb(node, msg, node->amcast->dev_cb_arg);
-        htable_remove(node->amcast->h_msgs, &msg->msg.mid);
-        free_amcast_msg(NULL, msg, NULL);
+        //Free amcast_msg structs delivered by everyone in my group
+        while(pqueue_size(node->amcast->delivered_gts) > 0) {
+            struct amcast_msg **i_msg = NULL;
+            if((i_msg = pqueue_peek(node->amcast->delivered_gts)) == NULL) {
+                printf("Failed to peek - %u\n", pqueue_size(node->amcast->delivered_gts));
+                return;
+            }
+            if(paircmp(&(*i_msg)->gts, &cmd->gts_inf_delivered) > 0)
+                break;
+            if((i_msg = pqueue_pop(node->amcast->delivered_gts)) == NULL) {
+                printf("Failed to pop - %u\n", pqueue_size(node->amcast->delivered_gts));
+                return;
+            }
+            htable_remove(node->amcast->h_msgs, &(*i_msg)->msg.mid);
+            free_amcast_msg(NULL, *i_msg, NULL);
+        }
     }
 }
 
@@ -350,6 +379,7 @@ struct amcast *amcast_init(msginit_cb_fun msginit_cb, void *ini_cb_arg, delivery
     amcast->clock = 0;
     amcast->h_msgs = htable_init(pairhash_cantor, pairequ);
     //EXTRA FIELDS (NOT IN SPEC)
+    amcast->delivered_gts = pqueue_init((pq_pricmp_fun) paircmp);
     amcast->committed_gts = pqueue_init((pq_pricmp_fun) paircmp);
     amcast->pending_lts = pqueue_init((pq_pricmp_fun) paircmp);
     amcast->msginit_cb = msginit_cb;
@@ -372,8 +402,10 @@ static int free_amcast_msg(m_uid_t *mid, struct amcast_msg *msg, void *arg) {
 }
 
 int amcast_free(struct amcast *amcast) {
+    pqueue_free(amcast->delivered_gts);
     pqueue_free(amcast->committed_gts);
     pqueue_free(amcast->pending_lts);
+    free(amcast->gts_last_delivered);
     htable_foreach(amcast->h_msgs, (GHFunc) free_amcast_msg, NULL);
     htable_free(amcast->h_msgs);
     free(amcast);
