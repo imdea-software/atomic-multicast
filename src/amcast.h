@@ -38,8 +38,11 @@ struct amcast {
     clk_t clock;
     htable_t *h_msgs;
     //EXTRA FIELDS (NOT IN SPEC)
+    pqueue_t *delivered_gts;
     pqueue_t *committed_gts;
     pqueue_t *pending_lts;
+    g_uid_t *gts_last_delivered;
+    g_uid_t gts_inf_delivered;
     msginit_cb_fun msginit_cb;
     delivery_cb_fun delivery_cb;
     void *dev_cb_arg;
