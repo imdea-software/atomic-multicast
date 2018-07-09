@@ -295,18 +295,77 @@ static void handle_deliver(struct node *node, xid_t sid, deliver_t *cmd) {
 
 static void handle_newleader(struct node *node, xid_t sid, newleader_t *cmd) {
     printf("[%u] We got NEWLEADER command from %u!\n", node->id, sid);
+    if(paircmp(&node->amcast->ballot, &cmd->ballot) > 0)
+        return;
+    node->amcast->status = PREPARE;
+    node->amcast->ballot = cmd->ballot;
+    //TODO Check if delivered_gts pqueue can be trimmed
+    struct enveloppe rep = {
+        .sid = node->id,
+        .cmd_type = NEWLEADER_ACK,
+        .cmd.newleader_ack = {
+            .ballot = node->amcast->ballot,
+            .aballot = node->amcast->aballot,
+            .clock = node->amcast->clock,
+            .msg_count = pqueue_size(node->amcast->delivered_gts),
+        }
+    };
+    //TODO Properly add message informations in this enveloppe
+    send_to_peer(node, &rep, sid);
 }
 
 static void handle_newleader_ack(struct node *node, xid_t sid, newleader_ack_t *cmd) {
     printf("[%u] We got NEWLEADER_ACK command from %u!\n", node->id, sid);
+    //TODO wait for a quorum of replies
+    if(node->amcast->status != PREPARE || paircmp(&node->amcast->ballot, &cmd->ballot) != 0)
+        return;
+    //TODO reset all local state
+    //TODO forge a new state from messages
+    //TODO compute max clock incrementally and replace it only at the end
+    if(node->amcast->clock < cmd->clock)
+        node->amcast->clock = cmd->clock;
+    node->amcast->aballot = cmd->ballot;
+    struct enveloppe rep = {
+        .sid = node->id,
+        .cmd_type = NEWLEADER_SYNC,
+        .cmd.newleader_sync = {
+            .ballot = node->amcast->ballot,
+            .clock = node->amcast->clock,
+            //.msg_count = FIND THE RIGHT COUNT,
+        }
+    };
+    //TODO Properly add message informations in this enveloppe
+    //TODO CHANGETHIS do not send this to itself (group except me)
+    send_to_group(node, &rep, node->comm->groups[node->id]);
 }
 
 static void handle_newleader_sync(struct node *node, xid_t sid, newleader_sync_t *cmd) {
     printf("[%u] We got NEWLEADER_SYNC command from %u!\n", node->id, sid);
+    //TODO CHANGETHIS Do not let the futur leader send this cmd to itself
+    if(node->id == sid)
+        return;
+    if(node->amcast->status != PREPARE || paircmp(&node->amcast->ballot, &cmd->ballot) != 0)
+        return;
+    node->amcast->status = FOLLOWER;
+    node->amcast->aballot = cmd->ballot;
+    //TODO dump received state into local one
+    struct enveloppe rep = {
+        .sid = node->id,
+        .cmd_type = NEWLEADER_SYNC_ACK,
+        .cmd.newleader_sync_ack = {
+            .ballot = cmd->ballot
+        }
+    };
+    send_to_peer(node, &rep, sid);
 }
 
 static void handle_newleader_sync_ack(struct node *node, xid_t sid, newleader_sync_ack_t *cmd) {
     printf("[%u] We got NEWLEADER_SYNC_ACK command from %u!\n", node->id, sid);
+    if(node->amcast->status != PREPARE || paircmp(&node->amcast->ballot, &cmd->ballot) != 0)
+        return;
+    node->amcast->status = LEADER;
+    //TODO add delivery pattern
+    //TODO add retry pattern for accepted messages
 }
 
 void dispatch_amcast_command(struct node *node, struct enveloppe *env) {
