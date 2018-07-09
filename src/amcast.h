@@ -32,7 +32,7 @@ struct amcast_msg {
 #include "htable.h"
 
 struct amcast {
-    enum { INIT, LEADER, FOLLOWER, LEADER_INIT, FOLLOWER_PREPARE, LEADER_SYNC } status;
+    enum { INIT, LEADER, FOLLOWER, PREPARE } status;
     p_uid_t ballot;
     p_uid_t aballot;
     clk_t clock;
