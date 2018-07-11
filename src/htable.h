@@ -15,6 +15,9 @@ typedef GHashTable htable_t;
 #define htable_free(ht) \
     g_hash_table_destroy((ht))
 
+#define htable_size(ht) \
+    g_hash_table_size((ht))
+
 #define htable_insert(ht, key, val) \
     g_hash_table_insert((ht), (key), (val))
 
