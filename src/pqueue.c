@@ -74,3 +74,7 @@ pq_val_t *pqueue_pop(pqueue_t *pq) {
 unsigned int pqueue_size(pqueue_t *pq) {
     return pq->size;
 }
+
+void pqueue_foreach(pqueue_t *pq, pq_traverse_fun cb, void *cb_arg) {
+    g_tree_foreach(pq->tree, (GTraverseFunc) cb, cb_arg);
+}
