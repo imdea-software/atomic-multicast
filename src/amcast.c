@@ -84,7 +84,7 @@ static void handle_multicast(struct node *node, xid_t sid, message_t *cmd) {
             msg->lts[node->comm->groups[node->id]].time = node->amcast->clock;
             msg->lts[node->comm->groups[node->id]].id = node->comm->groups[node->id];
             msg->lballot[node->comm->groups[node->id]] = node->amcast->ballot;
-            pqueue_push(node->amcast->pending_lts, &msg, &msg->lts[node->comm->groups[node->id]]);
+            pqueue_push(node->amcast->pending_lts, msg, &msg->lts[node->comm->groups[node->id]]);
         }
         struct enveloppe rep = {
 	    .sid = node->id,
@@ -204,7 +204,7 @@ static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
         if(msg->phase != COMMITTED) {
             pqueue_remove(node->amcast->pending_lts,
                           &msg->lts[node->comm->groups[node->id]]);
-            pqueue_push(node->amcast->committed_gts, &msg, &msg->gts);
+            pqueue_push(node->amcast->committed_gts, msg, &msg->gts);
         }
         msg->phase = COMMITTED;
         //Compute infimum of gts_last_delivered for my group
@@ -218,18 +218,18 @@ static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
 	//TODO A lot of possible improvements in the delivery pattern
         int try_next = 1;
         while(try_next && pqueue_size(node->amcast->committed_gts) > 0) {
-            struct amcast_msg **i_msg = NULL, **j_msg = NULL;
+            struct amcast_msg *i_msg = NULL, *j_msg = NULL;
             try_next = 0;
             if((i_msg = pqueue_peek(node->amcast->committed_gts)) == NULL) {
                 printf("Failed to peek - %u\n", pqueue_size(node->amcast->committed_gts));
                 return;
             }
-            if((*i_msg)->phase == COMMITTED
-               && (*i_msg)->delivered == FALSE) {
+            if(i_msg->phase == COMMITTED
+               && i_msg->delivered == FALSE) {
                 j_msg = pqueue_peek(node->amcast->pending_lts);
-                if(j_msg != NULL && paircmp(&(*j_msg)->lts[node->comm->groups[node->id]],
-                                        &(*i_msg)->gts) < 0
-                             && (*j_msg)->phase != COMMITTED) {
+                if(j_msg != NULL && paircmp(&j_msg->lts[node->comm->groups[node->id]],
+                                        &i_msg->gts) < 0
+                             && j_msg->phase != COMMITTED) {
                     return;
                 }
                 if((i_msg = pqueue_pop(node->amcast->committed_gts)) == NULL) {
@@ -241,11 +241,11 @@ static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
 	            .sid = node->id,
 	            .cmd_type = DELIVER,
 	            .cmd.deliver = {
-	                .mid = (*i_msg)->msg.mid,
+	                .mid = i_msg->msg.mid,
 		        .ballot = node->amcast->ballot,
-		        .lts = (*i_msg)->lts[node->comm->groups[node->id]],
+		        .lts = i_msg->lts[node->comm->groups[node->id]],
 		        .gts_inf_delivered = node->amcast->gts_inf_delivered,
-		        .gts = (*i_msg)->gts
+		        .gts = i_msg->gts
 	            },
 	        };
                 send_to_group(node, &rep, node->comm->groups[node->id]);
