@@ -37,6 +37,12 @@ struct amcast {
     p_uid_t aballot;
     clk_t clock;
     htable_t *h_msgs;
+    //EXTRA FIELDS - NEWLEADER_ACK COUNTERS
+    unsigned int newleader_ack_groupcount;
+    unsigned int *newleader_ack_count;
+    //EXTRA FIELDS - NEWLEADER_SYNC_ACK COUNTERS
+    unsigned int newleader_sync_ack_groupcount;
+    unsigned int *newleader_sync_ack_count;
     //EXTRA FIELDS (NOT IN SPEC)
     pqueue_t *delivered_gts;
     pqueue_t *committed_gts;
