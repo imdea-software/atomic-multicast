@@ -308,10 +308,28 @@ static void handle_newleader(struct node *node, xid_t sid, newleader_t *cmd) {
             .ballot = node->amcast->ballot,
             .aballot = node->amcast->aballot,
             .clock = node->amcast->clock,
-            .msg_count = pqueue_size(node->amcast->delivered_gts),
+            .msg_count = htable_size(node->amcast->h_msgs),
         }
     };
-    //TODO Properly add message informations in this enveloppe
+    //Limitation due to bad way of sending state arrays
+    if(rep.cmd.newleader_ack.msg_count > MAX_MSG_DIFF) {
+        printf("[%u] ERROR: can not send %u messages in a single enveloppe %u,%d\n", node->id, rep.cmd.newleader_ack.msg_count, node->amcast->gts_inf_delivered.time, node->amcast->gts_inf_delivered.id);
+        return;
+    }
+    //TODO CHANGETHIS ugly a.f. Have a clean way to append arrays to enveloppe
+    int acc = 0;
+    void fill_rep(m_uid_t *mid, struct amcast_msg *msg, int *acc) {
+        //ADDITION do not bother transmitting PROPOSED messages
+        if(msg->phase < ACCEPTED && msg->phase != COMMITTED)
+            return;
+        rep.cmd.newleader_ack.messages[*acc].msg = msg->msg;
+        rep.cmd.newleader_ack.messages[*acc].phase = msg->phase;
+        rep.cmd.newleader_ack.messages[*acc].gts = msg->gts;
+        memcpy(rep.cmd.newleader_ack.messages[*acc].lballot, msg->lballot, sizeof(p_uid_t) * node->groups->groups_count);
+        memcpy(rep.cmd.newleader_ack.messages[*acc].lts, msg->lts, sizeof(g_uid_t) * node->groups->groups_count);
+        *acc += 1;
+    }
+    htable_foreach(node->amcast->h_msgs, (GHFunc) fill_rep, &acc);
     send_to_peer(node, &rep, sid);
 }
 
@@ -332,10 +350,29 @@ static void handle_newleader_ack(struct node *node, xid_t sid, newleader_ack_t *
         .cmd.newleader_sync = {
             .ballot = node->amcast->ballot,
             .clock = node->amcast->clock,
-            //.msg_count = FIND THE RIGHT COUNT,
+            //TODO send a custom diff, not whole state
+            .msg_count = htable_size(node->amcast->h_msgs),
         }
     };
-    //TODO Properly add message informations in this enveloppe
+    //Limitation due to bad way of sending state arrays
+    if(rep.cmd.newleader_ack.msg_count > MAX_MSG_DIFF) {
+        printf("[%u] ERROR: can not send %u messages in a single enveloppe %u,%d\n", node->id, rep.cmd.newleader_ack.msg_count, node->amcast->gts_inf_delivered.time, node->amcast->gts_inf_delivered.id);
+        return;
+    }
+    //TODO CHANGETHIS ugly a.f. Have a clean way to append arrays to enveloppe
+    int acc = 0;
+    void fill_rep(m_uid_t *mid, struct amcast_msg *msg, int *acc) {
+        //ADDITION do not bother transmitting PROPOSED messages
+        if(msg->phase != ACCEPTED && msg->phase != COMMITTED)
+            return;
+        rep.cmd.newleader_ack.messages[*acc].msg = msg->msg;
+        rep.cmd.newleader_ack.messages[*acc].phase = msg->phase;
+        rep.cmd.newleader_ack.messages[*acc].gts = msg->gts;
+        memcpy(rep.cmd.newleader_ack.messages[*acc].lballot, msg->lballot, sizeof(p_uid_t) * node->groups->groups_count);
+        memcpy(rep.cmd.newleader_ack.messages[*acc].lts, msg->lts, sizeof(g_uid_t) * node->groups->groups_count);
+        *acc += 1;
+    }
+    htable_foreach(node->amcast->h_msgs, (GHFunc) fill_rep, &acc);
     //TODO CHANGETHIS do not send this to itself (group except me)
     send_to_group(node, &rep, node->comm->groups[node->id]);
 }
