@@ -534,6 +534,11 @@ static void handle_newleader_sync_ack(struct node *node, xid_t sid, newleader_sy
         }
     }
     //TODO add retry pattern for accepted messages
+    int retry_message(g_uid_t *lts, struct amcast_msg *msg, struct node *node) {
+        handle_multicast(node, msg->msg.mid.id, &msg->msg);
+        return 0;
+    }
+    pqueue_foreach(node->amcast->pending_lts, (pq_traverse_fun) retry_message, node);
 }
 
 void dispatch_amcast_command(struct node *node, struct enveloppe *env) {
