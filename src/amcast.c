@@ -301,6 +301,13 @@ static void handle_newleader(struct node *node, xid_t sid, newleader_t *cmd) {
     if(paircmp(&node->amcast->ballot, &cmd->ballot) > 0)
         return;
     node->amcast->status = PREPARE;
+    //Reset counters when initializing higher ballot number
+    if(sid == node->id && paircmp(&node->amcast->ballot, &cmd->ballot) < 0) {
+        node->amcast->newleader_ack_groupcount = 0;
+        node->amcast->newleader_sync_ack_groupcount = 1;
+        memset(node->amcast->newleader_ack_count, 0, sizeof(unsigned int) * node->comm->cluster_size);
+        memset(node->amcast->newleader_sync_ack_count, 0, sizeof(unsigned int) * node->comm->cluster_size);
+    }
     node->amcast->ballot = cmd->ballot;
     //TODO Is trimming delivered_gts pqueue here important ?
     struct enveloppe rep = {
@@ -337,15 +344,33 @@ static void handle_newleader(struct node *node, xid_t sid, newleader_t *cmd) {
 
 static void handle_newleader_ack(struct node *node, xid_t sid, newleader_ack_t *cmd) {
     printf("[%u] We got NEWLEADER_ACK command from %u with %u messages!\n", node->id, sid, cmd->msg_count);
-    //TODO wait for a quorum of replies
-    if(node->amcast->status != PREPARE || paircmp(&node->amcast->ballot, &cmd->ballot) != 0)
+    //Reject replies if we already had enough
+    if((node->amcast->newleader_ack_groupcount >= node->groups->node_counts[node->comm->groups[node->id]]/2 + 1
+            && node->amcast->status == PREPARE)
+            || node->amcast->newleader_ack_count[sid] > 0)
         return;
+    //Proceed if uninitialised, but reset counters
+    if(node->amcast->status != PREPARE && paircmp(&node->amcast->ballot, &cmd->ballot) < 0) {
+        node->amcast->ballot = cmd->ballot;
+        node->amcast->newleader_ack_groupcount = 0;
+        memset(node->amcast->newleader_ack_count, 0, sizeof(unsigned int) * node->comm->cluster_size);
+    }
+    //Reject replies with wrong ballot
+    else if(paircmp(&node->amcast->ballot, &cmd->ballot) != 0)
+        return;
+    //Keep track of replies and reject if needed
+    node->amcast->newleader_ack_groupcount += 1;
+    node->amcast->newleader_ack_count[sid] += 1;
     //TODO reset all local state
     //TODO forge a new state from messages
     //TODO compute max clock incrementally and replace it only at the end
     if(node->amcast->clock < cmd->clock)
         node->amcast->clock = cmd->clock;
     node->amcast->aballot = cmd->ballot;
+    //Send NEWLEADER_SYNC once got a quorum of replies
+    if(node->amcast->newleader_ack_groupcount < node->groups->node_counts[node->comm->groups[node->id]]/2 + 1
+            || node->amcast->status != PREPARE)
+        return;
     struct enveloppe rep = {
         .sid = node->id,
         .cmd_type = NEWLEADER_SYNC,
@@ -402,6 +427,13 @@ static void handle_newleader_sync(struct node *node, xid_t sid, newleader_sync_t
 static void handle_newleader_sync_ack(struct node *node, xid_t sid, newleader_sync_ack_t *cmd) {
     printf("[%u] We got NEWLEADER_SYNC_ACK command from %u!\n", node->id, sid);
     if(node->amcast->status != PREPARE || paircmp(&node->amcast->ballot, &cmd->ballot) != 0)
+        return;
+    //Wait for a quorum of replies
+    if(!node->amcast->newleader_sync_ack_count[sid]) {
+        node->amcast->newleader_sync_ack_count[sid] += 1;
+        node->amcast->newleader_sync_ack_groupcount += 1;
+    }
+    if(node->amcast->newleader_sync_ack_groupcount < node->groups->node_counts[node->comm->groups[node->id]]/2 + 1)
         return;
     node->amcast->status = LEADER;
     //TODO add delivery pattern
