@@ -489,7 +489,50 @@ static void handle_newleader_sync_ack(struct node *node, xid_t sid, newleader_sy
     if(node->amcast->newleader_sync_ack_groupcount < node->groups->node_counts[node->comm->groups[node->id]]/2 + 1)
         return;
     node->amcast->status = LEADER;
-    //TODO add delivery pattern
+    //TODO CHANGETHIS ugly copy-paste of the delivery pattern
+    node->amcast->gts_inf_delivered = node->amcast->gts_last_delivered[node->id];
+    for(xid_t *nid = node->groups->members[node->comm->groups[node->id]];
+            nid < node->groups->members[node->comm->groups[node->id]]
+            + node->groups->node_counts[node->comm->groups[node->id]];
+            nid++)
+        if(paircmp(node->amcast->gts_last_delivered+(*nid), &node->amcast->gts_inf_delivered) < 0)
+            node->amcast->gts_inf_delivered = node->amcast->gts_last_delivered[(*nid)];
+    int try_next = 1;
+    while(try_next && pqueue_size(node->amcast->committed_gts) > 0) {
+        struct amcast_msg **i_msg = NULL, **j_msg = NULL;
+        try_next = 0;
+        if((i_msg = pqueue_peek(node->amcast->committed_gts)) == NULL) {
+            printf("Failed to peek - %u\n", pqueue_size(node->amcast->committed_gts));
+            return;
+        }
+        if((*i_msg)->phase == COMMITTED) {
+                //Allow sending delivered messages even if locally already delivered
+                //&& (*i_msg)->delivered == FALSE) {
+            j_msg = pqueue_peek(node->amcast->pending_lts);
+            if(j_msg != NULL && paircmp(&(*j_msg)->lts[node->comm->groups[node->id]],
+                    &(*i_msg)->gts) < 0
+                    && (*j_msg)->phase != COMMITTED) {
+                return;
+            }
+            if((i_msg = pqueue_pop(node->amcast->committed_gts)) == NULL) {
+                printf("Failed to pop - %u\n", pqueue_size(node->amcast->committed_gts));
+                return;
+            }
+            try_next = 1;
+            struct enveloppe rep = {
+	            .sid = node->id,
+	            .cmd_type = DELIVER,
+	            .cmd.deliver = {
+	                .mid = (*i_msg)->msg.mid,
+                    .ballot = node->amcast->ballot,
+                    .lts = (*i_msg)->lts[node->comm->groups[node->id]],
+                    .gts_inf_delivered = node->amcast->gts_inf_delivered,
+                    .gts = (*i_msg)->gts
+	            },
+	        };
+            send_to_group(node, &rep, node->comm->groups[node->id]);
+        }
+    }
     //TODO add retry pattern for accepted messages
 }
 
