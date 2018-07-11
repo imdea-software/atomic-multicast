@@ -208,13 +208,13 @@ static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
         }
         msg->phase = COMMITTED;
         //Compute infimum of gts_last_delivered for my group
-        g_uid_t *inf_gts = node->amcast->gts_last_delivered+node->id;
+        node->amcast->gts_inf_delivered = node->amcast->gts_last_delivered[node->id];
         for(xid_t *nid = node->groups->members[node->comm->groups[node->id]];
                 nid < node->groups->members[node->comm->groups[node->id]]
                 + node->groups->node_counts[node->comm->groups[node->id]];
                 nid++)
-            if(paircmp(node->amcast->gts_last_delivered+(*nid), inf_gts) < 0)
-                inf_gts = node->amcast->gts_last_delivered+(*nid);
+            if(paircmp(node->amcast->gts_last_delivered+(*nid), &node->amcast->gts_inf_delivered) < 0)
+                node->amcast->gts_inf_delivered = node->amcast->gts_last_delivered[(*nid)];
 	//TODO A lot of possible improvements in the delivery pattern
         int try_next = 1;
         while(try_next && pqueue_size(node->amcast->committed_gts) > 0) {
@@ -244,7 +244,7 @@ static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
 	                .mid = (*i_msg)->msg.mid,
 		        .ballot = node->amcast->ballot,
 		        .lts = (*i_msg)->lts[node->comm->groups[node->id]],
-		        .gts_inf_delivered = *inf_gts,
+		        .gts_inf_delivered = node->amcast->gts_inf_delivered,
 		        .gts = (*i_msg)->gts
 	            },
 	        };
@@ -271,6 +271,7 @@ static void handle_deliver(struct node *node, xid_t sid, deliver_t *cmd) {
             node->amcast->clock = msg->gts.time;
         msg->delivered = TRUE;
         node->amcast->gts_last_delivered[node->id] = msg->gts;
+        node->amcast->gts_inf_delivered = cmd->gts_inf_delivered;
         pqueue_push(node->amcast->delivered_gts, msg, &msg->gts);
         if(node->amcast->delivery_cb)
             node->amcast->delivery_cb(node, msg, node->amcast->dev_cb_arg);
@@ -281,7 +282,7 @@ static void handle_deliver(struct node *node, xid_t sid, deliver_t *cmd) {
                 printf("Failed to peek - %u\n", pqueue_size(node->amcast->delivered_gts));
                 return;
             }
-            if(paircmp(&(i_msg)->gts, &cmd->gts_inf_delivered) > 0)
+            if(paircmp(&(i_msg)->gts, &node->amcast->gts_inf_delivered) > 0)
                 break;
             if((i_msg = pqueue_pop(node->amcast->delivered_gts)) == NULL) {
                 printf("Failed to pop - %u\n", pqueue_size(node->amcast->delivered_gts));
@@ -441,6 +442,7 @@ struct amcast *amcast_init(msginit_cb_fun msginit_cb, void *ini_cb_arg, delivery
     amcast->delivered_gts = pqueue_init((pq_pricmp_fun) paircmp);
     amcast->committed_gts = pqueue_init((pq_pricmp_fun) paircmp);
     amcast->pending_lts = pqueue_init((pq_pricmp_fun) paircmp);
+    amcast->gts_inf_delivered = default_pair;
     amcast->msginit_cb = msginit_cb;
     amcast->delivery_cb = delivery_cb;
     amcast->ini_cb_arg = ini_cb_arg;
