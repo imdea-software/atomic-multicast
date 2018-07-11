@@ -356,7 +356,7 @@ static void handle_newleader(struct node *node, xid_t sid, newleader_t *cmd) {
 }
 
 static void handle_newleader_ack(struct node *node, xid_t sid, newleader_ack_t *cmd) {
-    printf("[%u] We got NEWLEADER_ACK command from %u!\n", node->id, sid);
+    printf("[%u] We got NEWLEADER_ACK command from %u with %u messages!\n", node->id, sid, cmd->msg_count);
     //Proceed if uninitialised, but reset counters
     if(node->amcast->status != PREPARE && paircmp(&node->amcast->ballot, &cmd->ballot) < 0) {
         node->amcast->ballot = cmd->ballot;
