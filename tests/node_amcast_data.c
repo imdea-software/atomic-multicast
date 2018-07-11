@@ -14,7 +14,7 @@
 #include "tests.h"
 #include "amcast.h"
 
-#define NUMBER_OF_MESSAGES 50
+#define NUMBER_OF_MESSAGES 100
 
 // Everything is done manually here, quite normal since we want
 // some checks in the early stages of the project ; a real use
@@ -62,6 +62,17 @@ void delivery_cb(struct node *node, struct amcast_msg *msg, void* cb_arg) {
 	return;
     }
     delivered++;
+    if(node->id == 4 && delivered == NUMBER_OF_MESSAGES) {
+        struct enveloppe env = {
+            .sid = node->id,
+            .cmd_type = NEWLEADER,
+            .cmd.newleader = {
+                .ballot.id = node->id,
+                .ballot.time = node->amcast->ballot.time + 1,
+            }
+        };
+        send_to_group(node, &env, node->comm->groups[node->id]);
+    }
 
 }
 
@@ -118,6 +129,7 @@ int main(int argc, char *argv[]) {
 	if(delivered != NUMBER_OF_MESSAGES)
             printf("[%u] Failed to deliver all messages: %lu delivered \n",
 	           id, delivered);
+        printf("[%u] Ending with ballot: %u,%d \n", n->id, n->amcast->ballot.time, n->amcast->ballot.id);
         node_free(n);
     }
     //Let the main process do some stuffs e.g. be a client
