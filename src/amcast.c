@@ -361,12 +361,38 @@ static void handle_newleader_ack(struct node *node, xid_t sid, newleader_ack_t *
     //Keep track of replies and reject if needed
     node->amcast->newleader_ack_groupcount += 1;
     node->amcast->newleader_ack_count[sid] += 1;
-    //TODO reset all local state
-    //TODO forge a new state from messages
+    //TODO THOUGHT do we really need to reset all local state ?
+    //Forge a new state from replies with high-enough aballot
+    //  TODO Find a better way of doing this
+    //  TODO Find a way to avoid sending the payload for already known messages
+    if(paircmp(&node->amcast->aballot, &cmd->aballot) <= 0) {
+        for(int i=0; i<cmd->msg_count; i++) {
+            struct amcast_msg *msg = NULL;
+            message_t *message = &cmd->messages[i].msg;
+            if((msg = htable_lookup(node->amcast->h_msgs, &message->mid)) == NULL) {
+                msg = init_amcast_msg(node->groups, node->comm->cluster_size, message);
+                //Run msginit callback
+                if(node->amcast->msginit_cb)
+                    node->amcast->msginit_cb(node, msg, node->amcast->ini_cb_arg);
+                htable_insert(node->amcast->h_msgs, &msg->msg.mid, msg);
+            }
+            //TODO CHANGETHIS depends on enum declaration order
+            if(msg->phase < cmd->messages[i].phase) {
+                msg->phase = cmd->messages[i].phase;
+                msg->gts = cmd->messages[i].gts;
+                memcpy(msg->lballot, cmd->messages[i].lballot, sizeof(p_uid_t) * node->groups->groups_count);
+                memcpy(msg->lts, cmd->messages[i].lts, sizeof(g_uid_t) * node->groups->groups_count);
+            }
+            if(msg->phase == COMMITTED)
+                pqueue_push(node->amcast->committed_gts, msg, &msg->gts);
+            else
+                pqueue_push(node->amcast->pending_lts, msg, &msg->lts[node->comm->groups[node->id]]);
+        }
+        node->amcast->aballot = cmd->ballot;
+    }
     //TODO compute max clock incrementally and replace it only at the end
     if(node->amcast->clock < cmd->clock)
         node->amcast->clock = cmd->clock;
-    node->amcast->aballot = cmd->ballot;
     //Send NEWLEADER_SYNC once got a quorum of replies
     if(node->amcast->newleader_ack_groupcount < node->groups->node_counts[node->comm->groups[node->id]]/2 + 1
             || node->amcast->status != PREPARE)
@@ -413,7 +439,22 @@ static void handle_newleader_sync(struct node *node, xid_t sid, newleader_sync_t
         return;
     node->amcast->status = FOLLOWER;
     node->amcast->aballot = cmd->ballot;
-    //TODO dump received state into local one
+    //Dump received state into local one
+    for(int i=0; i<cmd->msg_count; i++) {
+        struct amcast_msg *msg = NULL;
+        message_t *message = &cmd->messages[i].msg;
+        if((msg = htable_lookup(node->amcast->h_msgs, &message->mid)) == NULL) {
+            msg = init_amcast_msg(node->groups, node->comm->cluster_size, message);
+            //Run msginit callback
+            if(node->amcast->msginit_cb)
+                node->amcast->msginit_cb(node, msg, node->amcast->ini_cb_arg);
+            htable_insert(node->amcast->h_msgs, &msg->msg.mid, msg);
+        }
+        msg->phase = cmd->messages[i].phase;
+        msg->gts = cmd->messages[i].gts;
+        memcpy(msg->lballot, cmd->messages[i].lballot, sizeof(p_uid_t) * node->groups->groups_count);
+        memcpy(msg->lts, cmd->messages[i].lts, sizeof(g_uid_t) * node->groups->groups_count);
+    }
     struct enveloppe rep = {
         .sid = node->id,
         .cmd_type = NEWLEADER_SYNC_ACK,
