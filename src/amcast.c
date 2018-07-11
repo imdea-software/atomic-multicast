@@ -271,24 +271,24 @@ static void handle_deliver(struct node *node, xid_t sid, deliver_t *cmd) {
             node->amcast->clock = msg->gts.time;
         msg->delivered = TRUE;
         node->amcast->gts_last_delivered[node->id] = msg->gts;
-        pqueue_push(node->amcast->delivered_gts, &msg, &msg->gts);
+        pqueue_push(node->amcast->delivered_gts, msg, &msg->gts);
         if(node->amcast->delivery_cb)
             node->amcast->delivery_cb(node, msg, node->amcast->dev_cb_arg);
         //Free amcast_msg structs delivered by everyone in my group
         while(pqueue_size(node->amcast->delivered_gts) > 0) {
-            struct amcast_msg **i_msg = NULL;
+            struct amcast_msg *i_msg = NULL;
             if((i_msg = pqueue_peek(node->amcast->delivered_gts)) == NULL) {
                 printf("Failed to peek - %u\n", pqueue_size(node->amcast->delivered_gts));
                 return;
             }
-            if(paircmp(&(*i_msg)->gts, &cmd->gts_inf_delivered) > 0)
+            if(paircmp(&(i_msg)->gts, &cmd->gts_inf_delivered) > 0)
                 break;
             if((i_msg = pqueue_pop(node->amcast->delivered_gts)) == NULL) {
                 printf("Failed to pop - %u\n", pqueue_size(node->amcast->delivered_gts));
                 return;
             }
-            htable_remove(node->amcast->h_msgs, &(*i_msg)->msg.mid);
-            free_amcast_msg(NULL, *i_msg, NULL);
+            htable_remove(node->amcast->h_msgs, &(i_msg)->msg.mid);
+            free_amcast_msg(NULL, i_msg, NULL);
         }
     }
 }
