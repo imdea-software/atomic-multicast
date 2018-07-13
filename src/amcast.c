@@ -430,11 +430,11 @@ static void handle_newleader_ack(struct node *node, xid_t sid, newleader_ack_t *
         //ADDITION do not bother transmitting PROPOSED messages
         if(msg->phase != ACCEPTED && msg->phase != COMMITTED)
             return;
-        rep.cmd.newleader_ack.messages[*acc].msg = msg->msg;
-        rep.cmd.newleader_ack.messages[*acc].phase = msg->phase;
-        rep.cmd.newleader_ack.messages[*acc].gts = msg->gts;
-        memcpy(rep.cmd.newleader_ack.messages[*acc].lballot, msg->lballot, sizeof(p_uid_t) * node->groups->groups_count);
-        memcpy(rep.cmd.newleader_ack.messages[*acc].lts, msg->lts, sizeof(g_uid_t) * node->groups->groups_count);
+        rep.cmd.newleader_sync.messages[*acc].msg = msg->msg;
+        rep.cmd.newleader_sync.messages[*acc].phase = msg->phase;
+        rep.cmd.newleader_sync.messages[*acc].gts = msg->gts;
+        memcpy(rep.cmd.newleader_sync.messages[*acc].lballot, msg->lballot, sizeof(p_uid_t) * node->groups->groups_count);
+        memcpy(rep.cmd.newleader_sync.messages[*acc].lts, msg->lts, sizeof(g_uid_t) * node->groups->groups_count);
         *acc += 1;
     }
     htable_foreach(node->amcast->h_msgs, (GHFunc) fill_rep, &acc);
