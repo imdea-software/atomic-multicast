@@ -395,9 +395,9 @@ static void handle_newleader_ack(struct node *node, xid_t sid, newleader_ack_t *
                 memcpy(msg->lballot, cmd->messages[i].lballot, sizeof(p_uid_t) * node->groups->groups_count);
                 memcpy(msg->lts, cmd->messages[i].lts, sizeof(g_uid_t) * node->groups->groups_count);
                 if(msg->phase == COMMITTED)
-                    pqueue_push(node->amcast->committed_gts, &msg, &msg->gts);
+                    pqueue_push(node->amcast->committed_gts, msg, &msg->gts);
                 else
-                    pqueue_push(node->amcast->pending_lts, &msg, &msg->lts);
+                    pqueue_push(node->amcast->pending_lts, msg, &msg->lts);
 
             }
         }
@@ -499,19 +499,19 @@ static void handle_newleader_sync_ack(struct node *node, xid_t sid, newleader_sy
             node->amcast->gts_inf_delivered = node->amcast->gts_last_delivered[(*nid)];
     int try_next = 1;
     while(try_next && pqueue_size(node->amcast->committed_gts) > 0) {
-        struct amcast_msg **i_msg = NULL, **j_msg = NULL;
+        struct amcast_msg *i_msg = NULL, *j_msg = NULL;
         try_next = 0;
         if((i_msg = pqueue_peek(node->amcast->committed_gts)) == NULL) {
             printf("Failed to peek - %u\n", pqueue_size(node->amcast->committed_gts));
             return;
         }
-        if((*i_msg)->phase == COMMITTED) {
+        if((i_msg)->phase == COMMITTED) {
                 //Allow sending delivered messages even if locally already delivered
-                //&& (*i_msg)->delivered == FALSE) {
+                //&& (i_msg)->delivered == FALSE) {
             j_msg = pqueue_peek(node->amcast->pending_lts);
-            if(j_msg != NULL && paircmp(&(*j_msg)->lts[node->comm->groups[node->id]],
-                    &(*i_msg)->gts) < 0
-                    && (*j_msg)->phase != COMMITTED) {
+            if(j_msg != NULL && paircmp(&(j_msg)->lts[node->comm->groups[node->id]],
+                    &(i_msg)->gts) < 0
+                    && (j_msg)->phase != COMMITTED) {
                 return;
             }
             if((i_msg = pqueue_pop(node->amcast->committed_gts)) == NULL) {
@@ -523,11 +523,11 @@ static void handle_newleader_sync_ack(struct node *node, xid_t sid, newleader_sy
 	            .sid = node->id,
 	            .cmd_type = DELIVER,
 	            .cmd.deliver = {
-	                .mid = (*i_msg)->msg.mid,
+	                .mid = (i_msg)->msg.mid,
                     .ballot = node->amcast->ballot,
-                    .lts = (*i_msg)->lts[node->comm->groups[node->id]],
+                    .lts = (i_msg)->lts[node->comm->groups[node->id]],
                     .gts_inf_delivered = node->amcast->gts_inf_delivered,
-                    .gts = (*i_msg)->gts
+                    .gts = (i_msg)->gts
 	            },
 	        };
             send_to_group(node, &rep, node->comm->groups[node->id]);
