@@ -474,14 +474,8 @@ static void handle_newleader_sync_ack(struct node *node, xid_t sid, newleader_sy
     if(node->amcast->newleader_sync_ack_groupcount < node->groups->node_counts[node->comm->groups[node->id]]/2 + 1)
         return;
     node->amcast->status = LEADER;
+    //TODO Check whether computing gts_inf_delivered is useful for recovered messages
     //TODO CHANGETHIS ugly copy-paste of the delivery pattern
-    node->amcast->gts_inf_delivered = node->amcast->gts_last_delivered[node->id];
-    for(xid_t *nid = node->groups->members[node->comm->groups[node->id]];
-            nid < node->groups->members[node->comm->groups[node->id]]
-            + node->groups->node_counts[node->comm->groups[node->id]];
-            nid++)
-        if(paircmp(node->amcast->gts_last_delivered+(*nid), &node->amcast->gts_inf_delivered) < 0)
-            node->amcast->gts_inf_delivered = node->amcast->gts_last_delivered[(*nid)];
     int try_next = 1;
     while(try_next && pqueue_size(node->amcast->committed_gts) > 0) {
         struct amcast_msg *i_msg = NULL, *j_msg = NULL;
