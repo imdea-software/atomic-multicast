@@ -307,22 +307,7 @@ static void handle_newleader(struct node *node, xid_t sid, newleader_t *cmd) {
         memset(node->amcast->newleader_sync_ack_count, 0, sizeof(unsigned int) * node->comm->cluster_size);
     }
     node->amcast->ballot = cmd->ballot;
-    //Check if delivered_gts pqueue can be trimmed
-    while(pqueue_size(node->amcast->delivered_gts) > 0) {
-        struct amcast_msg *i_msg = NULL;
-        if((i_msg = pqueue_peek(node->amcast->delivered_gts)) == NULL) {
-            printf("Failed to peek - %u\n", pqueue_size(node->amcast->delivered_gts));
-            break;
-        }
-        if(paircmp(&(i_msg)->gts, &node->amcast->gts_inf_delivered) > 0)
-            break;
-        if((i_msg = pqueue_pop(node->amcast->delivered_gts)) == NULL) {
-            printf("Failed to pop - %u\n", pqueue_size(node->amcast->delivered_gts));
-            break;
-        }
-        htable_remove(node->amcast->h_msgs, &(i_msg)->msg.mid);
-        free_amcast_msg(NULL, i_msg, NULL);
-    }
+    //TODO Is trimming delivered_gts pqueue here important ?
     struct enveloppe rep = {
         .sid = node->id,
         .cmd_type = NEWLEADER_ACK,
