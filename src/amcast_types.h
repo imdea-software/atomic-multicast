@@ -68,6 +68,13 @@ typedef struct deliver {
     g_uid_t		gts_inf_delivered;
 } deliver_t;
 
+typedef struct reaccept {
+    m_uid_t     mid;
+    xid_t       grp;
+    p_uid_t     ballot[MAX_NUMBER_OF_GROUPS];
+    g_uid_t     gts;
+} reaccept_t;
+
 typedef struct newleader {
     p_uid_t		ballot;
 } newleader_t;
