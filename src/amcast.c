@@ -261,14 +261,14 @@ static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
 static void handle_deliver(struct node *node, xid_t sid, deliver_t *cmd) {
     //printf("[%u] {%u,%d} We got DELIVER command from %u with gts: (%u,%u)!\n",
     //        node->id, cmd->mid.time, cmd->mid.id, sid, cmd->gts.time, cmd->gts.id);
-    struct amcast_msg *msg = NULL;
-    if((msg = htable_lookup(node->amcast->h_msgs, &cmd->mid)) == NULL) {
-        puts("ERROR: Could not find this mid in h_msgs");
-        exit(EXIT_FAILURE);
-    }
     if ((node->amcast->status == FOLLOWER || node->amcast->status == LEADER)
             && paircmp(&node->amcast->ballot, &cmd->ballot) == 0
             && paircmp(&cmd->gts, &node->amcast->gts_last_delivered[node->id]) > 0) {
+        struct amcast_msg *msg = NULL;
+        if((msg = htable_lookup(node->amcast->h_msgs, &cmd->mid)) == NULL) {
+            puts("ERROR: Could not find this mid in h_msgs");
+            exit(EXIT_FAILURE);
+        }
         msg->lts[node->comm->groups[node->id]] = cmd->lts;
         msg->gts = cmd->gts;
         if(node->amcast->clock < msg->gts.time)
