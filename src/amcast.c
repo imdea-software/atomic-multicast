@@ -385,12 +385,11 @@ static void handle_newleader_ack(struct node *node, xid_t sid, newleader_ack_t *
                 msg->gts = cmd->messages[i].gts;
                 memcpy(msg->lballot, cmd->messages[i].lballot, sizeof(p_uid_t) * node->groups->groups_count);
                 memcpy(msg->lts, cmd->messages[i].lts, sizeof(g_uid_t) * node->groups->groups_count);
-                if(msg->phase == COMMITTED)
-                    pqueue_push(node->amcast->committed_gts, msg, &msg->gts);
-                else
-                    pqueue_push(node->amcast->pending_lts, msg, &msg->lts);
-
             }
+            if(msg->phase == COMMITTED)
+                pqueue_push(node->amcast->committed_gts, msg, &msg->gts);
+            else
+                pqueue_push(node->amcast->pending_lts, msg, &msg->lts[node->comm->groups[node->id]]);
         }
         node->amcast->aballot = cmd->ballot;
     }
