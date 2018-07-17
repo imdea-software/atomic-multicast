@@ -152,6 +152,36 @@ static void handle_accept(struct node *node, xid_t sid, accept_t *cmd) {
     }
 }
 
+static void handle_reaccept(struct node *node, xid_t sid, reaccept_t *cmd) {
+    //printf("[%u] {%u,%d} We got REACCEPT command from %u!\n", node->id, cmd->mid.time, cmd->mid.id, sid);
+    //TODO Would be nice to be able to re-use this lookup instead of redoing one in handle_accept()
+    struct amcast_msg *msg = NULL;
+    if(((msg = htable_lookup(node->amcast->h_msgs, &cmd->mid)) == NULL)
+            && (paircmp(&cmd->gts, &node->amcast->gts_last_delivered[node->id]) < 0)) {
+        struct enveloppe rep = {
+            .sid = node->id,
+            .cmd_type = ACCEPT_ACK,
+            .cmd.accept_ack = {
+                .mid = cmd->mid,
+                .grp = node->comm->groups[node->id],
+                .gts_last_delivered = node->amcast->gts_last_delivered[node->id],
+                .gts = cmd->gts,
+            },
+        };
+        memcpy(rep.cmd.accept_ack.ballot, cmd->ballot, sizeof(p_uid_t) * node->groups->groups_count);
+        send_to_peer(node, &rep, sid);
+    } else {
+        accept_t accept = {
+            .mid = cmd->mid,
+            .grp = cmd->grp,
+            .ballot = cmd->ballot[node->comm->groups[sid]],
+            .lts = cmd->gts,
+            .msg = msg->msg,
+        };
+        handle_accept(node, sid, &accept);
+    }
+}
+
 static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
     //printf("[%u] {%u,%d} We got ACCEPT_ACK command from %u!\n", node->id, cmd->mid.time, cmd->mid.id, sid);
     if (node->amcast->status == LEADER) {
@@ -390,6 +420,8 @@ static void handle_newleader_ack(struct node *node, xid_t sid, newleader_ack_t *
                 pqueue_push(node->amcast->committed_gts, msg, &msg->gts);
             else
                 pqueue_push(node->amcast->pending_lts, msg, &msg->lts[node->comm->groups[node->id]]);
+            //TODO Is setting lballot to new ballot upon recovery good ?
+            msg->lballot[node->comm->groups[node->id]] = cmd->ballot;
         }
         node->amcast->aballot = cmd->ballot;
     }
@@ -518,7 +550,17 @@ static void handle_newleader_sync_ack(struct node *node, xid_t sid, newleader_sy
     }
     //TODO add retry pattern for accepted messages
     int retry_message(g_uid_t *lts, struct amcast_msg *msg, struct node *node) {
-        handle_multicast(node, msg->msg.mid.id, &msg->msg);
+        struct enveloppe rep = {
+            .sid = node->id,
+            .cmd_type = REACCEPT,
+            .cmd.reaccept = {
+                .mid = msg->msg.mid,
+                .grp = node->comm->groups[node->id],
+                .gts = msg->gts,
+            },
+        };
+        memcpy(rep.cmd.reaccept.ballot, msg->lballot, sizeof(p_uid_t) * node->groups->groups_count);
+        send_to_destgrps(node, &rep, msg->msg.destgrps, msg->msg.destgrps_count);
         return 0;
     }
     pqueue_foreach(node->amcast->pending_lts, (pq_traverse_fun) retry_message, node);
@@ -537,6 +579,9 @@ void dispatch_amcast_command(struct node *node, struct enveloppe *env) {
             break;
         case DELIVER:
             handle_deliver(node, env->sid, &(env->cmd.deliver));
+            break;
+        case REACCEPT:
+            handle_reaccept(node, env->sid, &(env->cmd.reaccept));
             break;
         case NEWLEADER:
             handle_newleader(node, env->sid, &(env->cmd.newleader));

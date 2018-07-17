@@ -18,6 +18,7 @@ typedef enum cmd_type {
     ACCEPT_ACK,
     COMMIT,
     DELIVER,
+    REACCEPT,
     NEWLEADER,
     NEWLEADER_ACK,
     NEWLEADER_SYNC,
@@ -32,6 +33,7 @@ struct enveloppe {
         accept_t		accept;
         accept_ack_t		accept_ack;
         deliver_t		deliver;
+        reaccept_t		reaccept;
         newleader_t		newleader;
         newleader_ack_t 	newleader_ack;
         newleader_sync_t	newleader_sync;
