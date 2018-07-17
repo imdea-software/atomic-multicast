@@ -351,6 +351,9 @@ static void handle_newleader_ack(struct node *node, xid_t sid, newleader_ack_t *
         node->amcast->newleader_ack_groupcount = 0;
         memset(node->amcast->newleader_ack_count, 0, sizeof(unsigned int) * node->comm->cluster_size);
     }
+    //Reject replies if we already  had enough
+    if(node->amcast->newleader_ack_groupcount >= node->groups->node_counts[node->comm->groups[node->id]]/2 + 1)
+        return;
     //Reject replies with wrong ballot
     else if(paircmp(&node->amcast->ballot, &cmd->ballot) != 0)
         return;
