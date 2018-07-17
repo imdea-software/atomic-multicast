@@ -201,7 +201,7 @@ static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
         if(msg->accept_ack_totalcount !=
 			msg->msg.destgrps_count)
             return;
-        if(msg->phase != COMMITTED) {
+        if(msg->phase != COMMITTED && msg->delivered == FALSE) {
             pqueue_remove(node->amcast->pending_lts,
                           &msg->lts[node->comm->groups[node->id]]);
             pqueue_push(node->amcast->committed_gts, msg, &msg->gts);
@@ -249,6 +249,7 @@ static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
 	            },
 	        };
                 send_to_group(node, &rep, node->comm->groups[node->id]);
+                msg->delivered = TRUE;
             }
         }
     }
@@ -264,12 +265,11 @@ static void handle_deliver(struct node *node, xid_t sid, deliver_t *cmd) {
     }
     if (node->amcast->status == FOLLOWER || node->amcast->status == LEADER
             && paircmp(&node->amcast->ballot, &cmd->ballot) == 0
-            && msg->delivered == FALSE) {
+            && paircmp(&cmd->gts, &node->amcast->gts_last_delivered[node->id]) > 0) {
         msg->lts[node->comm->groups[node->id]] = cmd->lts;
         msg->gts = cmd->gts;
         if(node->amcast->clock < msg->gts.time)
             node->amcast->clock = msg->gts.time;
-        msg->delivered = TRUE;
         node->amcast->gts_last_delivered[node->id] = msg->gts;
         node->amcast->gts_inf_delivered = cmd->gts_inf_delivered;
         pqueue_push(node->amcast->delivered_gts, msg, &msg->gts);
@@ -484,9 +484,8 @@ static void handle_newleader_sync_ack(struct node *node, xid_t sid, newleader_sy
             printf("Failed to peek - %u\n", pqueue_size(node->amcast->committed_gts));
             return;
         }
-        if((i_msg)->phase == COMMITTED) {
-                //Allow sending delivered messages even if locally already delivered
-                //&& (i_msg)->delivered == FALSE) {
+        if((i_msg)->phase == COMMITTED
+                && (i_msg)->delivered == FALSE) {
             j_msg = pqueue_peek(node->amcast->pending_lts);
             if(j_msg != NULL && paircmp(&(j_msg)->lts[node->comm->groups[node->id]],
                     &(i_msg)->gts) < 0
