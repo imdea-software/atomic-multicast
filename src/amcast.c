@@ -197,8 +197,10 @@ static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
                 msg->accept_ack_totalcount += 1;
         }
         //Update latest_gts delivered if sender is in my group
-        if(cmd->grp == node->comm->groups[node->id])
-            node->amcast->gts_last_delivered[sid] = cmd->gts_last_delivered;
+        //  TODO This should not be required: ACCEPT_ACK are not received in order
+        if(cmd->grp == node->comm->groups[node->id]
+           && paircmp(&node->amcast->gts_last_delivered[sid], &cmd->gts_last_delivered) < 0)
+                node->amcast->gts_last_delivered[sid] = cmd->gts_last_delivered;
         if(msg->accept_ack_totalcount !=
 			msg->msg.destgrps_count)
             return;
