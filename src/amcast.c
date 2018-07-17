@@ -266,7 +266,7 @@ static void handle_deliver(struct node *node, xid_t sid, deliver_t *cmd) {
         puts("ERROR: Could not find this mid in h_msgs");
         exit(EXIT_FAILURE);
     }
-    if (node->amcast->status == FOLLOWER || node->amcast->status == LEADER
+    if ((node->amcast->status == FOLLOWER || node->amcast->status == LEADER)
             && paircmp(&node->amcast->ballot, &cmd->ballot) == 0
             && paircmp(&cmd->gts, &node->amcast->gts_last_delivered[node->id]) > 0) {
         msg->lts[node->comm->groups[node->id]] = cmd->lts;
