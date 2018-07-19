@@ -163,6 +163,12 @@ struct node *node_init(struct cluster_config *conf, xid_t id, msginit_cb_fun msg
     node->comm = init_node_comm(conf);
     node->events = init_node_events(node->comm, id);
     node->amcast = amcast_init(msginit_cb, ini_cb_arg, delivery_cb, dev_cb_arg);
+    //TODO CHANGETHIS init this amcast field here
+    node->amcast->gts_last_delivered = calloc(node->comm->cluster_size, sizeof(g_uid_t));
+    node->amcast->newleader_ack_groupcount = 0;
+    node->amcast->newleader_ack_count = calloc(node->comm->cluster_size, sizeof(unsigned int));
+    node->amcast->newleader_sync_ack_groupcount = 1;
+    node->amcast->newleader_sync_ack_count = calloc(node->comm->cluster_size, sizeof(unsigned int));
     return node;
 }
 

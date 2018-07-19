@@ -5,6 +5,7 @@
 
 #include "types.h"
 
+#define MAX_MSG_DIFF 100
 #define MAX_NUMBER_OF_GROUPS 10
 //#define MAX_PAYLOAD_LEN 156
 #define MAX_PAYLOAD_LEN 20
@@ -56,6 +57,7 @@ typedef struct accept_ack {
     xid_t		grp;
     p_uid_t		ballot[MAX_NUMBER_OF_GROUPS];
     g_uid_t		gts;
+    g_uid_t		gts_last_delivered;
 } accept_ack_t;
 
 typedef struct deliver {
@@ -63,7 +65,15 @@ typedef struct deliver {
     p_uid_t		ballot;
     g_uid_t		lts;
     g_uid_t		gts;
+    g_uid_t		gts_inf_delivered;
 } deliver_t;
+
+typedef struct reaccept {
+    m_uid_t     mid;
+    xid_t       grp;
+    p_uid_t     ballot[MAX_NUMBER_OF_GROUPS];
+    g_uid_t     gts;
+} reaccept_t;
 
 typedef struct newleader {
     p_uid_t		ballot;
@@ -75,11 +85,12 @@ typedef struct newleader_ack {
     clk_t 		clock;
     int 		msg_count;
     struct {
-        m_uid_t 	mid;
         phase_t 	phase;
-        g_uid_t 	lts;
+        p_uid_t 	lballot[MAX_NUMBER_OF_GROUPS];
+        g_uid_t 	lts[MAX_NUMBER_OF_GROUPS];
         g_uid_t 	gts;
-    } *messages;
+        message_t 	msg;
+    } messages[MAX_MSG_DIFF];
 } newleader_ack_t;
 
 typedef struct newleader_sync {
@@ -87,11 +98,12 @@ typedef struct newleader_sync {
     clk_t 		clock;
     int 		msg_count;
     struct {
-        m_uid_t 	mid;
         phase_t 	phase;
-        g_uid_t 	lts;
+        p_uid_t 	lballot[MAX_NUMBER_OF_GROUPS];
+        g_uid_t 	lts[MAX_NUMBER_OF_GROUPS];
         g_uid_t 	gts;
-    } *messages;
+        message_t 	msg;
+    } messages[MAX_MSG_DIFF];
 } newleader_sync_t;
 
 typedef struct newleader_sync_ack {

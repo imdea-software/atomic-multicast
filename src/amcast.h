@@ -32,14 +32,23 @@ struct amcast_msg {
 #include "htable.h"
 
 struct amcast {
-    enum { INIT, LEADER, FOLLOWER, LEADER_INIT, FOLLOWER_PREPARE, LEADER_SYNC } status;
+    enum { INIT, LEADER, FOLLOWER, PREPARE } status;
     p_uid_t ballot;
     p_uid_t aballot;
     clk_t clock;
     htable_t *h_msgs;
+    //EXTRA FIELDS - NEWLEADER_ACK COUNTERS
+    unsigned int newleader_ack_groupcount;
+    unsigned int *newleader_ack_count;
+    //EXTRA FIELDS - NEWLEADER_SYNC_ACK COUNTERS
+    unsigned int newleader_sync_ack_groupcount;
+    unsigned int *newleader_sync_ack_count;
     //EXTRA FIELDS (NOT IN SPEC)
+    pqueue_t *delivered_gts;
     pqueue_t *committed_gts;
     pqueue_t *pending_lts;
+    g_uid_t *gts_last_delivered;
+    g_uid_t gts_inf_delivered;
     msginit_cb_fun msginit_cb;
     delivery_cb_fun delivery_cb;
     void *dev_cb_arg;
