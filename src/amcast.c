@@ -441,8 +441,8 @@ static void handle_newleader_ack(struct node *node, xid_t sid, newleader_ack_t *
         }
     };
     //Limitation due to bad way of sending state arrays
-    if(rep.cmd.newleader_ack.msg_count > MAX_MSG_DIFF) {
-        printf("[%u] ERROR: can not send %u messages in a single enveloppe %u,%d\n", node->id, rep.cmd.newleader_ack.msg_count, node->amcast->gts_inf_delivered.time, node->amcast->gts_inf_delivered.id);
+    if(rep.cmd.newleader_sync.msg_count > MAX_MSG_DIFF) {
+        printf("[%u] ERROR: can not send %u messages in a single enveloppe %u,%d\n", node->id, rep.cmd.newleader_sync.msg_count, node->amcast->gts_inf_delivered.time, node->amcast->gts_inf_delivered.id);
         return;
     }
     //TODO CHANGETHIS ugly a.f. Have a clean way to append arrays to enveloppe
