@@ -545,6 +545,7 @@ static void handle_newleader_sync_ack(struct node *node, xid_t sid, newleader_sy
 	            },
 	        };
             send_to_group(node, &rep, node->comm->groups[node->id]);
+            msg->delivered = TRUE;
         }
     }
     //TODO add retry pattern for accepted messages
