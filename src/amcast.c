@@ -520,12 +520,12 @@ static void handle_newleader_sync_ack(struct node *node, xid_t sid, newleader_sy
             printf("Failed to peek - %u\n", pqueue_size(node->amcast->committed_gts));
             return;
         }
-        if((i_msg)->phase == COMMITTED
-                && (i_msg)->delivered == FALSE) {
+        if(i_msg->phase == COMMITTED
+                && i_msg->delivered == FALSE) {
             j_msg = pqueue_peek(node->amcast->pending_lts);
-            if(j_msg != NULL && paircmp(&(j_msg)->lts[node->comm->groups[node->id]],
-                    &(i_msg)->gts) < 0
-                    && (j_msg)->phase != COMMITTED) {
+            if(j_msg != NULL && paircmp(&j_msg->lts[node->comm->groups[node->id]],
+                    &i_msg->gts) < 0
+                    && j_msg->phase != COMMITTED) {
                 return;
             }
             if((i_msg = pqueue_pop(node->amcast->committed_gts)) == NULL) {
@@ -537,11 +537,11 @@ static void handle_newleader_sync_ack(struct node *node, xid_t sid, newleader_sy
 	            .sid = node->id,
 	            .cmd_type = DELIVER,
 	            .cmd.deliver = {
-	                .mid = (i_msg)->msg.mid,
+	                .mid = i_msg->msg.mid,
                     .ballot = node->amcast->ballot,
-                    .lts = (i_msg)->lts[node->comm->groups[node->id]],
+                    .lts = i_msg->lts[node->comm->groups[node->id]],
                     .gts_inf_delivered = node->amcast->gts_inf_delivered,
-                    .gts = (i_msg)->gts
+                    .gts = i_msg->gts
 	            },
 	        };
             send_to_group(node, &rep, node->comm->groups[node->id]);
