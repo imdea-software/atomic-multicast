@@ -203,7 +203,7 @@ static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
         if(msg->accept_ack_totalcount !=
 			msg->msg.destgrps_count)
             return;
-        if(msg->phase != COMMITTED) {
+        if(msg->phase != COMMITTED && msg->delivered == FALSE) {
             pqueue_remove(node->amcast->pending_lts,
                           &msg->lts[node->comm->groups[node->id]]);
             pqueue_push(node->amcast->committed_gts, msg, &msg->gts);
@@ -251,6 +251,7 @@ static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
 	            },
 	        };
                 send_to_group(node, &rep, node->comm->groups[node->id]);
+                msg->delivered = TRUE;
             }
         }
     }
@@ -261,7 +262,7 @@ static void handle_deliver(struct node *node, xid_t sid, deliver_t *cmd) {
     //        node->id, cmd->mid.time, cmd->mid.id, sid, cmd->gts.time, cmd->gts.id);
     if ((node->amcast->status == FOLLOWER || node->amcast->status == LEADER)
             && paircmp(&node->amcast->ballot, &cmd->ballot) == 0
-            && msg->delivered == FALSE) {
+            && paircmp(&cmd->gts, &node->amcast->gts_last_delivered[node->id]) > 0) {
         struct amcast_msg *msg = NULL;
         if((msg = htable_lookup(node->amcast->h_msgs, &cmd->mid)) == NULL) {
             puts("ERROR: Could not find this mid in h_msgs");
@@ -271,7 +272,6 @@ static void handle_deliver(struct node *node, xid_t sid, deliver_t *cmd) {
         msg->gts = cmd->gts;
         if(node->amcast->clock < msg->gts.time)
             node->amcast->clock = msg->gts.time;
-        msg->delivered = TRUE;
         node->amcast->gts_last_delivered[node->id] = msg->gts;
         node->amcast->gts_inf_delivered = cmd->gts_inf_delivered;
         pqueue_push(node->amcast->delivered_gts, msg, &msg->gts);
