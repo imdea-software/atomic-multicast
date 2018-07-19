@@ -375,25 +375,23 @@ static void handle_newleader(struct node *node, xid_t sid, newleader_t *cmd) {
 
 static void handle_newleader_ack(struct node *node, xid_t sid, newleader_ack_t *cmd) {
     printf("[%u] We got NEWLEADER_ACK command from %u with %u messages!\n", node->id, sid, cmd->msg_count);
+    //Reject replies if we already had enough
+    if((node->amcast->newleader_ack_groupcount >= node->groups->node_counts[node->comm->groups[node->id]]/2 + 1
+            && node->amcast->status == PREPARE)
+            || node->amcast->newleader_ack_count[sid] > 0)
+        return;
     //Proceed if uninitialised, but reset counters
     if(node->amcast->status != PREPARE && paircmp(&node->amcast->ballot, &cmd->ballot) < 0) {
         node->amcast->ballot = cmd->ballot;
         node->amcast->newleader_ack_groupcount = 0;
         memset(node->amcast->newleader_ack_count, 0, sizeof(unsigned int) * node->comm->cluster_size);
     }
-    //Reject replies if we already  had enough
-    if(node->amcast->newleader_ack_groupcount >= node->groups->node_counts[node->comm->groups[node->id]]/2 + 1)
-        return;
     //Reject replies with wrong ballot
     else if(paircmp(&node->amcast->ballot, &cmd->ballot) != 0)
         return;
     //Keep track of replies and reject if needed
-    if(node->amcast->newleader_ack_count[sid])
-        return;
-    else {
-        node->amcast->newleader_ack_groupcount += 1;
-        node->amcast->newleader_ack_count[sid] += 1;
-    }
+    node->amcast->newleader_ack_groupcount += 1;
+    node->amcast->newleader_ack_count[sid] += 1;
     //TODO THOUGHT do we really need to reset all local state ?
     //Forge a new state from replies with high-enough aballot
     //  TODO Find a better way of doing this
@@ -429,7 +427,8 @@ static void handle_newleader_ack(struct node *node, xid_t sid, newleader_ack_t *
     if(node->amcast->clock < cmd->clock)
         node->amcast->clock = cmd->clock;
     //Send NEWLEADER_SYNC once got a quorum of replies
-    if(node->amcast->newleader_ack_groupcount < node->groups->node_counts[node->comm->groups[node->id]]/2 + 1)
+    if(node->amcast->newleader_ack_groupcount < node->groups->node_counts[node->comm->groups[node->id]]/2 + 1
+            || node->amcast->status != PREPARE)
         return;
     struct enveloppe rep = {
         .sid = node->id,
