@@ -301,6 +301,7 @@ static void handle_deliver(struct node *node, xid_t sid, deliver_t *cmd) {
         }
         msg->lts[node->comm->groups[node->id]] = cmd->lts;
         msg->gts = cmd->gts;
+        msg->phase = COMMITTED;
         if(node->amcast->clock < msg->gts.time)
             node->amcast->clock = msg->gts.time;
         node->amcast->gts_last_delivered[node->id] = msg->gts;
