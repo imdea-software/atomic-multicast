@@ -282,7 +282,7 @@ static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
 	            },
 	        };
                 send_to_group(node, &rep, node->comm->groups[node->id]);
-                msg->delivered = TRUE;
+                i_msg->delivered = TRUE;
             }
         }
     }
@@ -546,7 +546,7 @@ static void handle_newleader_sync_ack(struct node *node, xid_t sid, newleader_sy
 	            },
 	        };
             send_to_group(node, &rep, node->comm->groups[node->id]);
-            msg->delivered = TRUE;
+            i_msg->delivered = TRUE;
         }
     }
     //TODO add retry pattern for accepted messages
