@@ -338,14 +338,16 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
             if(bufferevent_write(bev, &init_client, sizeof(init_client)) < 0)
                 printf("[c-%u] Something bad happened (init_client)\n", c->id);
         }
-        else if (events & (BEV_EVENT_EOF|BEV_EVENT_ERROR))
+        else if (events & (BEV_EVENT_EOF|BEV_EVENT_ERROR)) {
             c->connected--;
+            if(c->received < c->stats->size) {
+                printf("[c-%u] Server %i left before all messages were sent: %u sent\n", c->id, p->id, c->sent);
+            }
+        }
         if(c->connected == c->groups_count) {
             printf("[c-%u] Connection established to all groups\n", c->id);
             if(c->sent == 0)
                 submit_cb(0,0,c);
-        } else if(p->received < NUMBER_OF_MESSAGES) {
-            printf("[c-%u] Server %i left before all messages were sent: %u sent\n", c->id, p->id, c->sent);
         }
     }
     void alt_event_cb(struct bufferevent *bev, short events, void *ptr) {
@@ -356,7 +358,7 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
         }
         else if (events & (BEV_EVENT_EOF|BEV_EVENT_ERROR)) {
             c->connected--;
-            if(p->received < NUMBER_OF_MESSAGES) {
+            if(c->received < NUMBER_OF_MESSAGES) {
                 printf("[c-%u] Server %i left before all messages were sent: %u sent\n", c->id, p->id, c->sent);
             }
         }
