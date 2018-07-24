@@ -159,6 +159,7 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
         unsigned int connected;
         unsigned int sent;
         unsigned int received;
+        g_uid_t *last_gts;
         struct stats *stats;
         struct event_base *base;
         struct bufferevent **bev;
@@ -259,6 +260,16 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
                                 c->id, env.cmd.deliver.mid.id);
                         exit(EXIT_FAILURE);
                     }
+                    /* --> do not re-deliver messages */
+                    if(c->last_gts && paircmp(&env.cmd.deliver.gts, c->last_gts) <= 0) {
+                        continue;
+                    }
+                    if(stats->tv_dev[env.cmd.deliver.mid.time].tv_sec != 0
+                            && stats->tv_dev[env.cmd.deliver.mid.time].tv_nsec != 0) {
+                        printf("[c-%u] FAILURE: received deliver ack with wrong s-mid %u instead of %u from %d\n",
+                                c->id, env.cmd.deliver.mid.time, c->ref_value->cmd.multicast.mid.time, p->id);
+                        continue;
+                    }
                     /* --> update deliver counts */
                     p->received++;
                     c->received++;
@@ -266,6 +277,7 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
                     if( ((stats->delivered + 1) % MEASURE_RESOLUTION) == 0) {
                         clock_gettime(CLOCK_MONOTONIC, stats->tv_dev + env.cmd.deliver.mid.time);
                         stats->gts[env.cmd.deliver.mid.time] = env.cmd.deliver.gts;
+                        c->last_gts = stats->gts + env.cmd.deliver.mid.time;
                         stats->count++;
                     }
                     stats->delivered++;
@@ -294,6 +306,9 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
                        c->id, mid.id);
                 exit(EXIT_FAILURE);
             }
+            /* --> do not re-deliver messages */
+            if(c->last_gts && msg.timestamp <= c->last_gts.time)
+                continue;
             /* --> update deliver counts */
             p->received++;
             c->received++;
@@ -302,6 +317,7 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
                 clock_gettime(CLOCK_MONOTONIC, stats->tv_dev + mid.time);
                 stats->gts[mid.time].time = msg.timestamp;
                 stats->gts[mid.time].id = get_leader_from_group(msg.from_group);
+                c->last_gts = stats->gts + mid.time;
                 stats->count++;
             }
             stats->delivered++;
