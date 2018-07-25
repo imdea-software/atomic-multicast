@@ -154,6 +154,7 @@ void run_client_node(struct cluster_config *config, xid_t client_id) {
 void run_client_node_libevent(struct cluster_config *config, xid_t client_id, struct stats *stats) {
     struct client {
         xid_t id;
+        unsigned int nodes_count;
         unsigned int groups_count;
         unsigned int dests_count;
         unsigned int connected;
@@ -344,8 +345,8 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
                 printf("[c-%u] Server %i left before all messages were sent: %u sent\n", c->id, p->id, c->sent);
             }
         }
-        if(c->connected == c->groups_count) {
-            printf("[c-%u] Connection established to all groups\n", c->id);
+        if(c->connected == c->nodes_count) {
+            printf("[c-%u] Connection established to all nodes\n", c->id);
             if(c->sent == 0)
                 submit_cb(0,0,c);
         }
@@ -362,8 +363,8 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
                 printf("[c-%u] Server %i left before all messages were sent: %u sent\n", c->id, p->id, c->sent);
             }
         }
-        if(c->connected == c->groups_count) {
-            printf("[c-%u] Connection established to all groups\n", c->id);
+        if(c->connected == c->nodes_count) {
+            printf("[c-%u] Connection established to all nodes\n", c->id);
             if(c->sent == 0)
                 alt_submit_cb(0,0,c);
         }
@@ -377,15 +378,15 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
     //SET-UP libevent
     memset(&client, 0, sizeof(struct client));
     client.id = client_id;
+    client.nodes_count = config->size;
     client.groups_count = config->groups_count;
     client.dests_count = NUMBER_OF_TARGETS;
     client.stats = stats;
     client.base = event_base_new();
     client.bev = calloc(config->size, sizeof(struct bufferevent *));
     peers = calloc(config->size, sizeof(struct peer));
-    //Connect with TCP to group LEADERS
-    for(int i=0; i<config->groups_count; i++) {
-        xid_t peer_id = get_leader_from_group(i);
+    //Start a TCP connection to all nodes
+    for(xid_t peer_id=0; peer_id<client.nodes_count; peer_id++) {
         peers[peer_id].c = &client;
         peers[peer_id].id = peer_id;
         client.bev[peer_id] = bufferevent_socket_new(client.base, -1, BEV_OPT_CLOSE_ON_FREE);
