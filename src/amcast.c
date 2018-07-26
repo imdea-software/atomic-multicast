@@ -602,6 +602,48 @@ void dispatch_amcast_command(struct node *node, struct enveloppe *env) {
     }
 }
 
+void amcast_recover(struct node *node, xid_t peer_id) {
+    //Works but not so nice
+    //  TODO Do not try to recover if not enough alive node to form a quorum
+    //  TODO Add support for node coming back online
+    //  TODO May be a good idea to implement this with linked list in event module
+    static xid_t **watch = NULL;
+    static xid_t last, next, magic = -1;
+    if(!watch) {
+        watch = calloc(node->comm->cluster_size, sizeof(xid_t *));
+        xid_t *base = node->groups->members[node->comm->groups[node->id]];
+        unsigned int size = node->groups->node_counts[node->comm->groups[node->id]];
+        watch[*base] = &magic;
+        for(xid_t *peer=base+1; peer < base + size; peer++) {
+            watch[*peer] = peer-1;
+        }
+        last = *(base+size-1);
+    }
+    next = peer_id + 1;
+    while(!watch[next] && next <= last)
+        next++;
+    if(next > last)
+        last = peer_id;
+    else
+        watch[next] = watch[peer_id];
+    watch[peer_id] = NULL;
+    //printf("[%u] RECOVER after %d failure with %d current leader and watching %d\n",
+    //        node->id, peer_id, node->amcast->ballot.id, *watch[node->id]);
+    if(node->amcast->ballot.id == peer_id) {
+        if(*watch[node->id] == magic) {
+            struct enveloppe rep = {
+                .sid = node->id,
+                .cmd_type = NEWLEADER,
+                .cmd.newleader = {
+                    .ballot.id = node->id,
+                    .ballot.time = node->amcast->ballot.time + 1,
+                },
+            };
+            send_to_group(node, &rep, node->comm->groups[node->id]);
+        }
+    }
+}
+
 static struct amcast_msg *init_amcast_msg(struct groups *groups, unsigned int cluster_size, message_t *cmd) {
     struct amcast_msg *msg = malloc(sizeof(struct amcast_msg));
     msg->phase = START;
