@@ -28,5 +28,6 @@ void termination_cb(evutil_socket_t sock, short events, void *ptr);
 void read_cb(struct bufferevent *bev, void *ptr);
 void event_cb(struct bufferevent *bev, short flags, void *ptr);
 void close_cb(struct bufferevent *bev, void *ptr);
+void failure_cb(evutil_socket_t sock, short events, void *ptr);
 
 #endif
