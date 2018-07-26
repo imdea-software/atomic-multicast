@@ -62,7 +62,8 @@ void delivery_cb(struct node *node, struct amcast_msg *msg, void* cb_arg) {
 	return;
     }
     delivered++;
-
+    if(node->id == 3 && delivered == 10 && node->amcast->ballot.id == node->id)
+        kill(getpid(), 2);
 }
 
 //Scenario:
