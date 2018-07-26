@@ -4,6 +4,7 @@
 #include "node.h"
 #include "events.h"
 #include "message.h"
+#include "amcast.h"
 
 #define __extend_array(base_ptr, size_ptr, elem_size, new_index) do { \
     unsigned int __nsize = *(size_ptr) * 2; \
@@ -14,6 +15,8 @@
 } while(0)
 
 static struct timeval reconnect_timeout = { 1, 0 };
+
+int isolated = 0;
 
 struct cb_arg *set_cb_arg(xid_t peer_id, struct node *node) {
     if(node->events->ev_cb_arg[peer_id] == NULL) {
@@ -142,15 +145,27 @@ void read_cb(struct bufferevent *bev, void *ptr) {
     struct evbuffer *in_buf = bufferevent_get_input(bev);
     while (evbuffer_get_length(in_buf) >= sizeof(struct enveloppe)) {
         struct enveloppe env;
-        read_enveloppe(bev, &env);
+        // Copy data without draining the buffer in case
+        evbuffer_copyout(in_buf, &env, sizeof(struct enveloppe));
+        //TODO CHANGETHIS have nice is_in_my_group() check
+        if(isolated)
+            if(((env.sid < node->comm->cluster_size && node->comm->groups[env.sid] != node->comm->groups[node->id])
+                    || (env.sid < node->comm->c_size && node->comm->c_bevs[env.sid] == bev))) {
+                bufferevent_disable(bev, EV_READ);
+                return;
+            }
         switch(env.cmd_type) {
             case TESTREPLY:
                 write_enveloppe(bev, &env);
                 break;
             default:
+                if(env.cmd_type == NEWLEADER_SYNC)
+                    isolated = 0;
                 dispatch_message(node, &env);
                 break;
         }
+        //Delete data from reception buffer
+        evbuffer_drain(in_buf, sizeof(struct enveloppe));
     }
 }
 
@@ -168,9 +183,14 @@ void event_cb(struct bufferevent *bev, short events, void *ptr) {
         printf("[%u] Connection lost to node %u\n", node->id, peer_id);
         node->comm->connected_count--;
         close_connection(node, peer_id);
+        //Start recover routine
+        if(node->comm->groups[peer_id] == node->comm->groups[node->id]) {
+            isolated = 1;
+            amcast_recover(node, peer_id);
+        }
         //TODO Have nodes tell each other when they exit normally
         //     so we can have a smarter reconnect pattern
-        connect_to_node(node, peer_id);
+        //connect_to_node(node, peer_id);
     } else {
         printf("[%u] Event %d not handled", node->id, events);
     }
@@ -194,6 +214,13 @@ void event_cb(struct bufferevent *bev, short events, void *ptr) {
 //Called after last write of a connection
 void close_cb(struct bufferevent *bev, void *ptr) {
     bufferevent_free(bev);
+}
+
+void failure_cb(evutil_socket_t sock, short flags, void *ptr) {
+    struct node *node = NULL; xid_t peer_id;
+    retrieve_cb_arg(&peer_id, &node, (struct cb_arg *) ptr);
+
+    //TODO run recover routine after node failed to reconnect for too long
 }
 
 void reconnect_cb(evutil_socket_t sock, short flags, void *ptr) {
