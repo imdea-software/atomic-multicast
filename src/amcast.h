@@ -58,5 +58,6 @@ struct amcast {
 struct amcast *amcast_init(msginit_cb_fun msginit_cb, void *ini_cb_arg, delivery_cb_fun delivery_cb, void *dev_cb_arg);
 int amcast_free(struct amcast *amcast);
 void dispatch_amcast_command(struct node *node, struct enveloppe *env);
+void amcast_recover(struct node *node, xid_t peer_id);
 
 #endif
