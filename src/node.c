@@ -62,6 +62,7 @@ static struct node_comm *init_node_comm(struct cluster_config *conf) {
     memcpy(ids, conf->id, size * sizeof(xid_t));
 
     comm->cluster_size = size;
+    comm->connected_count = 0;
     comm->accepted_count = 0;
     comm->a_size = 0;
     comm->c_size = 0;

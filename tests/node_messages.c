@@ -70,9 +70,9 @@ int main(int argc, char *argv[]) {
     if (id != -1) {
         struct node *n = node_init(&conf, id, NULL, NULL, NULL, NULL);
         node_start(n);
-        if (n->comm->accepted_count != NUMBER_OF_NODES)
+        if (n->comm->connected_count != NUMBER_OF_NODES)
             printf("[%u] Failed to connect to the whole cluster"
-	           " (%u connected peers)\n", id, n->comm->accepted_count);
+	           " (%u connected peers)\n", id, n->comm->connected_count);
 	//TODO Put a barrier here, so that nodes are not being freed until they were all stopped
         node_free(n);
     }

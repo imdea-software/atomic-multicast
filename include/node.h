@@ -21,6 +21,7 @@ struct groups {
 
 struct node_comm {
     unsigned int	cluster_size;
+    unsigned int	connected_count;
     unsigned int	accepted_count;
     unsigned int	a_size;
     unsigned int	c_size;

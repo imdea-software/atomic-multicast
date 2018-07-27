@@ -163,11 +163,11 @@ void event_cb(struct bufferevent *bev, short events, void *ptr) {
 
     if (events & BEV_EVENT_CONNECTED) {
         printf("[%u] Connection established to node %u\n", node->id, peer_id);
-        node->comm->accepted_count += 1;
+        node->comm->connected_count++;
     } else if (events & (BEV_EVENT_EOF|BEV_EVENT_ERROR)) {
         printf("[%u] Connection lost to node %u\n", node->id, peer_id);
 	if (events & BEV_EVENT_EOF)
-            node->comm->accepted_count -= 1;
+            node->comm->connected_count--;
         close_connection(node, peer_id);
         //TODO Have nodes tell each other when they exit normally
         //     so we can have a smarter reconnect pattern
