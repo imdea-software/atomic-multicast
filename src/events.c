@@ -5,6 +5,14 @@
 #include "events.h"
 #include "message.h"
 
+#define __extend_array(base_ptr, size_ptr, elem_size, new_index) do { \
+    unsigned int __nsize = *(size_ptr) * 2; \
+    (base_ptr) = realloc((base_ptr), (elem_size) * (((new_index) < __nsize) ? \
+             __nsize : (__nsize = (new_index) + 1))); \
+    memset((base_ptr) + *(size_ptr), 0, (__nsize - *(size_ptr)) * (elem_size)); \
+    *(size_ptr) = __nsize; \
+} while(0)
+
 static struct timeval reconnect_timeout = { 1, 0 };
 
 struct cb_arg *set_cb_arg(xid_t peer_id, struct node *node) {
