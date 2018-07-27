@@ -29,8 +29,9 @@ void send_to_peer(struct node *node, struct enveloppe *env, xid_t peer_id) {
 }
 
 void send_to_client(struct node *node, struct enveloppe *env, xid_t client_id) {
+    xid_t peer_id = node->comm->cluster_size * 2 + client_id;
     struct bufferevent *bev;
-    if( client_id < node->comm->c_size && (bev = node->comm->c_bevs[client_id]) != NULL )
+    if( peer_id < node->comm->bevs_size && (bev = node->comm->bevs[peer_id]) != NULL )
         write_enveloppe(bev, env);
 }
 

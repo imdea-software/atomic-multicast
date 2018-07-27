@@ -23,15 +23,11 @@ struct node_comm {
     unsigned int	cluster_size;
     unsigned int	connected_count;
     unsigned int	accepted_count;
-    unsigned int	a_size;
-    unsigned int	c_size;
     unsigned int	bevs_size;
     xid_t		*ids;
     xid_t 		*groups;
     struct sockaddr_in	*addrs;
     struct bufferevent  **bevs;
-    struct bufferevent	**a_bevs;
-    struct bufferevent	**c_bevs;
 };
 
 #include "events.h"

@@ -46,8 +46,7 @@ static struct node_comm *init_node_comm(struct cluster_config *conf) {
     struct sockaddr_in *addrs = malloc(size * sizeof(struct sockaddr_in));
     xid_t *ids = malloc(size * sizeof(xid_t));
     xid_t *groups = malloc(size * sizeof(xid_t));
-    //TODO It might be better to realloc when connection is accepted/lost
-    struct bufferevent **bevs = malloc(size * sizeof(struct bufferevent *));
+    struct bufferevent **bevs = calloc(size * 2, sizeof(struct bufferevent *));
 
     for(int i=0; i<size; i++) {
 	xid_t c_id = conf->id[i];
@@ -64,15 +63,11 @@ static struct node_comm *init_node_comm(struct cluster_config *conf) {
     comm->cluster_size = size;
     comm->connected_count = 0;
     comm->accepted_count = 0;
-    comm->a_size = 0;
-    comm->c_size = 0;
     comm->bevs_size = size * 2;
     comm->addrs = addrs;
     comm->ids = ids;
     comm->groups = groups;
     comm->bevs = bevs;
-    comm->a_bevs = NULL;
-    comm->c_bevs = NULL;
 
     return comm;
 };
@@ -80,17 +75,9 @@ static struct node_comm *init_node_comm(struct cluster_config *conf) {
 static int free_node_comm(struct node_comm *comm) {
     //Every remaining bev have to be freed manually
     //If already freed elsewhere, the pointer was set to NULL
-    for(struct bufferevent **bev = comm->bevs; bev< comm->bevs + comm->cluster_size; bev++)
-	if(*bev)
-	    bufferevent_free(*bev);
-    if(comm->a_bevs != NULL) {
-        for(struct bufferevent **bev = comm->a_bevs; bev< comm->a_bevs + comm->a_size; bev++)
+    for(struct bufferevent **bev = comm->bevs; bev< comm->bevs + comm->bevs_size; bev++)
         if(*bev)
             bufferevent_free(*bev);
-        free(comm->a_bevs);
-    }
-    if(comm->c_bevs != NULL)
-        free(comm->c_bevs);
     free(comm->bevs);
     free(comm->ids);
     free(comm->groups);
