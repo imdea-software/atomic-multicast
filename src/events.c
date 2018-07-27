@@ -170,16 +170,32 @@ void event_cb(struct bufferevent *bev, short events, void *ptr) {
     if (events & BEV_EVENT_CONNECTED) {
         printf("[%u] Connection established to node %u\n", node->id, peer_id);
         node->comm->connected_count++;
+        struct enveloppe init = { .sid = node->id, .cmd_type = INIT_NODE };
+        write_enveloppe(bev, &init);
     } else if (events & (BEV_EVENT_EOF|BEV_EVENT_ERROR)) {
         printf("[%u] Connection lost to node %u\n", node->id, peer_id);
-	if (events & BEV_EVENT_EOF)
-            node->comm->connected_count--;
+        node->comm->connected_count--;
         close_connection(node, peer_id);
         //TODO Have nodes tell each other when they exit normally
         //     so we can have a smarter reconnect pattern
         connect_to_node(node, peer_id);
     } else {
         printf("[%u] Event %d not handled", node->id, events);
+    }
+    if(node->comm->connected_count == node->comm->cluster_size
+            && node->comm->accepted_count > 0) {
+        struct bufferevent **bev = node->comm->bevs + node->comm->cluster_size;
+        unsigned int checked = 0;
+        while(bev < node->comm->bevs + node->comm->bevs_size
+                && checked < node->comm->accepted_count) {
+            if(*bev) {
+                bufferevent_enable(*bev,
+                        (!(bufferevent_get_enabled(*bev) & EV_READ)) ? EV_READ : 0);
+                bufferevent_trigger(*bev, EV_READ, 0);
+                checked++;
+            }
+            bev++;
+        }
     }
 }
 
