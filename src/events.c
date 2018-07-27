@@ -26,10 +26,6 @@ struct cb_arg *set_cb_arg(xid_t peer_id, struct node *node) {
 int retrieve_cb_arg(xid_t *peer_id, struct node **node, struct cb_arg *arg) {
     *peer_id = arg->peer_id;
     *node = arg->node;
-    //TODO Change this broken design: either store all the cb_arg struct and
-    //     alloc/dealloc when a connection is established.
-    //     Or change how a peer is represented so this cb_arg struct is not needed.
-    //free(arg);
     return 0;
 }
 
@@ -41,7 +37,6 @@ int connect_to_node(struct node *node, xid_t peer_id) {
 // STATIC FUNCTIONS
 
 static int init_connection(struct node *node, xid_t peer_id) {
-    //Create a new bufferevent
     node->comm->bevs[peer_id] = bufferevent_socket_new(node->events->base,
 		   -1, BEV_OPT_CLOSE_ON_FREE);
     struct bufferevent *bev = node->comm->bevs[peer_id];
@@ -69,7 +64,6 @@ static int close_connection(struct node *node, xid_t peer_id) {
 }
 
 //Called when the status of a connection changes
-//TODO Find something useful to do in there
 static void event_a_cb(struct bufferevent *bev, short events, void *ptr) {
     struct node *node = NULL; xid_t peer_id;
     retrieve_cb_arg(&peer_id, &node, (struct cb_arg *) ptr);
@@ -149,8 +143,6 @@ void read_cb(struct bufferevent *bev, void *ptr) {
     while (evbuffer_get_length(in_buf) >= sizeof(struct enveloppe)) {
         struct enveloppe env;
         read_enveloppe(bev, &env);
-        //TODO Have to way to identify clients (atm only bev pointer)
-        //     So that this can be put in the dispatch sequence
         switch(env.cmd_type) {
             case TESTREPLY:
                 write_enveloppe(bev, &env);
