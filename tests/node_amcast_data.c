@@ -90,7 +90,7 @@ int main(int argc, char *argv[]) {
     }
 
     struct enveloppe env = {
-        .sid = -1,
+        .sid = 1,
         .cmd_type = MULTICAST,
         .cmd.multicast = {
             .mid = {0, 0},
@@ -135,6 +135,8 @@ int main(int argc, char *argv[]) {
 	        .sin_addr.s_addr = inet_addr(conf.addresses[peer_id])
             };
             connect(sock[peer_id], (struct sockaddr *) &addr, sizeof(addr));
+            struct enveloppe init = { .sid = 1, .cmd_type = INIT_CLIENT };
+            send(sock[peer_id], &init, sizeof(init), 0);
 	}
     //Let's send some messages
 	for(int j=0; j<NUMBER_OF_MESSAGES; j++) {

@@ -113,6 +113,8 @@ void run_client_node(struct cluster_config *config, xid_t client_id) {
             .sin_addr.s_addr = inet_addr(config->addresses[peer_id])
         };
         connect(sock[peer_id], (struct sockaddr *) &addr, sizeof(addr));
+        struct enveloppe init = { .sid = client_id, .cmd_type = INIT_CLIENT };
+        send(sock[peer_id], &init, sizeof(init), 0);
 	}
     //Let's send some messages
     struct enveloppe env = {

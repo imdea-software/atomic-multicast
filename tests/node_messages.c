@@ -89,9 +89,11 @@ int main(int argc, char *argv[]) {
 		.sin_addr.s_addr = inet_addr(conf.addresses[peer_id])
         };
         connect(sock, (struct sockaddr *) &addr, sizeof(addr));
+        struct enveloppe init = { .sid = 1, .cmd_type = INIT_CLIENT };
+        send(sock, &init, sizeof(init), 0);
         //Let's send some messages
         struct enveloppe env = {
-	    .sid = -1,
+	    .sid = 1,
 	    .cmd_type = TESTREPLY,
 	    .cmd.multicast = {
 	        .mid = {0,0},
