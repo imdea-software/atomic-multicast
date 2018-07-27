@@ -85,6 +85,40 @@ static void event_a_cb(struct bufferevent *bev, short events, void *ptr) {
     }
 }
 
+void read_a_cb(struct bufferevent *bev, void *ptr) {
+    struct node *node = (struct node *) ptr;
+    xid_t peer_id = -1;
+
+    struct enveloppe env;
+    read_enveloppe(bev, &env);
+    switch(env.cmd_type) {
+        case INIT_CLIENT:
+            peer_id = node->comm->cluster_size * 2 + env.sid;
+            if(peer_id >= node->comm->bevs_size)
+                __extend_array(node->comm->bevs, &node->comm->bevs_size,
+                        sizeof(struct bufferevent *), peer_id);
+            if(peer_id >= node->events->ev_cb_arg_count)
+                __extend_array(node->events->ev_cb_arg, &node->events->ev_cb_arg_count,
+                        sizeof(struct cb_arg *), peer_id);
+            bufferevent_enable(bev, EV_WRITE);
+            break;
+        case INIT_NODE:
+            peer_id = node->comm->cluster_size + env.sid;
+            break;
+        default:
+            break;
+    }
+    if(peer_id >= 0) {
+        node->comm->bevs[peer_id] = bev;
+        node->comm->accepted_count++;
+        bufferevent_setcb(bev, read_cb, NULL, event_a_cb, set_cb_arg(peer_id, node));
+        if(node->comm->connected_count < node->comm->cluster_size)
+            bufferevent_disable(bev, EV_READ);
+        else
+            bufferevent_trigger(bev, EV_READ, 0);
+    }
+}
+
 // CALLBACKS IMPLEMENTATION
 
 //Called after accepting a connection, currently, create and

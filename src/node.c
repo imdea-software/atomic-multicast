@@ -66,6 +66,7 @@ static struct node_comm *init_node_comm(struct cluster_config *conf) {
     comm->accepted_count = 0;
     comm->a_size = 0;
     comm->c_size = 0;
+    comm->bevs_size = size * 2;
     comm->addrs = addrs;
     comm->ids = ids;
     comm->groups = groups;
@@ -112,8 +113,8 @@ static struct node_events *init_node_events(struct node_comm *comm, xid_t id) {
     events->interrupt_ev = NULL;
     events->termination_ev = NULL;
     //Add ev_cb_arg array
-    events->ev_cb_arg_count = comm->cluster_size;
-    events->ev_cb_arg = malloc(sizeof(struct cb_arg *) * comm->cluster_size);
+    events->ev_cb_arg_count = comm->bevs_size;
+    events->ev_cb_arg = malloc(sizeof(struct cb_arg *) * events->ev_cb_arg_count);
     memset(events->ev_cb_arg, 0, sizeof(struct cb_arg *) * events->ev_cb_arg_count);
     return events;
 }

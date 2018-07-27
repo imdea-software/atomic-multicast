@@ -12,6 +12,7 @@ typedef enum cmd_type {
     TESTREPLY,
     //CONNECT PROTOCOL
     INIT_CLIENT,
+    INIT_NODE,
     //AMCAST COMMANDS
     MULTICAST,
     ACCEPT,
