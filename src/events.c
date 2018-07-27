@@ -37,14 +37,14 @@ int connect_to_node(struct node *node, xid_t peer_id) {
 // STATIC FUNCTIONS
 
 static int init_connection(struct node *node, xid_t peer_id) {
-    node->comm->bevs[peer_id] = bufferevent_socket_new(node->events->base,
+    struct bufferevent *bev = bufferevent_socket_new(node->events->base,
 		   -1, BEV_OPT_CLOSE_ON_FREE);
-    struct bufferevent *bev = node->comm->bevs[peer_id];
     bufferevent_setcb(bev, read_cb, NULL, event_cb, set_cb_arg(peer_id, node));
     bufferevent_setwatermark(bev, EV_READ, sizeof(struct enveloppe), 0);
     bufferevent_enable(bev, EV_READ|EV_WRITE);
     bufferevent_socket_connect(bev, (struct sockaddr *)node->comm->addrs+peer_id,
         sizeof(node->comm->addrs[peer_id]));
+    node->comm->bevs[peer_id] = bev;
     return 0;
 }
 
