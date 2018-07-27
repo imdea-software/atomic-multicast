@@ -95,14 +95,12 @@ static struct node_events *init_node_events(struct node_comm *comm, xid_t id) {
 		    LEV_OPT_CLOSE_ON_EXEC | LEV_OPT_CLOSE_ON_FREE | LEV_OPT_REUSEABLE,
 		    -1, (struct sockaddr*) comm->addrs+id, sizeof(comm->addrs[id]));
     //Create an array of reconnection events
-    events->reconnect_evs = malloc(comm->cluster_size * sizeof(struct event *));
-    memset(events->reconnect_evs, 0, sizeof(struct event *) * comm->cluster_size);
+    events->reconnect_evs = calloc(comm->cluster_size, sizeof(struct event *));
     events->interrupt_ev = NULL;
     events->termination_ev = NULL;
     //Add ev_cb_arg array
     events->ev_cb_arg_count = comm->bevs_size;
-    events->ev_cb_arg = malloc(sizeof(struct cb_arg *) * events->ev_cb_arg_count);
-    memset(events->ev_cb_arg, 0, sizeof(struct cb_arg *) * events->ev_cb_arg_count);
+    events->ev_cb_arg = calloc(events->ev_cb_arg_count, sizeof(struct cb_arg *));
     return events;
 }
 
