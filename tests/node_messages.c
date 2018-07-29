@@ -70,9 +70,9 @@ int main(int argc, char *argv[]) {
     if (id != -1) {
         struct node *n = node_init(&conf, id, NULL, NULL, NULL, NULL);
         node_start(n);
-        if (n->comm->accepted_count != NUMBER_OF_NODES)
+        if (n->comm->connected_count != NUMBER_OF_NODES)
             printf("[%u] Failed to connect to the whole cluster"
-	           " (%u connected peers)\n", id, n->comm->accepted_count);
+	           " (%u connected peers)\n", id, n->comm->connected_count);
 	//TODO Put a barrier here, so that nodes are not being freed until they were all stopped
         node_free(n);
     }
@@ -89,9 +89,11 @@ int main(int argc, char *argv[]) {
 		.sin_addr.s_addr = inet_addr(conf.addresses[peer_id])
         };
         connect(sock, (struct sockaddr *) &addr, sizeof(addr));
+        struct enveloppe init = { .sid = 1, .cmd_type = INIT_CLIENT };
+        send(sock, &init, sizeof(init), 0);
         //Let's send some messages
         struct enveloppe env = {
-	    .sid = -1,
+	    .sid = 1,
 	    .cmd_type = TESTREPLY,
 	    .cmd.multicast = {
 	        .mid = {0,0},

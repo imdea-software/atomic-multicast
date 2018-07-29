@@ -668,6 +668,8 @@ int amcast_free(struct amcast *amcast) {
     pqueue_free(amcast->committed_gts);
     pqueue_free(amcast->pending_lts);
     free(amcast->gts_last_delivered);
+    free(amcast->newleader_ack_count);
+    free(amcast->newleader_sync_ack_count);
     htable_foreach(amcast->h_msgs, (GHFunc) free_amcast_msg, NULL);
     htable_free(amcast->h_msgs);
     free(amcast);

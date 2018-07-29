@@ -90,7 +90,7 @@ int main(int argc, char *argv[]) {
     }
 
     struct enveloppe env = {
-        .sid = -1,
+        .sid = 1,
         .cmd_type = MULTICAST,
         .cmd.multicast = {
             .mid = {0, 0},
@@ -111,9 +111,9 @@ int main(int argc, char *argv[]) {
         n->amcast->ballot.id = (id < 3) ? 0 : 3;
 
         node_start(n);
-        if (n->comm->accepted_count != NUMBER_OF_NODES)
+        if (n->comm->connected_count != NUMBER_OF_NODES)
             printf("[%u] Failed to connect to the whole cluster"
-	           " (%u connected peers)\n", id, n->comm->accepted_count);
+	           " (%u connected peers)\n", id, n->comm->connected_count);
 	//TODO Put a barrier here, so that nodes are not being freed until they were all stopped
 	if(delivered != NUMBER_OF_MESSAGES)
             printf("[%u] Failed to deliver all messages: %lu delivered \n",
@@ -135,6 +135,8 @@ int main(int argc, char *argv[]) {
 	        .sin_addr.s_addr = inet_addr(conf.addresses[peer_id])
             };
             connect(sock[peer_id], (struct sockaddr *) &addr, sizeof(addr));
+            struct enveloppe init = { .sid = 1, .cmd_type = INIT_CLIENT };
+            send(sock[peer_id], &init, sizeof(init), 0);
 	}
     //Let's send some messages
 	for(int j=0; j<NUMBER_OF_MESSAGES; j++) {

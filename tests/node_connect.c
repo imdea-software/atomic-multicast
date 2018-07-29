@@ -45,9 +45,9 @@ void* node_create_run(void* arg) {
     pthread_barrier_wait(pth_barrier);
     node_start(nodes[id]);
 
-    if (nodes[id]->comm->accepted_count != NUMBER_OF_NODES)
+    if (nodes[id]->comm->connected_count != NUMBER_OF_NODES)
         printf("[%u] Failed to connect to the whole cluster"
-			" (%u connected peers)\n", id, nodes[id]->comm->accepted_count);
+			" (%u connected peers)\n", id, nodes[id]->comm->connected_count);
 
     node_free(nodes[id]);
 
@@ -99,7 +99,7 @@ int main(int argc, char *argv[]) {
         connected = 0;
         for(int i=0; i<NUMBER_OF_NODES; i++) {
 	    if (nodes[i])
-                if (nodes[i]->comm->accepted_count == NUMBER_OF_NODES)
+                if (nodes[i]->comm->connected_count == NUMBER_OF_NODES)
                     connected++;
         }
     } while(connected != NUMBER_OF_NODES);
@@ -120,7 +120,7 @@ int main(int argc, char *argv[]) {
         connected = 0;
         for(int i=0; i<NUMBER_OF_NODES; i++) {
             if(status[i] != 0)
-                if(nodes[i]->comm->accepted_count == NUMBER_OF_NODES - NUMBER_OF_FAILURES)
+                if(nodes[i]->comm->connected_count == NUMBER_OF_NODES - NUMBER_OF_FAILURES)
                     connected++;
         }
     } while(connected != NUMBER_OF_NODES - NUMBER_OF_FAILURES);
@@ -138,7 +138,7 @@ int main(int argc, char *argv[]) {
         connected = 0;
         for(int i=0; i<NUMBER_OF_NODES; i++) {
 	    if (status[i] != 0)
-                if (nodes[i]->comm->accepted_count == NUMBER_OF_NODES)
+                if (nodes[i]->comm->connected_count == NUMBER_OF_NODES)
                     connected++;
         }
     } while(connected != NUMBER_OF_NODES);
