@@ -106,6 +106,7 @@ static void handle_accept(struct node *node, xid_t sid, accept_t *cmd) {
     struct amcast_msg *msg = NULL;
     if((msg = htable_lookup(node->amcast->h_msgs, &cmd->mid)) == NULL) {
         msg = init_amcast_msg(node->groups, node->comm->cluster_size, &cmd->msg);
+        msg->phase = PROPOSED;
         //Run msginit callback
         if(node->amcast->msginit_cb)
             node->amcast->msginit_cb(node, msg, node->amcast->ini_cb_arg);
@@ -361,7 +362,7 @@ static void handle_newleader(struct node *node, xid_t sid, newleader_t *cmd) {
     int acc = 0;
     void fill_rep(m_uid_t *mid, struct amcast_msg *msg, int *acc) {
         //ADDITION do not bother transmitting PROPOSED messages
-        if(msg->phase < ACCEPTED && msg->phase != COMMITTED)
+        if(msg->phase < PROPOSED && msg->phase != COMMITTED)
             return;
         rep.cmd.newleader_ack.messages[*acc].msg = msg->msg;
         rep.cmd.newleader_ack.messages[*acc].phase = msg->phase;
@@ -450,7 +451,7 @@ static void handle_newleader_ack(struct node *node, xid_t sid, newleader_ack_t *
     int acc = 0;
     void fill_rep(m_uid_t *mid, struct amcast_msg *msg, int *acc) {
         //ADDITION do not bother transmitting PROPOSED messages
-        if(msg->phase != ACCEPTED && msg->phase != COMMITTED)
+        if(msg->phase < PROPOSED && msg->phase != COMMITTED)
             return;
         rep.cmd.newleader_sync.messages[*acc].msg = msg->msg;
         rep.cmd.newleader_sync.messages[*acc].phase = msg->phase;
