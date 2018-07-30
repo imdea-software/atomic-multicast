@@ -16,8 +16,6 @@
 
 static struct timeval reconnect_timeout = { 1, 0 };
 
-int isolated = 0;
-
 struct cb_arg *set_cb_arg(xid_t peer_id, struct node *node) {
     if(node->events->ev_cb_arg[peer_id] == NULL) {
 	node->events->ev_cb_arg[peer_id] = malloc(sizeof(struct cb_arg));
@@ -34,6 +32,31 @@ int retrieve_cb_arg(xid_t *peer_id, struct node **node, struct cb_arg *arg) {
 
 int connect_to_node(struct node *node, xid_t peer_id) {
     event_add(node->events->reconnect_evs[peer_id], &reconnect_timeout);
+    return 0;
+}
+
+int put_globals_on_hold(struct node *node) {
+    for(xid_t peer_id = 0; peer_id < node->comm->bevs_size ; peer_id++)
+        if((peer_id >= node->comm->cluster_size * 2
+                || (peer_id < node->comm->cluster_size
+                    && node->comm->groups[peer_id] != node->comm->groups[node->id])
+                || (peer_id > node->comm->cluster_size
+                    && peer_id < node->comm->cluster_size * 2
+                    && node->comm->groups[peer_id - node->comm->cluster_size]
+                        != node->comm->groups[node->id]))
+                && node->comm->bevs[peer_id]
+                && (bufferevent_get_enabled(node->comm->bevs[peer_id]) & EV_READ))
+            bufferevent_disable(node->comm->bevs[peer_id], EV_READ);
+    return 0;
+}
+
+int resume_globals(struct node *node) {
+    for(xid_t peer_id = 0; peer_id < node->comm->bevs_size ; peer_id++)
+        if(node->comm->bevs[peer_id]
+                && (!(bufferevent_get_enabled(node->comm->bevs[peer_id]) & EV_READ))) {
+            bufferevent_enable(node->comm->bevs[peer_id], EV_READ);
+            bufferevent_trigger(node->comm->bevs[peer_id], EV_READ, 0);
+        }
     return 0;
 }
 
@@ -145,27 +168,15 @@ void read_cb(struct bufferevent *bev, void *ptr) {
     struct evbuffer *in_buf = bufferevent_get_input(bev);
     while (evbuffer_get_length(in_buf) >= sizeof(struct enveloppe)) {
         struct enveloppe env;
-        // Copy data without draining the buffer in case
-        evbuffer_copyout(in_buf, &env, sizeof(struct enveloppe));
-        //TODO CHANGETHIS have nice is_in_my_group() check
-        if(isolated)
-            if(((env.sid < node->comm->cluster_size && node->comm->groups[env.sid] != node->comm->groups[node->id])
-                    || (env.sid < node->comm->c_size && node->comm->c_bevs[env.sid] == bev))) {
-                bufferevent_disable(bev, EV_READ);
-                return;
-            }
+        read_enveloppe(bev, &env);
         switch(env.cmd_type) {
             case TESTREPLY:
                 write_enveloppe(bev, &env);
                 break;
             default:
-                if(env.cmd_type == NEWLEADER_SYNC)
-                    isolated = 0;
                 dispatch_message(node, &env);
                 break;
         }
-        //Delete data from reception buffer
-        evbuffer_drain(in_buf, sizeof(struct enveloppe));
     }
 }
 

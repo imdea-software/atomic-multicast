@@ -2,6 +2,7 @@
 
 #include "types.h"
 #include "node.h"
+#include "events.h"
 #include "message.h"
 #include "amcast_types.h"
 #include "amcast.h"
@@ -498,6 +499,7 @@ static void handle_newleader_sync(struct node *node, xid_t sid, newleader_sync_t
         }
     };
     send_to_peer(node, &rep, sid);
+    resume_globals(node);
 }
 
 static void handle_newleader_sync_ack(struct node *node, xid_t sid, newleader_sync_ack_t *cmd) {
@@ -566,6 +568,7 @@ static void handle_newleader_sync_ack(struct node *node, xid_t sid, newleader_sy
         return 0;
     }
     pqueue_foreach(node->amcast->pending_lts, (pq_traverse_fun) retry_message, node);
+    resume_globals(node);
 }
 
 void dispatch_amcast_command(struct node *node, struct enveloppe *env) {
@@ -641,6 +644,8 @@ void amcast_recover(struct node *node, xid_t peer_id) {
         };
         send_to_group(node, &rep, node->comm->groups[node->id]);
     }
+    if(node->amcast->ballot.id == peer_id)
+        put_globals_on_hold(node);
 }
 
 static struct amcast_msg *init_amcast_msg(struct groups *groups, unsigned int cluster_size, message_t *cmd) {
