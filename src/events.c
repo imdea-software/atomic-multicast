@@ -35,6 +35,34 @@ int connect_to_node(struct node *node, xid_t peer_id) {
     return 0;
 }
 
+int put_globals_on_hold(struct node *node) {
+    for(xid_t peer_id = 0; peer_id < node->comm->bevs_size ; peer_id++) {
+        if(node->comm->bevs[peer_id])
+            bufferevent_trigger(node->comm->bevs[peer_id], EV_READ, 0);
+        if((peer_id >= node->comm->cluster_size * 2
+                || (peer_id < node->comm->cluster_size
+                    && node->comm->groups[peer_id] != node->comm->groups[node->id])
+                || (peer_id > node->comm->cluster_size
+                    && peer_id < node->comm->cluster_size * 2
+                    && node->comm->groups[peer_id - node->comm->cluster_size]
+                        != node->comm->groups[node->id]))
+                && node->comm->bevs[peer_id]
+                && (bufferevent_get_enabled(node->comm->bevs[peer_id]) & EV_READ))
+            bufferevent_disable(node->comm->bevs[peer_id], EV_READ);
+    }
+    return 0;
+}
+
+int resume_globals(struct node *node) {
+    for(xid_t peer_id = 0; peer_id < node->comm->bevs_size ; peer_id++)
+        if(node->comm->bevs[peer_id]
+                && (!(bufferevent_get_enabled(node->comm->bevs[peer_id]) & EV_READ))) {
+            bufferevent_enable(node->comm->bevs[peer_id], EV_READ);
+            bufferevent_trigger(node->comm->bevs[peer_id], EV_READ, 0);
+        }
+    return 0;
+}
+
 // STATIC FUNCTIONS
 
 static int init_connection(struct node *node, xid_t peer_id) {
