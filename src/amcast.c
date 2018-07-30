@@ -173,6 +173,7 @@ static void handle_reaccept(struct node *node, xid_t sid, reaccept_t *cmd) {
         memcpy(rep.cmd.accept_ack.ballot, cmd->ballot, sizeof(p_uid_t) * node->groups->groups_count);
         send_to_peer(node, &rep, sid);
     } else {
+        /*
         accept_t accept = {
             .mid = cmd->mid,
             .grp = cmd->grp,
@@ -181,6 +182,8 @@ static void handle_reaccept(struct node *node, xid_t sid, reaccept_t *cmd) {
             .msg = msg->msg,
         };
         handle_accept(node, sid, &accept);
+        */
+        handle_multicast(node, node->id, &msg->msg);
     }
 }
 
