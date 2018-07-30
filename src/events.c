@@ -195,10 +195,8 @@ void event_cb(struct bufferevent *bev, short events, void *ptr) {
         node->comm->connected_count--;
         close_connection(node, peer_id);
         //Start recover routine
-        if(node->comm->groups[peer_id] == node->comm->groups[node->id]) {
-            isolated = 1;
-            amcast_recover(node, peer_id);
-        }
+        failure_cb(0, 0, ptr);
+        //event_base_once(node->events->base, -1, EV_TIMEOUT, failure_cb, ptr, &reconnect_timeout);
         //TODO Have nodes tell each other when they exit normally
         //     so we can have a smarter reconnect pattern
         //connect_to_node(node, peer_id);
@@ -231,7 +229,10 @@ void failure_cb(evutil_socket_t sock, short flags, void *ptr) {
     struct node *node = NULL; xid_t peer_id;
     retrieve_cb_arg(&peer_id, &node, (struct cb_arg *) ptr);
 
-    //TODO run recover routine after node failed to reconnect for too long
+    //run recover routine after node failed to reconnect for too long
+    if(node->comm->groups[peer_id] == node->comm->groups[node->id])
+        if(!node->comm->bevs[peer_id])
+            amcast_recover(node, peer_id);
 }
 
 void reconnect_cb(evutil_socket_t sock, short flags, void *ptr) {
