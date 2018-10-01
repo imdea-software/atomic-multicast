@@ -188,6 +188,7 @@ void read_cb(struct bufferevent *bev, void *ptr) {
 void event_cb(struct bufferevent *bev, short events, void *ptr) {
     struct node *node = NULL; xid_t peer_id;
     retrieve_cb_arg(&peer_id, &node, (struct cb_arg *) ptr);
+    static int fully_connected = 0;
 
     if (events & BEV_EVENT_CONNECTED) {
         printf("[%u] Connection established to node %u\n", node->id, peer_id);
@@ -196,7 +197,8 @@ void event_cb(struct bufferevent *bev, short events, void *ptr) {
         write_enveloppe(bev, &init);
     } else if (events & (BEV_EVENT_EOF|BEV_EVENT_ERROR)) {
         printf("[%u] Connection lost to node %u\n", node->id, peer_id);
-        node->comm->connected_count--;
+        if(fully_connected)
+            node->comm->connected_count--;
         bufferevent_disable(bev, EV_WRITE);
         close_connection(node, peer_id);
         //Start recover routine
@@ -204,23 +206,26 @@ void event_cb(struct bufferevent *bev, short events, void *ptr) {
         //event_base_once(node->events->base, -1, EV_TIMEOUT, failure_cb, ptr, &reconnect_timeout);
         //TODO Have nodes tell each other when they exit normally
         //     so we can have a smarter reconnect pattern
-        //connect_to_node(node, peer_id);
+        if(!fully_connected)
+            connect_to_node(node, peer_id);
     } else {
         printf("[%u] Event %d not handled", node->id, events);
     }
-    if(node->comm->connected_count == node->comm->cluster_size
-            && node->comm->accepted_count > 0) {
-        struct bufferevent **bev = node->comm->bevs + node->comm->cluster_size;
-        unsigned int checked = 0;
-        while(bev < node->comm->bevs + node->comm->bevs_size
-                && checked < node->comm->accepted_count) {
-            if(*bev) {
-                bufferevent_enable(*bev,
-                        (!(bufferevent_get_enabled(*bev) & EV_READ)) ? EV_READ : 0);
-                bufferevent_trigger(*bev, EV_READ, 0);
-                checked++;
+    if(node->comm->connected_count == node->comm->cluster_size) {
+        fully_connected = 1;
+        if(node->comm->accepted_count > 0) {
+            struct bufferevent **bev = node->comm->bevs + node->comm->cluster_size;
+            unsigned int checked = 0;
+            while(bev < node->comm->bevs + node->comm->bevs_size
+                    && checked < node->comm->accepted_count) {
+                if(*bev) {
+                    bufferevent_enable(*bev,
+                            (!(bufferevent_get_enabled(*bev) & EV_READ)) ? EV_READ : 0);
+                    bufferevent_trigger(*bev, EV_READ, 0);
+                    checked++;
+                }
+                bev++;
             }
-            bev++;
         }
     }
 }
