@@ -80,9 +80,9 @@ static int init_connection(struct node *node, xid_t peer_id) {
 static int close_connection(struct node *node, xid_t peer_id) {
     struct bufferevent **bev = node->comm->bevs+peer_id;
     if(*bev) {
-        if(evbuffer_get_length(bufferevent_get_input(*bev)))
-            read_cb(*bev, set_cb_arg(peer_id, node));
-        if(evbuffer_get_length(bufferevent_get_output(*bev))) {
+        bufferevent_trigger(*bev, EV_READ, 0);
+        if((bufferevent_get_enabled(*bev) & EV_WRITE)
+                && evbuffer_get_length(bufferevent_get_output(*bev)) > 0) {
             bufferevent_setcb(*bev, NULL, close_cb, event_cb, set_cb_arg(peer_id, node));
             bufferevent_disable(*bev, EV_READ);
         } else
@@ -100,6 +100,7 @@ static void event_a_cb(struct bufferevent *bev, short events, void *ptr) {
     if (events & (BEV_EVENT_EOF|BEV_EVENT_ERROR)) {
         printf("[%u] Connection lost to %u-th accepted\n", node->id, peer_id);
         node->comm->accepted_count--;
+        bufferevent_disable(bev, EV_WRITE);
         close_connection(node, peer_id);
     } else {
         printf("[%u] Event %d not handled", node->id, events);
@@ -196,6 +197,7 @@ void event_cb(struct bufferevent *bev, short events, void *ptr) {
     } else if (events & (BEV_EVENT_EOF|BEV_EVENT_ERROR)) {
         printf("[%u] Connection lost to node %u\n", node->id, peer_id);
         node->comm->connected_count--;
+        bufferevent_disable(bev, EV_WRITE);
         close_connection(node, peer_id);
         //Start recover routine
         failure_cb(0, 0, ptr);
