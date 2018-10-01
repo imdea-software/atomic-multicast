@@ -2,6 +2,7 @@
 
 #include "types.h"
 #include "node.h"
+#include "events.h"
 #include "message.h"
 #include "amcast_types.h"
 #include "amcast.h"
@@ -332,6 +333,7 @@ static void handle_newleader(struct node *node, xid_t sid, newleader_t *cmd) {
     printf("[%u] We got NEWLEADER command from %u!\n", node->id, sid);
     if(paircmp(&node->amcast->ballot, &cmd->ballot) > 0)
         return;
+    put_globals_on_hold(node);
     node->amcast->status = PREPARE;
     //Reset counters when initializing higher ballot number
     if(sid == node->id && paircmp(&node->amcast->ballot, &cmd->ballot) < 0) {
@@ -497,6 +499,7 @@ static void handle_newleader_sync(struct node *node, xid_t sid, newleader_sync_t
         }
     };
     send_to_peer(node, &rep, sid);
+    resume_globals(node);
 }
 
 static void handle_newleader_sync_ack(struct node *node, xid_t sid, newleader_sync_ack_t *cmd) {
@@ -511,6 +514,7 @@ static void handle_newleader_sync_ack(struct node *node, xid_t sid, newleader_sy
     if(node->amcast->newleader_sync_ack_groupcount < node->groups->node_counts[node->comm->groups[node->id]]/2 + 1)
         return;
     node->amcast->status = LEADER;
+    resume_globals(node);
     //TODO Check whether computing gts_inf_delivered is useful for recovered messages
     //TODO CHANGETHIS ugly copy-paste of the delivery pattern
     int try_next = 1;
