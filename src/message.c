@@ -25,6 +25,10 @@ void write_enveloppe(struct bufferevent *bev, struct enveloppe *env) {
 }
 
 void send_to_peer(struct node *node, struct enveloppe *env, xid_t peer_id) {
+    if(!node->comm->bevs[peer_id]) {
+        //printf("[%u] WRITE ERROR: %u already left\n", node->id, peer_id);
+        return;
+    }
     write_enveloppe(node->comm->bevs[peer_id], env);
 }
 

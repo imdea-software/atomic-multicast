@@ -4,6 +4,7 @@
 #include "node.h"
 #include "events.h"
 #include "message.h"
+#include "amcast.h"
 
 #define __extend_array(base_ptr, size_ptr, elem_size, new_index) do { \
     unsigned int __nsize = *(size_ptr) * 2; \
@@ -34,6 +35,34 @@ int connect_to_node(struct node *node, xid_t peer_id) {
     return 0;
 }
 
+int put_globals_on_hold(struct node *node) {
+    for(xid_t peer_id = 0; peer_id < node->comm->bevs_size ; peer_id++) {
+        if(node->comm->bevs[peer_id])
+            bufferevent_trigger(node->comm->bevs[peer_id], EV_READ, 0);
+        if((peer_id >= node->comm->cluster_size * 2
+                || (peer_id < node->comm->cluster_size
+                    && node->comm->groups[peer_id] != node->comm->groups[node->id])
+                || (peer_id > node->comm->cluster_size
+                    && peer_id < node->comm->cluster_size * 2
+                    && node->comm->groups[peer_id - node->comm->cluster_size]
+                        != node->comm->groups[node->id]))
+                && node->comm->bevs[peer_id]
+                && (bufferevent_get_enabled(node->comm->bevs[peer_id]) & EV_READ))
+            bufferevent_disable(node->comm->bevs[peer_id], EV_READ);
+    }
+    return 0;
+}
+
+int resume_globals(struct node *node) {
+    for(xid_t peer_id = 0; peer_id < node->comm->bevs_size ; peer_id++)
+        if(node->comm->bevs[peer_id]
+                && (!(bufferevent_get_enabled(node->comm->bevs[peer_id]) & EV_READ))) {
+            bufferevent_enable(node->comm->bevs[peer_id], EV_READ);
+            bufferevent_trigger(node->comm->bevs[peer_id], EV_READ, 0);
+        }
+    return 0;
+}
+
 // STATIC FUNCTIONS
 
 static int init_connection(struct node *node, xid_t peer_id) {
@@ -51,9 +80,9 @@ static int init_connection(struct node *node, xid_t peer_id) {
 static int close_connection(struct node *node, xid_t peer_id) {
     struct bufferevent **bev = node->comm->bevs+peer_id;
     if(*bev) {
-        if(evbuffer_get_length(bufferevent_get_input(*bev)))
-            read_cb(*bev, set_cb_arg(peer_id, node));
-        if(evbuffer_get_length(bufferevent_get_output(*bev))) {
+        bufferevent_trigger(*bev, EV_READ, 0);
+        if((bufferevent_get_enabled(*bev) & EV_WRITE)
+                && evbuffer_get_length(bufferevent_get_output(*bev)) > 0) {
             bufferevent_setcb(*bev, NULL, close_cb, event_cb, set_cb_arg(peer_id, node));
             bufferevent_disable(*bev, EV_READ);
         } else
@@ -71,6 +100,7 @@ static void event_a_cb(struct bufferevent *bev, short events, void *ptr) {
     if (events & (BEV_EVENT_EOF|BEV_EVENT_ERROR)) {
         printf("[%u] Connection lost to %u-th accepted\n", node->id, peer_id);
         node->comm->accepted_count--;
+        bufferevent_disable(bev, EV_WRITE);
         close_connection(node, peer_id);
     } else {
         printf("[%u] Event %d not handled", node->id, events);
@@ -158,6 +188,7 @@ void read_cb(struct bufferevent *bev, void *ptr) {
 void event_cb(struct bufferevent *bev, short events, void *ptr) {
     struct node *node = NULL; xid_t peer_id;
     retrieve_cb_arg(&peer_id, &node, (struct cb_arg *) ptr);
+    static int fully_connected = 0;
 
     if (events & BEV_EVENT_CONNECTED) {
         printf("[%u] Connection established to node %u\n", node->id, peer_id);
@@ -166,27 +197,35 @@ void event_cb(struct bufferevent *bev, short events, void *ptr) {
         write_enveloppe(bev, &init);
     } else if (events & (BEV_EVENT_EOF|BEV_EVENT_ERROR)) {
         printf("[%u] Connection lost to node %u\n", node->id, peer_id);
-        node->comm->connected_count--;
+        if(fully_connected)
+            node->comm->connected_count--;
+        bufferevent_disable(bev, EV_WRITE);
         close_connection(node, peer_id);
+        //Start recover routine
+        failure_cb(0, 0, ptr);
+        //event_base_once(node->events->base, -1, EV_TIMEOUT, failure_cb, ptr, &reconnect_timeout);
         //TODO Have nodes tell each other when they exit normally
         //     so we can have a smarter reconnect pattern
-        connect_to_node(node, peer_id);
+        if(!fully_connected)
+            connect_to_node(node, peer_id);
     } else {
         printf("[%u] Event %d not handled", node->id, events);
     }
-    if(node->comm->connected_count == node->comm->cluster_size
-            && node->comm->accepted_count > 0) {
-        struct bufferevent **bev = node->comm->bevs + node->comm->cluster_size;
-        unsigned int checked = 0;
-        while(bev < node->comm->bevs + node->comm->bevs_size
-                && checked < node->comm->accepted_count) {
-            if(*bev) {
-                bufferevent_enable(*bev,
-                        (!(bufferevent_get_enabled(*bev) & EV_READ)) ? EV_READ : 0);
-                bufferevent_trigger(*bev, EV_READ, 0);
-                checked++;
+    if(node->comm->connected_count == node->comm->cluster_size) {
+        fully_connected = 1;
+        if(node->comm->accepted_count > 0) {
+            struct bufferevent **bev = node->comm->bevs + node->comm->cluster_size;
+            unsigned int checked = 0;
+            while(bev < node->comm->bevs + node->comm->bevs_size
+                    && checked < node->comm->accepted_count) {
+                if(*bev) {
+                    bufferevent_enable(*bev,
+                            (!(bufferevent_get_enabled(*bev) & EV_READ)) ? EV_READ : 0);
+                    bufferevent_trigger(*bev, EV_READ, 0);
+                    checked++;
+                }
+                bev++;
             }
-            bev++;
         }
     }
 }
@@ -194,6 +233,16 @@ void event_cb(struct bufferevent *bev, short events, void *ptr) {
 //Called after last write of a connection
 void close_cb(struct bufferevent *bev, void *ptr) {
     bufferevent_free(bev);
+}
+
+void failure_cb(evutil_socket_t sock, short flags, void *ptr) {
+    struct node *node = NULL; xid_t peer_id;
+    retrieve_cb_arg(&peer_id, &node, (struct cb_arg *) ptr);
+
+    //run recover routine after node failed to reconnect for too long
+    if(node->comm->groups[peer_id] == node->comm->groups[node->id])
+        if(!node->comm->bevs[peer_id])
+            amcast_recover(node, peer_id);
 }
 
 void reconnect_cb(evutil_socket_t sock, short flags, void *ptr) {

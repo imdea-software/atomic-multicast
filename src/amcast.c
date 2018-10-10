@@ -2,6 +2,7 @@
 
 #include "types.h"
 #include "node.h"
+#include "events.h"
 #include "message.h"
 #include "amcast_types.h"
 #include "amcast.h"
@@ -332,6 +333,7 @@ static void handle_newleader(struct node *node, xid_t sid, newleader_t *cmd) {
     printf("[%u] We got NEWLEADER command from %u!\n", node->id, sid);
     if(paircmp(&node->amcast->ballot, &cmd->ballot) > 0)
         return;
+    put_globals_on_hold(node);
     node->amcast->status = PREPARE;
     //Reset counters when initializing higher ballot number
     if(sid == node->id && paircmp(&node->amcast->ballot, &cmd->ballot) < 0) {
@@ -497,6 +499,7 @@ static void handle_newleader_sync(struct node *node, xid_t sid, newleader_sync_t
         }
     };
     send_to_peer(node, &rep, sid);
+    resume_globals(node);
 }
 
 static void handle_newleader_sync_ack(struct node *node, xid_t sid, newleader_sync_ack_t *cmd) {
@@ -511,6 +514,7 @@ static void handle_newleader_sync_ack(struct node *node, xid_t sid, newleader_sy
     if(node->amcast->newleader_sync_ack_groupcount < node->groups->node_counts[node->comm->groups[node->id]]/2 + 1)
         return;
     node->amcast->status = LEADER;
+    resume_globals(node);
     //TODO Check whether computing gts_inf_delivered is useful for recovered messages
     //TODO CHANGETHIS ugly copy-paste of the delivery pattern
     int try_next = 1;
@@ -599,6 +603,48 @@ void dispatch_amcast_command(struct node *node, struct enveloppe *env) {
 	default:
             printf("[%u] Unhandled command received from %u\n", node->id, env->sid);
             break;
+    }
+}
+
+void amcast_recover(struct node *node, xid_t peer_id) {
+    //Works but not so nice
+    //  TODO Do not try to recover if not enough alive node to form a quorum
+    //  TODO Add support for node coming back online
+    //  TODO May be a good idea to implement this with linked list in event module
+    static xid_t **watch = NULL;
+    static xid_t last, next, magic = -1;
+    if(!watch) {
+        watch = calloc(node->comm->cluster_size, sizeof(xid_t *));
+        xid_t *base = node->groups->members[node->comm->groups[node->id]];
+        unsigned int size = node->groups->node_counts[node->comm->groups[node->id]];
+        watch[*base] = &magic;
+        for(xid_t *peer=base+1; peer < base + size; peer++) {
+            watch[*peer] = peer-1;
+        }
+        last = *(base+size-1);
+    }
+    next = peer_id + 1;
+    while(!watch[next] && next <= last)
+        next++;
+    if(next > last)
+        last = peer_id;
+    else
+        watch[next] = watch[peer_id];
+    watch[peer_id] = NULL;
+    //printf("[%u] RECOVER after %d failure with %d current leader and watching %d\n",
+    //        node->id, peer_id, node->amcast->ballot.id, *watch[node->id]);
+    if(node->amcast->ballot.id == peer_id) {
+        if(*watch[node->id] == magic) {
+            struct enveloppe rep = {
+                .sid = node->id,
+                .cmd_type = NEWLEADER,
+                .cmd.newleader = {
+                    .ballot.id = node->id,
+                    .ballot.time = node->amcast->ballot.time + 1,
+                },
+            };
+            send_to_group(node, &rep, node->comm->groups[node->id]);
+        }
     }
 }
 
