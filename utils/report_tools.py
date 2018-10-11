@@ -18,8 +18,8 @@ class Experiment:
         for filename in os.listdir(dir_path):
             file_path = dir_path + filename
             #TODO Retrieve group id from filename aswell
-            node_id = int(filename.split(".")[1])
-            self._df[node_id] = pd.read_table(file_path, names=self.columns)
+            node_id = int(filename.split(".")[1]) if filename.split(".")[0] != "client" else -1
+            self._df[node_id] = self._df.setdefault(node_id, pd.DataFrame()).append(pd.read_table(file_path, names=self.columns))
             print(filename, "imported")
 
     def check(self):
