@@ -152,6 +152,11 @@ void run_client_node(struct cluster_config *config, xid_t client_id) {
 }
 
 void run_client_node_libevent(struct cluster_config *config, xid_t client_id, struct stats *stats) {
+    struct peer {
+        unsigned int id;
+        unsigned int received;
+        struct client *c;
+    };
     struct client {
         xid_t id;
         unsigned int nodes_count;
@@ -161,17 +166,13 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
         unsigned int sent;
         unsigned int received;
         g_uid_t *last_gts;
+        struct peer *peers;
         struct stats *stats;
         struct event_base *base;
         struct bufferevent **bev;
         struct enveloppe *ref_value;
         mcast_message *ref_msg;
     } client;
-    struct peer {
-        unsigned int id;
-        unsigned int received;
-        struct client *c;
-    } *peers;
     struct custom_payload {
         m_uid_t mid;
         unsigned int len;
@@ -384,14 +385,14 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
     client.stats = stats;
     client.base = event_base_new();
     client.bev = calloc(config->size, sizeof(struct bufferevent *));
-    peers = calloc(config->size, sizeof(struct peer));
+    client.peers = calloc(config->size, sizeof(struct peer));
     //Start a TCP connection to all nodes
     for(xid_t peer_id=0; peer_id<client.nodes_count; peer_id++) {
-        peers[peer_id].c = &client;
-        peers[peer_id].id = peer_id;
+        client.peers[peer_id].c = &client;
+        client.peers[peer_id].id = peer_id;
         client.bev[peer_id] = bufferevent_socket_new(client.base, -1, BEV_OPT_CLOSE_ON_FREE);
         //TODO CHANGETHIS: Have to edit those 2 lines to switch back to libevamcast
-        bufferevent_setcb(client.bev[peer_id], alt_read_cb, NULL, alt_event_cb, peers+peer_id);
+        bufferevent_setcb(client.bev[peer_id], alt_read_cb, NULL, alt_event_cb, client.peers+peer_id);
         //bufferevent_setwatermark(client.bev[peer_id], EV_READ, sizeof(struct enveloppe), 0);
         bufferevent_enable(client.bev[peer_id], EV_READ|EV_WRITE);
         struct sockaddr_in addr = {
@@ -442,7 +443,7 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
     free(client.bev);
     event_free(ev_exit);
     event_base_free(client.base);
-    free(peers);
+    free(client.peers);
 }
 
 //TODO Should find a trick to avoid the ugly conditionals
