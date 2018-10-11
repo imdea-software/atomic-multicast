@@ -166,6 +166,7 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
         unsigned int sent;
         unsigned int received;
         g_uid_t *last_gts;
+        xid_t *leaders;
         struct peer *peers;
         struct stats *stats;
         struct event_base *base;
@@ -179,7 +180,7 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
         char val[MAX_PAYLOAD_LEN];
     };
     xid_t get_leader_from_group(xid_t g_id) {
-        return g_id * NODES_PER_GROUP + INITIAL_LEADER_IN_GROUP;
+        return client.leaders[g_id];
     }
     void submit_cb(evutil_socket_t fd, short flags, void *ptr) {
         struct client *c = (struct client *) ptr;
@@ -344,6 +345,25 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
             c->connected--;
             if(c->received < c->stats->size) {
                 printf("[c-%u] Server %i left before all messages were sent: %u sent\n", c->id, p->id, c->sent);
+                xid_t gid = p->id / NODES_PER_GROUP;
+                if(p->id == get_leader_from_group(gid)) {
+                    bufferevent_trigger(c->bev[p->id], EV_READ, 0);
+                    //TODO Get real pattern to infer new leader
+                    c->leaders[gid] += 1;
+                    int is_in_destgrps = 0;
+                    for(xid_t *d_id=c->ref_value->cmd.multicast.destgrps;
+                            d_id < c->ref_value->cmd.multicast.destgrps + c->dests_count; d_id++) {
+                        bufferevent_trigger(c->bev[c->leaders[*d_id]], EV_READ, 0);
+                        if(*d_id == gid)
+                            is_in_destgrps = 1;
+                    }
+                    if(is_in_destgrps && c->received < c->sent) {
+                        printf("[c-%u] {%u,%d} RETRYING to %d after %d failure\n", c->id,
+                                c->ref_value->cmd.multicast.mid.time,
+                                c->ref_value->cmd.multicast.mid.id, c->leaders[gid], p->id);
+                        write_enveloppe(c->bev[c->leaders[gid]], c->ref_value);
+                    }
+                }
             }
         }
         if(c->connected == c->nodes_count) {
@@ -385,6 +405,9 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
     client.stats = stats;
     client.base = event_base_new();
     client.bev = calloc(config->size, sizeof(struct bufferevent *));
+    client.leaders = malloc(config->groups_count * sizeof(xid_t));
+    for(xid_t gid=0; gid < config->groups_count; gid++)
+        client.leaders[gid] = gid * NODES_PER_GROUP + INITIAL_LEADER_IN_GROUP;
     client.peers = calloc(config->size, sizeof(struct peer));
     //Start a TCP connection to all nodes
     for(xid_t peer_id=0; peer_id<client.nodes_count; peer_id++) {
@@ -535,6 +558,9 @@ int main(int argc, char *argv[]) {
     stats->tv_dev = calloc(stats->size, sizeof(struct timespec));
     stats->gts = calloc(stats->size, sizeof(g_uid_t));
     stats->msg = calloc(stats->size, sizeof(message_t));
+    //IGNORE SIGPIPES (USEFUL FOR RECOVERY)
+    if(signal(SIGPIPE, SIG_IGN) == SIG_ERR)
+        return (EXIT_FAILURE);
     //CLIENT NODE PATTERN
     if(is_client) {
         run_client_node_libevent(config, node_id, stats);
