@@ -558,6 +558,9 @@ int main(int argc, char *argv[]) {
     stats->tv_dev = calloc(stats->size, sizeof(struct timespec));
     stats->gts = calloc(stats->size, sizeof(g_uid_t));
     stats->msg = calloc(stats->size, sizeof(message_t));
+    //IGNORE SIGPIPES (USEFUL FOR RECOVERY)
+    if(signal(SIGPIPE, SIG_IGN) == SIG_ERR)
+        return (EXIT_FAILURE);
     //CLIENT NODE PATTERN
     if(is_client) {
         run_client_node_libevent(config, node_id, stats);
