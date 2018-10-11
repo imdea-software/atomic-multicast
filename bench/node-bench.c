@@ -531,10 +531,10 @@ int main(int argc, char *argv[]) {
         stats->size = ( NUMBER_OF_MESSAGES / MEASURE_RESOLUTION ) / client_count;
     else
         stats->size = ( NUMBER_OF_MESSAGES / MEASURE_RESOLUTION ) * NUMBER_OF_TARGETS / config->groups_count;
-    stats->tv_ini = malloc(sizeof(struct timespec) * stats->size);
-    stats->tv_dev = malloc(sizeof(struct timespec) * stats->size);
-    stats->gts = malloc(sizeof(g_uid_t) * stats->size);
-    stats->msg = malloc(sizeof(message_t) * stats->size);
+    stats->tv_ini = calloc(stats->size, sizeof(struct timespec));
+    stats->tv_dev = calloc(stats->size, sizeof(struct timespec));
+    stats->gts = calloc(stats->size, sizeof(g_uid_t));
+    stats->msg = calloc(stats->size, sizeof(message_t));
     //CLIENT NODE PATTERN
     if(is_client) {
         run_client_node_libevent(config, node_id, stats);
