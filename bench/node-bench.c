@@ -345,6 +345,25 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
             c->connected--;
             if(c->received < c->stats->size) {
                 printf("[c-%u] Server %i left before all messages were sent: %u sent\n", c->id, p->id, c->sent);
+                xid_t gid = p->id / NODES_PER_GROUP;
+                if(p->id == get_leader_from_group(gid)) {
+                    bufferevent_trigger(c->bev[p->id], EV_READ, 0);
+                    //TODO Get real pattern to infer new leader
+                    c->leaders[gid] += 1;
+                    int is_in_destgrps = 0;
+                    for(xid_t *d_id=c->ref_value->cmd.multicast.destgrps;
+                            d_id < c->ref_value->cmd.multicast.destgrps + c->dests_count; d_id++) {
+                        bufferevent_trigger(c->bev[c->leaders[*d_id]], EV_READ, 0);
+                        if(*d_id == gid)
+                            is_in_destgrps = 1;
+                    }
+                    if(is_in_destgrps && c->received < c->sent) {
+                        printf("[c-%u] {%u,%d} RETRYING to %d after %d failure\n", c->id,
+                                c->ref_value->cmd.multicast.mid.time,
+                                c->ref_value->cmd.multicast.mid.id, c->leaders[gid], p->id);
+                        write_enveloppe(c->bev[c->leaders[gid]], c->ref_value);
+                    }
+                }
             }
         }
         if(c->connected == c->nodes_count) {
