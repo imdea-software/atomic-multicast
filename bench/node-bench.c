@@ -166,6 +166,7 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
         unsigned int sent;
         unsigned int received;
         g_uid_t *last_gts;
+        xid_t *leaders;
         struct peer *peers;
         struct stats *stats;
         struct event_base *base;
@@ -179,7 +180,7 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
         char val[MAX_PAYLOAD_LEN];
     };
     xid_t get_leader_from_group(xid_t g_id) {
-        return g_id * NODES_PER_GROUP + INITIAL_LEADER_IN_GROUP;
+        return client.leaders[g_id];
     }
     void submit_cb(evutil_socket_t fd, short flags, void *ptr) {
         struct client *c = (struct client *) ptr;
@@ -385,6 +386,9 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
     client.stats = stats;
     client.base = event_base_new();
     client.bev = calloc(config->size, sizeof(struct bufferevent *));
+    client.leaders = malloc(config->groups_count * sizeof(xid_t));
+    for(xid_t gid=0; gid < config->groups_count; gid++)
+        client.leaders[gid] = gid * NODES_PER_GROUP + INITIAL_LEADER_IN_GROUP;
     client.peers = calloc(config->size, sizeof(struct peer));
     //Start a TCP connection to all nodes
     for(xid_t peer_id=0; peer_id<client.nodes_count; peer_id++) {
