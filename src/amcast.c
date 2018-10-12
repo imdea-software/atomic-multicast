@@ -387,19 +387,20 @@ static void handle_newleader(struct node *node, xid_t sid, newleader_t *cmd) {
         return;
     }
     //TODO CHANGETHIS ugly a.f. Have a clean way to append arrays to enveloppe
-    int acc = 0;
-    void fill_rep(m_uid_t *mid, struct amcast_msg *msg, int *acc) {
+    rep.cmd.newleader_ack.msg_count = 0;
+    void fill_rep(m_uid_t *mid, struct amcast_msg *msg, struct enveloppe *rep) {
         //ADDITION do not bother transmitting PROPOSED messages
         if(msg->phase < ACCEPTED && msg->phase != COMMITTED)
             return;
-        rep.cmd.newleader_ack.messages[*acc].msg = msg->msg;
-        rep.cmd.newleader_ack.messages[*acc].phase = msg->phase;
-        rep.cmd.newleader_ack.messages[*acc].gts = msg->gts;
-        memcpy(rep.cmd.newleader_ack.messages[*acc].lballot, msg->lballot, sizeof(p_uid_t) * node->groups->groups_count);
-        memcpy(rep.cmd.newleader_ack.messages[*acc].lts, msg->lts, sizeof(g_uid_t) * node->groups->groups_count);
+        int *acc = &rep->cmd.newleader_ack.msg_count;
+        rep->cmd.newleader_ack.messages[*acc].msg = msg->msg;
+        rep->cmd.newleader_ack.messages[*acc].phase = msg->phase;
+        rep->cmd.newleader_ack.messages[*acc].gts = msg->gts;
+        memcpy(rep->cmd.newleader_ack.messages[*acc].lballot, msg->lballot, sizeof(p_uid_t) * node->groups->groups_count);
+        memcpy(rep->cmd.newleader_ack.messages[*acc].lts, msg->lts, sizeof(g_uid_t) * node->groups->groups_count);
         *acc += 1;
     }
-    htable_foreach(node->amcast->h_msgs, (GHFunc) fill_rep, &acc);
+    htable_foreach(node->amcast->h_msgs, (GHFunc) fill_rep, &rep);
     send_to_peer(node, &rep, sid);
 }
 
@@ -476,8 +477,9 @@ static void handle_newleader_ack(struct node *node, xid_t sid, newleader_ack_t *
         return;
     }
     //TODO CHANGETHIS ugly a.f. Have a clean way to append arrays to enveloppe
-    int acc = 0;
-    void fill_rep(m_uid_t *mid, struct amcast_msg *msg, int *acc) {
+    rep.cmd.newleader_sync.msg_count = 0;
+    void fill_rep(m_uid_t *mid, struct amcast_msg *msg, struct enveloppe *rep) {
+        int *acc = &rep->cmd.newleader_sync.msg_count;
         /* Clear proposals from previous leader */
         if(msg->phase < COMMITTED) {
             if(msg->accept_groupcount[node->comm->groups[node->id]] > 0)
@@ -487,14 +489,14 @@ static void handle_newleader_ack(struct node *node, xid_t sid, newleader_ack_t *
         //ADDITION do not bother transmitting PROPOSED messages
         if(msg->phase != ACCEPTED && msg->phase != COMMITTED)
             return;
-        rep.cmd.newleader_sync.messages[*acc].msg = msg->msg;
-        rep.cmd.newleader_sync.messages[*acc].phase = msg->phase;
-        rep.cmd.newleader_sync.messages[*acc].gts = msg->gts;
-        memcpy(rep.cmd.newleader_sync.messages[*acc].lballot, msg->lballot, sizeof(p_uid_t) * node->groups->groups_count);
-        memcpy(rep.cmd.newleader_sync.messages[*acc].lts, msg->lts, sizeof(g_uid_t) * node->groups->groups_count);
+        rep->cmd.newleader_sync.messages[*acc].msg = msg->msg;
+        rep->cmd.newleader_sync.messages[*acc].phase = msg->phase;
+        rep->cmd.newleader_sync.messages[*acc].gts = msg->gts;
+        memcpy(rep->cmd.newleader_sync.messages[*acc].lballot, msg->lballot, sizeof(p_uid_t) * node->groups->groups_count);
+        memcpy(rep->cmd.newleader_sync.messages[*acc].lts, msg->lts, sizeof(g_uid_t) * node->groups->groups_count);
         *acc += 1;
     }
-    htable_foreach(node->amcast->h_msgs, (GHFunc) fill_rep, &acc);
+    htable_foreach(node->amcast->h_msgs, (GHFunc) fill_rep, &rep);
     //TODO CHANGETHIS do not send this to itself (group except me)
     send_to_group(node, &rep, node->comm->groups[node->id]);
 }
