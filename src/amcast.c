@@ -141,6 +141,10 @@ static void handle_accept(struct node *node, xid_t sid, accept_t *cmd) {
     msg->lts[cmd->grp] = cmd->lts;
     if(msg->accept_totalcount != msg->msg.destgrps_count)
         return;
+    /*
+    if(node->amcast->status == LEADER && msg->phase < PROPOSED)
+        return;
+    */
     if(msg->phase < COMMITTED) {
         msg->phase = ACCEPTED;
         msg->gts = msg->accept_max_lts;
