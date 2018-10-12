@@ -125,10 +125,11 @@ static void handle_accept(struct node *node, xid_t sid, accept_t *cmd) {
             if(paircmp(&msg->accept_max_lts, &cmd->lts) < 0)
                 msg->accept_max_lts = cmd->lts;
 	}
-    if(node->amcast->status == LEADER
-       && paircmp(&msg->lballot[cmd->grp], &default_pair) != 0
-       && paircmp(&msg->lballot[cmd->grp], &cmd->ballot) < 0)
+    if(paircmp(&msg->lballot[cmd->grp], &default_pair) != 0
+            && paircmp(&msg->lballot[cmd->grp], &cmd->ballot) < 0) {
         reset_accept_ack_counters(msg, node->groups, node->comm->cluster_size);
+        msg->collection = 0;
+    }
     msg->lballot[cmd->grp] = cmd->ballot;
     msg->lts[cmd->grp] = cmd->lts;
     if(msg->accept_totalcount != msg->msg.destgrps_count)
@@ -201,10 +202,6 @@ static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
         for(xid_t i=0; i<node->groups->groups_count; i++)
             switch(paircmp(&msg->lballot[i], &cmd->ballot[i])) {
                 case -1:
-                    //Reject commands with higher ballot numbers if already locally initialized
-                    //  TODO Check if this is important, since it prevents recovery
-                    //if(paircmp(&msg->lts[i], &default_pair) != 0)
-                    //    return;
                     //Only mark for reset if update from non-null value
                     if(paircmp(&msg->lballot[i], &default_pair) != 0)
                         updated_components++;
@@ -215,8 +212,10 @@ static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
                 default:
                     return;
             }
-        if(updated_components > 0)
+        if(updated_components > 0) {
+            msg->collection = 0;
             reset_accept_ack_counters(msg, node->groups, node->comm->cluster_size);
+        }
         if(msg->accept_ack_counts[sid] < 1) {
             msg->accept_ack_counts[sid] += 1;
             msg->accept_ack_groupcount[cmd->grp] += 1;
