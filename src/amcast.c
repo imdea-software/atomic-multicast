@@ -85,7 +85,10 @@ static void handle_multicast(struct node *node, xid_t sid, message_t *cmd) {
             node->amcast->clock++;
             msg->lts[node->comm->groups[node->id]].time = node->amcast->clock;
             msg->lts[node->comm->groups[node->id]].id = node->comm->groups[node->id];
-            pqueue_push(node->amcast->pending_lts, msg, &msg->lts[node->comm->groups[node->id]]);
+            if(pqueue_push(node->amcast->pending_lts, msg, &msg->lts[node->comm->groups[node->id]]) < 0) {
+                printf("[%u] {%u,%d} Failed to push into pending_lts\n", node->id, msg->msg.mid.time, msg->msg.mid.id);
+                exit(EXIT_FAILURE);
+            }
         }
         struct enveloppe rep = {
 	    .sid = node->id,
@@ -296,7 +299,9 @@ static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
             struct amcast_msg *i_msg = NULL, *j_msg = NULL;
             try_next = 0;
             if((i_msg = pqueue_peek(node->amcast->committed_gts)) == NULL) {
-                printf("Failed to peek - %u\n", pqueue_size(node->amcast->committed_gts));
+                p_uid_t *i_gts = pqueue_lowest_priority(node->amcast->delivered_gts);
+                printf("Failed to peek %u,%d - AACK - %u\n", i_gts->time, i_gts->id, pqueue_size(node->amcast->committed_gts));
+                exit(EXIT_FAILURE);
                 return;
             }
             if(i_msg->phase == COMMITTED
@@ -308,7 +313,8 @@ static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
                     return;
                 }
                 if((i_msg = pqueue_pop(node->amcast->committed_gts)) == NULL) {
-		    printf("Failed to pop - %u\n", pqueue_size(node->amcast->committed_gts));
+                    printf("Failed to pop - AACK - %u\n", pqueue_size(node->amcast->committed_gts));
+                    exit(EXIT_FAILURE);
                     return;
                 }
                 try_next = 1;
@@ -351,7 +357,10 @@ static void handle_deliver(struct node *node, xid_t sid, deliver_t *cmd) {
             node->amcast->clock = msg->gts.time;
         node->amcast->gts_last_delivered[node->id] = msg->gts;
         node->amcast->gts_inf_delivered = cmd->gts_inf_delivered;
-        pqueue_push(node->amcast->delivered_gts, msg, &msg->gts);
+        if(pqueue_push(node->amcast->delivered_gts, msg, &msg->gts) < 0) {
+                printf("[%u] {%u,%d} Failed to push into delivered_gts\n", node->id, msg->msg.mid.time, msg->msg.mid.id);
+                exit(EXIT_FAILURE);
+        }
         if(node->amcast->delivery_cb)
             node->amcast->delivery_cb(node, msg, node->amcast->dev_cb_arg);
         //Free amcast_msg structs delivered by everyone in my group
@@ -360,14 +369,17 @@ static void handle_deliver(struct node *node, xid_t sid, deliver_t *cmd) {
             try_next = 0;
             struct amcast_msg *i_msg = NULL;
             if((i_msg = pqueue_peek(node->amcast->delivered_gts)) == NULL) {
-                printf("Failed to peek - %u\n", pqueue_size(node->amcast->delivered_gts));
+                p_uid_t *i_gts = pqueue_lowest_priority(node->amcast->delivered_gts);
+                printf("Failed to peek %u,%d in delivered_gts - %u\n", i_gts->time, i_gts->id, pqueue_size(node->amcast->delivered_gts));
+                exit(EXIT_FAILURE);
                 return;
             }
             if(paircmp(&(i_msg)->gts, &node->amcast->gts_inf_delivered) > 0
                 || !i_msg->collection)
                 continue;
             if((i_msg = pqueue_pop(node->amcast->delivered_gts)) == NULL) {
-                printf("Failed to pop - %u\n", pqueue_size(node->amcast->delivered_gts));
+                printf("Failed to pop in delivered_gts - %u\n", pqueue_size(node->amcast->delivered_gts));
+                exit(EXIT_FAILURE);
                 return;
             }
             htable_remove(node->amcast->h_msgs, &(i_msg)->msg.mid);
@@ -501,10 +513,16 @@ static void handle_newleader_ack(struct node *node, xid_t sid, newleader_ack_t *
             return;
         /* Push messages to appropriate pqueues */
         if(msg->phase == COMMITTED) {
-            pqueue_push(node->amcast->committed_gts, msg, &msg->gts);
+            if(pqueue_push(node->amcast->committed_gts, msg, &msg->gts) < 0) {
+                printf("[%u] {%u,%d} Failed to push into committed_gts NL\n", node->id, msg->msg.mid.time, msg->msg.mid.id);
+                exit(EXIT_FAILURE);
+            }
         }
         else if(msg->phase > START) {
-            pqueue_push(node->amcast->pending_lts, msg, &msg->lts[node->comm->groups[node->id]]);
+            if(pqueue_push(node->amcast->pending_lts, msg, &msg->lts[node->comm->groups[node->id]]) < 0) {
+                printf("[%u] {%u,%d} Failed to push into pending_lts NL\n", node->id, msg->msg.mid.time, msg->msg.mid.id);
+                exit(EXIT_FAILURE);
+            }
         }
         /* Clear proposals from previous leader */
         if(msg->phase < COMMITTED) {
@@ -590,6 +608,7 @@ static void handle_newleader_sync_ack(struct node *node, xid_t sid, newleader_sy
         try_next = 0;
         if((i_msg = pqueue_peek(node->amcast->committed_gts)) == NULL) {
             printf("Failed to peek - %u\n", pqueue_size(node->amcast->committed_gts));
+            exit(EXIT_FAILURE);
             return;
         }
         if(i_msg->phase == COMMITTED
@@ -602,6 +621,7 @@ static void handle_newleader_sync_ack(struct node *node, xid_t sid, newleader_sy
             }
             if((i_msg = pqueue_pop(node->amcast->committed_gts)) == NULL) {
                 printf("Failed to pop - %u\n", pqueue_size(node->amcast->committed_gts));
+                exit(EXIT_FAILURE);
                 return;
             }
             try_next = 1;
