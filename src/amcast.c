@@ -618,7 +618,14 @@ static void handle_newleader_sync_ack(struct node *node, xid_t sid, newleader_sy
         send_to_destgrps(node, &rep, msg->msg.destgrps, msg->msg.destgrps_count);
         return 0;
     }
-    pqueue_foreach(node->amcast->pending_lts, (pq_traverse_fun) retry_message, node);
+    void retry_START(m_uid_t *mid, struct amcast_msg *msg, struct node *node) {
+        if(msg->delivered == TRUE)
+            return;
+        else if(msg->phase == ACCEPTED) {
+            retry_message(NULL, msg, node);
+        }
+    }
+    htable_foreach(node->amcast->h_msgs, (GHFunc) retry_START, node);
 }
 
 void dispatch_amcast_command(struct node *node, struct enveloppe *env) {
