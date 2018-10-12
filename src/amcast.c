@@ -389,8 +389,7 @@ static void handle_newleader(struct node *node, xid_t sid, newleader_t *cmd) {
     //TODO CHANGETHIS ugly a.f. Have a clean way to append arrays to enveloppe
     rep.cmd.newleader_ack.msg_count = 0;
     void fill_rep(m_uid_t *mid, struct amcast_msg *msg, struct enveloppe *rep) {
-        //ADDITION do not bother transmitting PROPOSED messages
-        if(msg->phase < ACCEPTED && msg->phase != COMMITTED)
+        if(msg->delivered == TRUE)
             return;
         int *acc = &rep->cmd.newleader_ack.msg_count;
         rep->cmd.newleader_ack.messages[*acc].msg = msg->msg;
@@ -480,14 +479,17 @@ static void handle_newleader_ack(struct node *node, xid_t sid, newleader_ack_t *
     rep.cmd.newleader_sync.msg_count = 0;
     void fill_rep(m_uid_t *mid, struct amcast_msg *msg, struct enveloppe *rep) {
         int *acc = &rep->cmd.newleader_sync.msg_count;
+        /* Eliminate fake message */
+        if(msg->delivered == TRUE)
+            return;
         /* Clear proposals from previous leader */
         if(msg->phase < COMMITTED) {
             if(msg->accept_groupcount[node->comm->groups[node->id]] > 0)
                 msg->accept_totalcount -= 1;
             msg->accept_groupcount[node->comm->groups[node->id]] = 0;
         }
-        //ADDITION do not bother transmitting PROPOSED messages
-        if(msg->phase != ACCEPTED && msg->phase != COMMITTED)
+        /* Do not propagate START & PROPOSED messages */
+        if(msg->phase < ACCEPTED)
             return;
         rep->cmd.newleader_sync.messages[*acc].msg = msg->msg;
         rep->cmd.newleader_sync.messages[*acc].phase = msg->phase;
