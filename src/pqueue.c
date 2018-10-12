@@ -55,6 +55,10 @@ pq_val_t *pqueue_peek(pqueue_t *pq) {
     return (pq->lowest_pri != NULL) ? g_tree_lookup(pq->tree, pq->lowest_pri) : NULL;
 }
 
+pq_pri_t *pqueue_lowest_priority(pqueue_t *pq) {
+    return pq->lowest_pri;
+}
+
 pq_val_t *pqueue_pop(pqueue_t *pq) {
     pq_val_t *min = pqueue_peek(pq);
     if(!g_tree_remove(pq->tree, pq->lowest_pri))
