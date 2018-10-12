@@ -283,6 +283,7 @@ static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
                 nid < node->groups->members[node->comm->groups[node->id]]
                 + node->groups->node_counts[node->comm->groups[node->id]];
                 nid++)
+            if(node->comm->bevs[*nid])
             if(paircmp(node->amcast->gts_last_delivered+(*nid), &node->amcast->gts_inf_delivered) < 0)
                 node->amcast->gts_inf_delivered = node->amcast->gts_last_delivered[(*nid)];
 	//TODO A lot of possible improvements in the delivery pattern
