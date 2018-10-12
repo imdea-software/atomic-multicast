@@ -137,6 +137,7 @@ static void handle_accept(struct node *node, xid_t sid, accept_t *cmd) {
     msg->gts = msg->accept_max_lts;
     if(node->amcast->clock < msg->gts.time)
         node->amcast->clock = msg->gts.time;
+        msg->collection = 1;
         struct enveloppe rep = {
 	    .sid = node->id,
 	    .cmd_type = ACCEPT_ACK,
@@ -321,8 +322,9 @@ static void handle_deliver(struct node *node, xid_t sid, deliver_t *cmd) {
                 printf("Failed to peek - %u\n", pqueue_size(node->amcast->delivered_gts));
                 return;
             }
-            if(paircmp(&(i_msg)->gts, &node->amcast->gts_inf_delivered) > 0)
-                break;
+            if(paircmp(&(i_msg)->gts, &node->amcast->gts_inf_delivered) > 0
+                || !i_msg->collection)
+                continue;
             if((i_msg = pqueue_pop(node->amcast->delivered_gts)) == NULL) {
                 printf("Failed to pop - %u\n", pqueue_size(node->amcast->delivered_gts));
                 return;
@@ -675,6 +677,8 @@ static struct amcast_msg *init_amcast_msg(struct groups *groups, unsigned int cl
     msg->gts = default_pair;
     msg->delivered = FALSE;
     msg->msg = *cmd;
+    //EXTRA FIELDS - COLLECTION
+    msg->collection = 1;
     //EXTRA FIELDS - ACCEPT COUNTERS
     msg->accept_totalcount = 0;
     msg->accept_groupcount = malloc(sizeof(unsigned int) * groups->groups_count);

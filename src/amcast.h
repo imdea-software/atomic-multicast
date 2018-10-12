@@ -25,6 +25,8 @@ struct amcast_msg {
     unsigned int *accept_ack_groupready;
     unsigned int *accept_ack_groupcount;
     unsigned int *accept_ack_counts;
+    //EXTRA FIELDS - DELETION & RECOVERY
+    int collection;
     //EXTRA FIELDS - APP STATE
     void *shared_cb_arg;
 };
