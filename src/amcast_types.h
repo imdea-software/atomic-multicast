@@ -73,6 +73,7 @@ typedef struct reaccept {
     xid_t       grp;
     p_uid_t     ballot[MAX_NUMBER_OF_GROUPS];
     g_uid_t     gts;
+    message_t   msg;
 } reaccept_t;
 
 typedef struct newleader {

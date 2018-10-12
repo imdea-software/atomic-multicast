@@ -157,33 +157,37 @@ static void handle_accept(struct node *node, xid_t sid, accept_t *cmd) {
 }
 
 static void handle_reaccept(struct node *node, xid_t sid, reaccept_t *cmd) {
-    //printf("[%u] {%u,%d} We got REACCEPT command from %u!\n", node->id, cmd->mid.time, cmd->mid.id, sid);
+    //printf("[%u] {%u,%d} We got REACCEPT command from %u with gts %u,%d!\n", node->id, cmd->mid.time, cmd->mid.id, sid, cmd->gts.time, cmd->gts.id);
     //TODO Would be nice to be able to re-use this lookup instead of redoing one in handle_accept()
-    struct amcast_msg *msg = NULL;
-    if(((msg = htable_lookup(node->amcast->h_msgs, &cmd->mid)) == NULL)
-            && (paircmp(&cmd->gts, &node->amcast->gts_last_delivered[node->id]) < 0)) {
-        struct enveloppe rep = {
-            .sid = node->id,
-            .cmd_type = ACCEPT_ACK,
-            .cmd.accept_ack = {
-                .mid = cmd->mid,
-                .grp = node->comm->groups[node->id],
-                .gts_last_delivered = node->amcast->gts_last_delivered[node->id],
-                .gts = cmd->gts,
-            },
-        };
-        memcpy(rep.cmd.accept_ack.ballot, cmd->ballot, sizeof(p_uid_t) * node->groups->groups_count);
-        send_to_peer(node, &rep, sid);
-    } else {
-        accept_t accept = {
-            .mid = cmd->mid,
-            .grp = cmd->grp,
-            .ballot = cmd->ballot[node->comm->groups[sid]],
-            .lts = cmd->gts,
-            .msg = msg->msg,
-        };
-        handle_accept(node, sid, &accept);
+    struct amcast_msg *msg = htable_lookup(node->amcast->h_msgs, &cmd->mid);
+    if(paircmp(&cmd->gts, &default_pair) != 0
+            && paircmp(&cmd->gts, &node->amcast->gts_last_delivered[node->id]) <= 0) {
+        if(!msg) {
+            msg = init_amcast_msg(node->groups, node->comm->cluster_size, &cmd->msg);
+            htable_insert(node->amcast->h_msgs, &msg->msg.mid, msg);
+        }
+        if(msg && msg->phase < ACCEPTED) {
+            if(node->amcast->status == LEADER)
+                msg->phase = PROPOSED;
+            msg->delivered = TRUE;
+            msg->lts[node->comm->groups[node->id]] = cmd->gts;
+            // ACCEPT forward
+            memcpy(msg->lballot, cmd->ballot, sizeof(p_uid_t) * node->groups->groups_count);
+            msg->gts = cmd->gts;
+            memset(msg->accept_groupcount, 1, sizeof(unsigned int) * node->groups->groups_count);
+            msg->accept_totalcount = msg->msg.destgrps_count;
+            msg->accept_max_lts = cmd->gts;
+        }
     }
+    if(msg && ((paircmp(&msg->lballot[cmd->grp], &default_pair) != 0
+            && paircmp(&msg->lballot[cmd->grp], &cmd->ballot[cmd->grp]) < 0)
+            || msg->delivered == TRUE)) {
+            if(node->amcast->status == LEADER)
+                reset_accept_ack_counters(msg, node->groups, node->comm->cluster_size);
+            msg->lballot[cmd->grp] = cmd->ballot[cmd->grp];
+            msg->collection = 0;
+    }
+    handle_multicast(node, node->id, &cmd->msg);
 }
 
 static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
@@ -582,6 +586,7 @@ static void handle_newleader_sync_ack(struct node *node, xid_t sid, newleader_sy
                 .mid = msg->msg.mid,
                 .grp = node->comm->groups[node->id],
                 .gts = msg->gts,
+                .msg = msg->msg,
             },
         };
         memcpy(rep.cmd.reaccept.ballot, msg->lballot, sizeof(p_uid_t) * node->groups->groups_count);
