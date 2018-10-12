@@ -577,7 +577,7 @@ static void handle_newleader_sync_ack(struct node *node, xid_t sid, newleader_sy
             if(j_msg != NULL && paircmp(&j_msg->lts[node->comm->groups[node->id]],
                     &i_msg->gts) < 0
                     && j_msg->phase != COMMITTED) {
-                return;
+                break;
             }
             if((i_msg = pqueue_pop(node->amcast->committed_gts)) == NULL) {
                 printf("Failed to pop - %u\n", pqueue_size(node->amcast->committed_gts));
@@ -596,10 +596,10 @@ static void handle_newleader_sync_ack(struct node *node, xid_t sid, newleader_sy
 	            },
 	        };
             send_to_group(node, &rep, node->comm->groups[node->id]);
-            i_msg->delivered = TRUE;
             //Have the deciding group's leader notify the client
-            if(rep.cmd.deliver.gts.id == node->comm->groups[node->id])
+            if(i_msg->delivered == FALSE && rep.cmd.deliver.gts.id == node->comm->groups[node->id])
                 send_to_client(node, &rep, rep.cmd.deliver.mid.id);
+            i_msg->delivered = TRUE;
         }
     }
     //TODO add retry pattern for accepted messages
