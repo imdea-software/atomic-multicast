@@ -147,21 +147,37 @@ static void handle_accept(struct node *node, xid_t sid, accept_t *cmd) {
     }
     if(node->amcast->clock < msg->gts.time)
         node->amcast->clock = msg->gts.time;
+    if(msg->retry_on_accept > 0) {
+        printf("[%u] {%u,%d} RETRY on accept with gts %u,%d because of %u!\n", node->id, cmd->mid.time, cmd->mid.id, msg->gts.time, msg->gts.id, sid);
+        msg->retry_on_accept = 0;
+        struct enveloppe rep = {
+            .sid = node->id,
+            .cmd_type = REACCEPT,
+            .cmd.reaccept = {
+                .mid = msg->msg.mid,
+                .grp = node->comm->groups[node->id],
+                .gts = msg->gts,
+                .msg = msg->msg,
+            },
+        };
+        memcpy(rep.cmd.reaccept.ballot, msg->lballot, sizeof(p_uid_t) * node->groups->groups_count);
+        send_to_destgrps(node, &rep, msg->msg.destgrps, msg->msg.destgrps_count);
+    } else {
         msg->collection = 1;
         struct enveloppe rep = {
-	    .sid = node->id,
-	    .cmd_type = ACCEPT_ACK,
-	    .cmd.accept_ack = {
-	        .mid = cmd->mid,
-		.grp = node->comm->groups[node->id],
-		.gts_last_delivered = node->amcast->gts_last_delivered[node->id],
-		.gts = msg->gts
-	    },
-	};
-	memcpy(rep.cmd.accept_ack.ballot, msg->lballot,
-			sizeof(p_uid_t) * node->groups->groups_count);
+            .sid = node->id,
+            .cmd_type = ACCEPT_ACK,
+            .cmd.accept_ack = {
+                .mid = cmd->mid,
+                .grp = node->comm->groups[node->id],
+                .gts_last_delivered = node->amcast->gts_last_delivered[node->id],
+                .gts = msg->gts
+            },
+        };
+        memcpy(rep.cmd.accept_ack.ballot, msg->lballot, sizeof(p_uid_t) * node->groups->groups_count);
         for(xid_t *grp = msg->msg.destgrps; grp < msg->msg.destgrps + msg->msg.destgrps_count; grp++)
             send_to_peer(node, &rep, msg->lballot[*grp].id);
+    }
     }
 }
 
@@ -621,7 +637,9 @@ static void handle_newleader_sync_ack(struct node *node, xid_t sid, newleader_sy
     void retry_START(m_uid_t *mid, struct amcast_msg *msg, struct node *node) {
         if(msg->delivered == TRUE)
             return;
-        else if(msg->phase == ACCEPTED) {
+        if(msg->phase < ACCEPTED) {
+            //msg->retry_on_accept += 1;
+        } else if(msg->phase == ACCEPTED) {
             retry_message(NULL, msg, node);
         }
     }
@@ -714,6 +732,7 @@ static struct amcast_msg *init_amcast_msg(struct groups *groups, unsigned int cl
     msg->delivered = FALSE;
     msg->msg = *cmd;
     //EXTRA FIELDS - COLLECTION
+    msg->retry_on_accept = 0;
     msg->collection = 1;
     //EXTRA FIELDS - ACCEPT COUNTERS
     msg->accept_totalcount = 0;
