@@ -455,6 +455,12 @@ static void handle_newleader_ack(struct node *node, xid_t sid, newleader_ack_t *
     //TODO CHANGETHIS ugly a.f. Have a clean way to append arrays to enveloppe
     int acc = 0;
     void fill_rep(m_uid_t *mid, struct amcast_msg *msg, int *acc) {
+        /* Clear proposals from previous leader */
+        if(msg->phase < COMMITTED) {
+            if(msg->accept_groupcount[node->comm->groups[node->id]] > 0)
+                msg->accept_totalcount -= 1;
+            msg->accept_groupcount[node->comm->groups[node->id]] = 0;
+        }
         //ADDITION do not bother transmitting PROPOSED messages
         if(msg->phase != ACCEPTED && msg->phase != COMMITTED)
             return;
@@ -494,6 +500,12 @@ static void handle_newleader_sync(struct node *node, xid_t sid, newleader_sync_t
         msg->gts = cmd->messages[i].gts;
         memcpy(msg->lballot, cmd->messages[i].lballot, sizeof(p_uid_t) * node->groups->groups_count);
         memcpy(msg->lts, cmd->messages[i].lts, sizeof(g_uid_t) * node->groups->groups_count);
+        /* Clear proposals from previous leader */
+        if(msg->phase < COMMITTED) {
+            if(msg->accept_groupcount[node->comm->groups[node->id]] > 0)
+                msg->accept_totalcount -= 1;
+            msg->accept_groupcount[node->comm->groups[node->id]] = 0;
+        }
     }
     struct enveloppe rep = {
         .sid = node->id,
