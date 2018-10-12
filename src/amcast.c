@@ -599,6 +599,9 @@ static void handle_newleader_sync_ack(struct node *node, xid_t sid, newleader_sy
     if(node->amcast->newleader_sync_ack_groupcount < node->groups->node_counts[node->comm->groups[node->id]]/2 + 1)
         return;
     node->amcast->status = LEADER;
+    //TODO CHANGETHIS : have the new leader choose safe lts for futur proposals
+    // instead of this manual clockbump
+    node->amcast->clock += 10000;
     resume_globals(node);
     //TODO Check whether computing gts_inf_delivered is useful for recovered messages
     //TODO CHANGETHIS ugly copy-paste of the delivery pattern
