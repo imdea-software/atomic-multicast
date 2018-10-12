@@ -303,10 +303,10 @@ static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
 	            },
 	        };
                 send_to_group(node, &rep, node->comm->groups[node->id]);
-                i_msg->delivered = TRUE;
                 //Have the deciding group's leader notify the client
-                if(rep.cmd.deliver.gts.id == node->comm->groups[node->id])
+                if(i_msg->delivered == FALSE && rep.cmd.deliver.gts.id == node->comm->groups[node->id])
                     send_to_client(node, &rep, rep.cmd.deliver.mid.id);
+                i_msg->delivered = TRUE;
             }
         }
     }
