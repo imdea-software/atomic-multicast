@@ -246,15 +246,21 @@ static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
         if(cmd->grp == node->comm->groups[node->id]
            && paircmp(&node->amcast->gts_last_delivered[sid], &cmd->gts_last_delivered) < 0)
                 node->amcast->gts_last_delivered[sid] = cmd->gts_last_delivered;
-        if(msg->accept_ack_totalcount !=
-			msg->msg.destgrps_count)
+        if(msg->accept_ack_totalcount != msg->msg.destgrps_count)
             return;
-        if(msg->phase != COMMITTED && msg->delivered == FALSE) {
-            pqueue_remove(node->amcast->pending_lts,
-                          &msg->lts[node->comm->groups[node->id]]);
-            pqueue_push(node->amcast->committed_gts, msg, &msg->gts);
+        if(msg->phase < COMMITTED) {
+            msg->phase = COMMITTED;
+            if(msg->delivered == TRUE) {
+                pqueue_push(node->amcast->delivered_gts, msg, &msg->gts);
+            } else {
+                pqueue_remove(node->amcast->pending_lts,
+                    &msg->lts[node->comm->groups[node->id]]);
+                if(pqueue_push(node->amcast->committed_gts, msg, &msg->gts) < 0) {
+                    printf("[%u] {%u,%d} Failed to push into committed_gts\n", node->id, msg->msg.mid.time, msg->msg.mid.id);
+                    exit(EXIT_FAILURE);
+                }
+            }
         }
-        msg->phase = COMMITTED;
         //Compute infimum of gts_last_delivered for my group
         node->amcast->gts_inf_delivered = node->amcast->gts_last_delivered[node->id];
         for(xid_t *nid = node->groups->members[node->comm->groups[node->id]];
