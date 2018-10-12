@@ -141,8 +141,10 @@ static void handle_accept(struct node *node, xid_t sid, accept_t *cmd) {
     msg->lts[cmd->grp] = cmd->lts;
     if(msg->accept_totalcount != msg->msg.destgrps_count)
         return;
-    msg->phase = ACCEPTED;
-    msg->gts = msg->accept_max_lts;
+    if(msg->phase < COMMITTED) {
+        msg->phase = ACCEPTED;
+        msg->gts = msg->accept_max_lts;
+    }
     if(node->amcast->clock < msg->gts.time)
         node->amcast->clock = msg->gts.time;
         msg->collection = 1;
