@@ -334,7 +334,9 @@ static void handle_deliver(struct node *node, xid_t sid, deliver_t *cmd) {
         if(node->amcast->delivery_cb)
             node->amcast->delivery_cb(node, msg, node->amcast->dev_cb_arg);
         //Free amcast_msg structs delivered by everyone in my group
-        while(pqueue_size(node->amcast->delivered_gts) > 0) {
+        int try_next = 1;
+        while(try_next && pqueue_size(node->amcast->delivered_gts) > 0) {
+            try_next = 0;
             struct amcast_msg *i_msg = NULL;
             if((i_msg = pqueue_peek(node->amcast->delivered_gts)) == NULL) {
                 printf("Failed to peek - %u\n", pqueue_size(node->amcast->delivered_gts));
@@ -349,6 +351,7 @@ static void handle_deliver(struct node *node, xid_t sid, deliver_t *cmd) {
             }
             htable_remove(node->amcast->h_msgs, &(i_msg)->msg.mid);
             free_amcast_msg(NULL, i_msg, NULL);
+            try_next = 1;
         }
     }
 }
