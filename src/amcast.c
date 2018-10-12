@@ -223,7 +223,7 @@ static void handle_reaccept(struct node *node, xid_t sid, reaccept_t *cmd) {
 }
 
 static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
-    //printf("[%u] {%u,%d} We got ACCEPT_ACK command from %u!\n", node->id, cmd->mid.time, cmd->mid.id, sid);
+    //printf("[%u] {%u,%d} We got ACCEPT_ACK command from %u supporting %u!\n", node->id, cmd->mid.time, cmd->mid.id, sid, cmd->ballot[cmd->grp].id);
     if (node->amcast->status == LEADER) {
         struct amcast_msg *msg = NULL;
         if((msg = htable_lookup(node->amcast->h_msgs, &cmd->mid)) == NULL) {
@@ -390,7 +390,7 @@ static void handle_deliver(struct node *node, xid_t sid, deliver_t *cmd) {
 }
 
 static void handle_newleader(struct node *node, xid_t sid, newleader_t *cmd) {
-    printf("[%u] We got NEWLEADER command from %u!\n", node->id, sid);
+    //printf("[%u] We got NEWLEADER command from %u!\n", node->id, sid);
     if(paircmp(&node->amcast->ballot, &cmd->ballot) > 0)
         return;
     put_globals_on_hold(node);
@@ -437,7 +437,7 @@ static void handle_newleader(struct node *node, xid_t sid, newleader_t *cmd) {
 }
 
 static void handle_newleader_ack(struct node *node, xid_t sid, newleader_ack_t *cmd) {
-    printf("[%u] We got NEWLEADER_ACK command from %u with %u messages!\n", node->id, sid, cmd->msg_count);
+    //printf("[%u] We got NEWLEADER_ACK command from %u with %u messages!\n", node->id, sid, cmd->msg_count);
     //Reject replies if we already had enough
     if((node->amcast->newleader_ack_groupcount >= node->groups->node_counts[node->comm->groups[node->id]]/2 + 1
             && node->amcast->status == PREPARE)
@@ -546,7 +546,7 @@ static void handle_newleader_ack(struct node *node, xid_t sid, newleader_ack_t *
 }
 
 static void handle_newleader_sync(struct node *node, xid_t sid, newleader_sync_t *cmd) {
-    printf("[%u] We got NEWLEADER_SYNC command from %u!\n", node->id, sid);
+    //printf("[%u] We got NEWLEADER_SYNC command from %u!\n", node->id, sid);
     //TODO CHANGETHIS Do not let the futur leader send this cmd to itself
     if(node->id == sid)
         return;
@@ -588,7 +588,7 @@ static void handle_newleader_sync(struct node *node, xid_t sid, newleader_sync_t
 }
 
 static void handle_newleader_sync_ack(struct node *node, xid_t sid, newleader_sync_ack_t *cmd) {
-    printf("[%u] We got NEWLEADER_SYNC_ACK command from %u!\n", node->id, sid);
+    //printf("[%u] We got NEWLEADER_SYNC_ACK command from %u!\n", node->id, sid);
     if(node->amcast->status != PREPARE || paircmp(&node->amcast->ballot, &cmd->ballot) != 0)
         return;
     //Wait for a quorum of replies
