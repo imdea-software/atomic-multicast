@@ -119,12 +119,19 @@ static void handle_accept(struct node *node, xid_t sid, accept_t *cmd) {
                   && !(paircmp(&node->amcast->ballot, &cmd->ballot) == 0) )) {
 	//TODO Carefully try to see when it's the best time to reset this counter
 	//     Probably upon a leader change
-	if (msg->accept_groupcount[cmd->grp] == 0) {
-            msg->accept_groupcount[cmd->grp] += 1;
-            msg->accept_totalcount += 1;
-            if(paircmp(&msg->accept_max_lts, &cmd->lts) < 0)
-                msg->accept_max_lts = cmd->lts;
-	}
+    //TODO Those probably should never be reseted
+    if (msg->accept_groupcount[cmd->grp] == 0) {
+        msg->accept_groupcount[cmd->grp] += 1;
+        msg->accept_totalcount += 1;
+    }
+    if(paircmp(&msg->accept_max_lts, &cmd->lts) < 0)
+        msg->accept_max_lts = cmd->lts;
+    if(msg->phase <= ACCEPTED && paircmp(&cmd->lts, &msg->lts[cmd->grp]) < 0) {
+        msg->accept_max_lts = default_pair;
+        for(xid_t *grp = msg->msg.destgrps; grp < msg->msg.destgrps + msg->msg.destgrps_count; grp++)
+            if(paircmp(&msg->lts[*grp], &msg->accept_max_lts) > 0)
+                msg->accept_max_lts = msg->lts[*grp];
+    }
     if(paircmp(&msg->lballot[cmd->grp], &default_pair) != 0
             && paircmp(&msg->lballot[cmd->grp], &cmd->ballot) < 0) {
         reset_accept_ack_counters(msg, node->groups, node->comm->cluster_size);
