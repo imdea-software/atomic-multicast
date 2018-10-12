@@ -74,6 +74,7 @@ static void handle_multicast(struct node *node, xid_t sid, message_t *cmd) {
         struct amcast_msg *msg = NULL;
         if((msg = htable_lookup(node->amcast->h_msgs, &cmd->mid)) == NULL) {
             msg = init_amcast_msg(node->groups, node->comm->cluster_size, cmd);
+            msg->lballot[node->comm->groups[node->id]] = node->amcast->ballot;
             //Run msginit callback
             if(node->amcast->msginit_cb)
                 node->amcast->msginit_cb(node, msg, node->amcast->ini_cb_arg);
@@ -84,7 +85,6 @@ static void handle_multicast(struct node *node, xid_t sid, message_t *cmd) {
             node->amcast->clock++;
             msg->lts[node->comm->groups[node->id]].time = node->amcast->clock;
             msg->lts[node->comm->groups[node->id]].id = node->comm->groups[node->id];
-            msg->lballot[node->comm->groups[node->id]] = node->amcast->ballot;
             pqueue_push(node->amcast->pending_lts, msg, &msg->lts[node->comm->groups[node->id]]);
         }
         struct enveloppe rep = {
@@ -107,6 +107,7 @@ static void handle_accept(struct node *node, xid_t sid, accept_t *cmd) {
     struct amcast_msg *msg = NULL;
     if((msg = htable_lookup(node->amcast->h_msgs, &cmd->mid)) == NULL) {
         msg = init_amcast_msg(node->groups, node->comm->cluster_size, &cmd->msg);
+        msg->lballot[node->comm->groups[node->id]] = node->amcast->ballot;
         //Run msginit callback
         if(node->amcast->msginit_cb)
             node->amcast->msginit_cb(node, msg, node->amcast->ini_cb_arg);
