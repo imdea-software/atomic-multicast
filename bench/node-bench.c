@@ -40,6 +40,10 @@ struct stats {
     message_t *msg;
 };
 
+struct timeval nodelay = { .tv_sec = 0, .tv_usec = 0 };
+struct timeval exit_node_timeout = { .tv_sec = 200, .tv_usec = 0 };
+struct timeval exit_client_timeout = { .tv_sec = 180, .tv_usec = 0 };
+
 //TODO write to file the execution log
 void write_report(struct stats *stats, FILE *stream) {
     for(int i=0; i<stats->count; i++) {
@@ -77,6 +81,10 @@ void write_report(struct stats *stats, FILE *stream) {
     }
 }
 
+static void terminate_on_timeout_cb(evutil_socket_t fd, short flags, void *ptr) {
+    kill(getpid(), SIGHUP);
+}
+
 //Record useful info regarding the initiated message
 void msginit_cb(struct node *node, struct amcast_msg *msg, void *cb_arg) {
     struct timespec *tv_ini = malloc(sizeof(struct timespec));
@@ -105,6 +113,7 @@ struct node *run_amcast_node(struct cluster_config *config, xid_t node_id, void 
     //TODO Do no configure the protocol manually like this
     n->amcast->status = (node_id % NODES_PER_GROUP == INITIAL_LEADER_IN_GROUP) ? LEADER : FOLLOWER;
     n->amcast->ballot.id = n->comm->groups[node_id] * NODES_PER_GROUP;
+    event_base_once(n->events->base, -1, EV_TIMEOUT, terminate_on_timeout_cb, NULL, &exit_node_timeout);
     node_start(n);
     return(n);
 }
@@ -168,6 +177,7 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
         unsigned int connected;
         unsigned int sent;
         unsigned int received;
+        unsigned int exit_on_delivery;
         g_uid_t *last_gts;
         xid_t *leaders;
         struct peer *peers;
@@ -185,6 +195,10 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
     };
     xid_t get_leader_from_group(xid_t g_id) {
         return client.leaders[g_id];
+    }
+    void exit_on_timeout_cb(evutil_socket_t fd, short flags, void *ptr) {
+        struct client *c = (struct client *) ptr;
+        c->exit_on_delivery = 1;
     }
     void submit_cb(evutil_socket_t fd, short flags, void *ptr) {
         struct client *c = (struct client *) ptr;
@@ -288,12 +302,17 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
                         stats->count++;
                     }
                     stats->delivered++;
+                    /* TIMEOUT termination */
+                    if(c->exit_on_delivery)
+                        event_base_loopexit(c->base, NULL);
+                    else {
                     /* MCAST the next message */
                     if(c->sent < c->stats->size)
                         submit_cb(0,0,c);
                     if(c->received >= c->stats->size)
-                        kill(getpid(), SIGHUP);
+                        event_base_loopexit(c->base, NULL);
                     break;
+                    }
                 default:
                     break;
             }
@@ -335,11 +354,16 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
             }
             stats->delivered++;
             mcast_message_content_free(&msg);
+            /* TIMEOUT termination */
+            if(c->exit_on_delivery)
+                event_base_loopexit(c->base, NULL);
+            else {
             /* MCAST the next message */
             if(c->sent < c->stats->size)
                 alt_submit_cb(0,0,c);
             if(c->received >= c->stats->size)
-                kill(getpid(), SIGHUP);
+                event_base_loopexit(c->base, NULL);
+            }
         }
     }
     void event_cb(struct bufferevent *bev, short events, void *ptr) {
@@ -403,12 +427,6 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
                 alt_submit_cb(0,0,c);
             }
         }
-    }
-    void interrupt_cb(evutil_socket_t fd, short flags, void *ptr) {
-        struct event *interrupt_ev = (struct event *) ptr;
-        struct event_base *base = event_get_base(interrupt_ev);
-        event_del(interrupt_ev);
-        event_base_loopexit(base, NULL);
     }
     void reconnect_to_peer(evutil_socket_t fd, short flags, void *ptr) {
         struct peer *p = (struct peer *) ptr;
@@ -479,9 +497,8 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
     msg.value.mcast_value_len = sizeof(struct custom_payload) - MAX_PAYLOAD_LEN + val.len;
     msg.value.mcast_value_val = (char *) &val;
     client.ref_msg = &msg;
-    //Set-up eventloop-exit
-    struct event *ev_exit = evsignal_new(client.base, SIGHUP, interrupt_cb, event_self_cbarg());
-    event_add(ev_exit, NULL);
+    //Set-up timeout-exit
+    event_base_once(client.base, -1, EV_TIMEOUT, exit_on_timeout_cb, &client, &exit_client_timeout);
     //Start client
     event_base_dispatch(client.base);
     //Leaving
@@ -493,7 +510,6 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
         if(client.bev[i])
             bufferevent_free(client.bev[i]);
     free(client.bev);
-    event_free(ev_exit);
     event_base_free(client.base);
     free(client.peers);
 }
