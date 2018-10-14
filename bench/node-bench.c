@@ -10,6 +10,7 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <semaphore.h>
+#include <netinet/tcp.h>
 
 #include <event2/buffer.h>
 
@@ -424,6 +425,8 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
             .sin_addr.s_addr = inet_addr(config->addresses[peer_id])
         };
         bufferevent_socket_connect(client.bev[peer_id], (struct sockaddr *) &addr, sizeof(addr));
+        int tcp_nodelay_flag = 1;
+        setsockopt(bufferevent_getfd(client.bev[peer_id]), IPPROTO_TCP, TCP_NODELAY, &tcp_nodelay_flag, sizeof(int));
     }
     //Prepare enveloppe template
     struct enveloppe env = {

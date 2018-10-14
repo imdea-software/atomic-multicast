@@ -1,5 +1,6 @@
 #include <string.h>
 #include <event2/buffer.h>
+#include <netinet/tcp.h>
 
 #include "node.h"
 #include "events.h"
@@ -15,6 +16,7 @@
 } while(0)
 
 static struct timeval reconnect_timeout = { 1, 0 };
+int tcp_nodelay_flag = 1;
 
 struct cb_arg *set_cb_arg(xid_t peer_id, struct node *node) {
     if(node->events->ev_cb_arg[peer_id] == NULL) {
@@ -74,6 +76,7 @@ static int init_connection(struct node *node, xid_t peer_id) {
     bufferevent_socket_connect(bev, (struct sockaddr *)node->comm->addrs+peer_id,
         sizeof(node->comm->addrs[peer_id]));
     node->comm->bevs[peer_id] = bev;
+    setsockopt(bufferevent_getfd(bev), IPPROTO_TCP, TCP_NODELAY, &tcp_nodelay_flag, sizeof(int));
     return 0;
 }
 
@@ -153,6 +156,7 @@ void accept_conn_cb(struct evconnlistener *lev, evutil_socket_t sock,
     bufferevent_setcb(bev, read_a_cb, NULL, event_a_cb, node);
     bufferevent_setwatermark(bev, EV_READ, sizeof(struct enveloppe), 0);
     bufferevent_enable(bev, EV_READ);
+    setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, &tcp_nodelay_flag, sizeof(int));
 }
 
 //Called if an accept() call fails, currently, just ends the event loop
