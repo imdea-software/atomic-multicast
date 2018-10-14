@@ -157,6 +157,7 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
     struct peer {
         unsigned int id;
         unsigned int received;
+        struct event *reconnect_ev;
         struct client *c;
     };
     struct client {
@@ -171,6 +172,7 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
         xid_t *leaders;
         struct peer *peers;
         struct stats *stats;
+        struct cluster_config *config;
         struct event_base *base;
         struct bufferevent **bev;
         struct enveloppe *ref_value;
@@ -408,6 +410,28 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
         event_del(interrupt_ev);
         event_base_loopexit(base, NULL);
     }
+    void reconnect_to_peer(evutil_socket_t fd, short flags, void *ptr) {
+        struct peer *p = (struct peer *) ptr;
+        struct client *c = p->c;
+        struct bufferevent **bev = c->bev + p->id;
+        if(bev && *bev) {
+            bufferevent_trigger(*bev, EV_READ, 0);
+            bufferevent_free(*bev);
+        }
+        *bev = bufferevent_socket_new(c->base, -1, BEV_OPT_CLOSE_ON_FREE);
+        //TODO CHANGETHIS: Have to edit those 2 lines to switch back to libevamcast
+        bufferevent_setcb(*bev, read_cb, NULL, event_cb, p);
+        bufferevent_setwatermark(*bev, EV_READ, sizeof(struct enveloppe), 0);
+        bufferevent_enable(*bev, EV_READ|EV_WRITE);
+        struct sockaddr_in addr = {
+            .sin_family = AF_INET,
+            .sin_port = htons(c->config->ports[p->id]),
+            .sin_addr.s_addr = inet_addr(c->config->addresses[p->id])
+        };
+        bufferevent_socket_connect(*bev, (struct sockaddr *) &addr, sizeof(addr));
+        int tcp_nodelay_flag = 1;
+        setsockopt(bufferevent_getfd(*bev), IPPROTO_TCP, TCP_NODELAY, &tcp_nodelay_flag, sizeof(int));
+    }
     //SET-UP libevent
     memset(&client, 0, sizeof(struct client));
     client.id = client_id;
@@ -415,6 +439,7 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
     client.groups_count = config->groups_count;
     client.dests_count = destgrps;
     client.stats = stats;
+    client.config = config;
     client.base = event_base_new();
     client.bev = calloc(config->size, sizeof(struct bufferevent *));
     client.leaders = malloc(config->groups_count * sizeof(xid_t));
@@ -423,21 +448,11 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
     client.peers = calloc(config->size, sizeof(struct peer));
     //Start a TCP connection to all nodes
     for(xid_t peer_id=0; peer_id<client.nodes_count; peer_id++) {
+        struct timeval custom_delay = { .tv_sec = 0, .tv_usec = 100 * client.id + 10 * peer_id };
         client.peers[peer_id].c = &client;
         client.peers[peer_id].id = peer_id;
-        client.bev[peer_id] = bufferevent_socket_new(client.base, -1, BEV_OPT_CLOSE_ON_FREE);
-        //TODO CHANGETHIS: Have to edit those 2 lines to switch back to libevamcast
-        bufferevent_setcb(client.bev[peer_id], alt_read_cb, NULL, alt_event_cb, client.peers+peer_id);
-        //bufferevent_setwatermark(client.bev[peer_id], EV_READ, sizeof(struct enveloppe), 0);
-        bufferevent_enable(client.bev[peer_id], EV_READ|EV_WRITE);
-        struct sockaddr_in addr = {
-            .sin_family = AF_INET,
-            .sin_port = htons(config->ports[peer_id]),
-            .sin_addr.s_addr = inet_addr(config->addresses[peer_id])
-        };
-        bufferevent_socket_connect(client.bev[peer_id], (struct sockaddr *) &addr, sizeof(addr));
-        int tcp_nodelay_flag = 1;
-        setsockopt(bufferevent_getfd(client.bev[peer_id]), IPPROTO_TCP, TCP_NODELAY, &tcp_nodelay_flag, sizeof(int));
+        client.peers[peer_id].reconnect_ev = evtimer_new(client.base, reconnect_to_peer, &client.peers[peer_id]);
+        event_add(client.peers[peer_id].reconnect_ev, &custom_delay);
     }
     //Prepare enveloppe template
     struct enveloppe env = {
