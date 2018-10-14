@@ -49,6 +49,7 @@ struct stats {
     struct timespec *tv_dev;
     g_uid_t *gts;
     message_t *msg;
+    unsigned int *pq_size;
 };
 
 struct timespec start, end;
@@ -84,7 +85,8 @@ void write_report(struct stats *stats, FILE *stream) {
                         "%u" LOG_SEPARATOR
                         "%s" LOG_SEPARATOR
                         "%u" LOG_SEPARATOR
-                        "%s" "\n",
+                        "%s" LOG_SEPARATOR
+                        "%u" "\n",
                         msg.mid.time, msg.mid.id,
                         (long long)ts_start.tv_sec, ts_start.tv_nsec,
                         (long long)ts_end.tv_sec, ts_end.tv_nsec,
@@ -93,7 +95,8 @@ void write_report(struct stats *stats, FILE *stream) {
                         msg.destgrps_count,
                         destgrps,
                         msg.value.len,
-                        msg.value.val);
+                        msg.value.val,
+                        stats->pq_size[i]);
         free(destgrps);
     }
 }
@@ -130,6 +133,7 @@ void delivery_cb(struct node *node, struct amcast_msg *msg, void *cb_arg) {
         stats->tv_commit[stats->count] = shared_cb_arg->tv_commit;
         stats->gts[stats->count] = msg->gts;
         stats->msg[stats->count] = msg->msg;
+        stats->pq_size[stats->count] = pqueue_size(node->amcast->committed_gts);
         stats->count++;
     }
     stats->delivered++;
@@ -674,6 +678,7 @@ void init_stats(struct stats *stats, long size) {
     stats->tv_dev = calloc(stats->size, sizeof(struct timespec));
     stats->gts = calloc(stats->size, sizeof(g_uid_t));
     stats->msg = calloc(stats->size, sizeof(message_t));
+    stats->pq_size = calloc(stats->size, sizeof(unsigned int));
 }
 void free_stats(struct stats *stats) {
     free(stats->tv_ini);
@@ -681,6 +686,7 @@ void free_stats(struct stats *stats) {
     free(stats->tv_dev);
     free(stats->gts);
     free(stats->msg);
+    free(stats->pq_size);
     free(stats);
 }
 void log_to_file(struct stats *stats, char *filename) {
