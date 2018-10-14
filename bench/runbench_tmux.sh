@@ -97,10 +97,7 @@ for gid in `seq 1 $client_hosts` ; do
     tmux new-window -n client_$gid
     tmux send-keys " ssh node-$chid" Enter
     tmux send-keys " export LD_LIBRARY_PATH=/usr/local/lib" Enter
-    for i in `seq $start_cid $end_cid` ; do
-        tmux send-keys " ${AMCAST_BIN} ${i} ${AMCAST_BENCH_NUMBER_OF_NODES} ${AMCAST_BENCH_NUMBER_OF_GROUPS} ${AMCAST_BENCH_NUMBER_OF_CLIENTS} 1 < $AMCAST_BENCH_CLUSTER_CONF  &" Enter
-        #tmux send-keys " (${AMCAST_BIN} ${i} ${AMCAST_BENCH_NUMBER_OF_NODES} ${AMCAST_BENCH_NUMBER_OF_GROUPS} ${AMCAST_BENCH_NUMBER_OF_CLIENTS} 1 < ${AMCAST_DIR}/bench/mcast_conf/alt_cluster.conf)> /dev/null &" Enter
-    done
+    tmux send-keys " ${AMCAST_BIN} $start_cid ${AMCAST_BENCH_NUMBER_OF_NODES} ${AMCAST_BENCH_NUMBER_OF_GROUPS} ${AMCAST_BENCH_NUMBER_OF_CLIENTS} $n_clients < $AMCAST_BENCH_CLUSTER_CONF" Enter
 done
 
 exit

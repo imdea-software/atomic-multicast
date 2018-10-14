@@ -153,7 +153,7 @@ void run_client_node(struct cluster_config *config, xid_t client_id) {
     }
 }
 
-void run_client_node_libevent(struct cluster_config *config, xid_t client_id, struct stats *stats) {
+void run_client_node_libevent(struct cluster_config *config, xid_t client_id, struct stats *stats, unsigned int destgrps) {
     struct peer {
         unsigned int id;
         unsigned int received;
@@ -413,7 +413,7 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
     client.id = client_id;
     client.nodes_count = config->size;
     client.groups_count = config->groups_count;
-    client.dests_count = NUMBER_OF_TARGETS;
+    client.dests_count = destgrps;
     client.stats = stats;
     client.base = event_base_new();
     client.bev = calloc(config->size, sizeof(struct bufferevent *));
@@ -543,15 +543,71 @@ int free_cluster_config(struct cluster_config *config) {
     return 0;
 }
 
+void init_stats(struct stats *stats, long size) {
+    memset(stats, 0, sizeof(struct stats));
+    stats->size = size;
+    stats->delivered = 0;
+    stats->count = 0;
+    stats->tv_ini = calloc(stats->size, sizeof(struct timespec));
+    stats->tv_dev = calloc(stats->size, sizeof(struct timespec));
+    stats->gts = calloc(stats->size, sizeof(g_uid_t));
+    stats->msg = calloc(stats->size, sizeof(message_t));
+}
+void free_stats(struct stats *stats) {
+    free(stats->tv_ini);
+    free(stats->tv_dev);
+    free(stats->gts);
+    free(stats->msg);
+    free(stats);
+}
+void log_to_file(struct stats *stats, char *filename) {
+    FILE *logfile;
+    if((logfile = fopen(filename, "w")) == NULL) {
+        puts("ERROR: Can not open logfile");
+        exit(EXIT_FAILURE);
+    }
+    write_report(stats, logfile);
+    fclose(logfile);
+}
+
+struct thread_arg {
+    xid_t    id;
+    unsigned int destgrps;
+    struct stats *stats;
+    struct cluster_config *config;
+};
+void init_thread_arg(struct thread_arg *arg, xid_t id,
+        unsigned int destgrps, unsigned total_client_count,
+        struct cluster_config *config) {
+    arg->id = id;
+    arg->destgrps = destgrps;
+    arg->config = config;
+    arg->stats = malloc(sizeof(struct stats));
+    init_stats(arg->stats,
+        ( NUMBER_OF_MESSAGES / MEASURE_RESOLUTION )
+	/ total_client_count);
+}
+void free_thread_arg(struct thread_arg *arg) {
+    free(arg->stats);
+}
+void *run_thread(void *ptr) {
+    struct thread_arg *arg = (struct thread_arg *) ptr;
+
+    run_client_node_libevent(arg->config, arg->id, arg->stats, arg->destgrps);
+
+    char filename[40];
+    sprintf(filename, "/tmp/client.%d.log", arg->id);
+    log_to_file(arg->stats, filename);
+
+    pthread_exit(NULL);
+}
+
 int main(int argc, char *argv[]) {
     if(argc != 6) {
         printf("USAGE: node-bench [node_id] [number_of_nodes]"
-                "[number_of_groups] [number_of_clients] [isClient?] \n");
+                "[number_of_groups] [total_number_of_clients] [local_number_of_clients]\n");
         exit(EXIT_FAILURE);
     }
-    FILE *logfile;
-    struct node *node;
-    struct stats *stats = malloc(sizeof(struct stats));
 
     //Init node & cluster config
     struct cluster_config *config = malloc(sizeof(struct cluster_config));
@@ -559,47 +615,49 @@ int main(int argc, char *argv[]) {
     init_cluster_config(config, atoi(argv[2]), atoi(argv[3]));
     read_cluster_config_from_stdin(config);
 
-    //Get client_count & init stats struct
-    int client_count = atoi(argv[4]);
-    int is_client = atoi(argv[5]);
-    stats->delivered = 0;
-    stats->count = 0;
-    if(is_client)
-        stats->size = ( NUMBER_OF_MESSAGES / MEASURE_RESOLUTION ) / client_count;
-    else
-        stats->size = ( NUMBER_OF_MESSAGES / MEASURE_RESOLUTION ) * NUMBER_OF_TARGETS / config->groups_count;
-    stats->tv_ini = calloc(stats->size, sizeof(struct timespec));
-    stats->tv_dev = calloc(stats->size, sizeof(struct timespec));
-    stats->gts = calloc(stats->size, sizeof(g_uid_t));
-    stats->msg = calloc(stats->size, sizeof(message_t));
     //IGNORE SIGPIPES (USEFUL FOR RECOVERY)
     if(signal(SIGPIPE, SIG_IGN) == SIG_ERR)
         return (EXIT_FAILURE);
-    //CLIENT NODE PATTERN
-    if(is_client) {
-        run_client_node_libevent(config, node_id, stats);
-    } else {
-        node = run_amcast_node(config, node_id, stats);
-    }
-    //Open logfile for editing
-    char filename[40];
-    sprintf(filename, "/tmp/%s.%d.log", (is_client ? "client" : "node"), node_id);
-    if((logfile = fopen(filename, "w")) == NULL) {
-        puts("ERROR: Can not open logfile");
-        exit(EXIT_FAILURE);
-    }
 
-    write_report(stats, logfile);
+    //Prepare stats->size
+    int destgrps = NUMBER_OF_TARGETS;
+    int total_client_count = atoi(argv[4]);
+    int local_client_count = atoi(argv[5]);
+
+    //CLIENT NODE PATTERN
+    if(local_client_count > 0) {
+        pthread_t *pths = calloc(local_client_count, sizeof(pthread_t));
+        struct thread_arg *args = calloc(local_client_count,
+			sizeof(struct thread_arg));
+        for(int i=0; i<local_client_count; i++)
+            init_thread_arg(args+i, node_id+i, destgrps,
+                    total_client_count, config);
+        for(int i=0; i<local_client_count; i++)
+            pthread_create(pths+i, NULL, run_thread, args+i);
+        for(int i=0; i<local_client_count; i++)
+            pthread_join(pths[i], NULL);
+        for(int i=0; i<local_client_count; i++)
+            free_thread_arg(args+i);
+	free(args);
+	free(pths);
+    //SERVER NODE PATTERN
+    } else {
+        struct stats *stats = malloc(sizeof(struct stats));
+        long messages_count = ( NUMBER_OF_MESSAGES / MEASURE_RESOLUTION )
+                * destgrps / config->groups_count;
+	init_stats(stats, messages_count);
+
+	struct node *node = run_amcast_node(config, node_id, stats);
+
+        char filename[40];
+        sprintf(filename, "/tmp/node.%d.log", node_id);
+        log_to_file(stats, filename);
+
+	 node_free(node);
+	 free_stats(stats);
+    }
 
     //Clean and exit
-    fclose(logfile);
-    if(!is_client)
-        node_free(node);
     free_cluster_config(config);
-    free(stats->tv_ini);
-    free(stats->tv_dev);
-    free(stats->gts);
-    free(stats->msg);
-    free(stats);
     return EXIT_SUCCESS;
 }
