@@ -67,6 +67,11 @@ typedef struct accept_ack {
     g_uid_t		gts_last_delivered;
 } accept_ack_t;
 
+typedef struct commit {
+    m_uid_t		mid;
+    p_uid_t		ballot;
+} commit_t;
+
 typedef struct deliver {
     m_uid_t 		mid;
     p_uid_t		ballot;

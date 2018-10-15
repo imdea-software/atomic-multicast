@@ -33,6 +33,7 @@ struct enveloppe {
         message_t		multicast;
         accept_t		accept;
         accept_ack_t		accept_ack;
+        commit_t		commit;
         deliver_t		deliver;
         reaccept_t		reaccept;
         newleader_t		newleader;

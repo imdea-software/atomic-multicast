@@ -186,8 +186,15 @@ static void handle_accept(struct node *node, xid_t sid, accept_t *cmd) {
         memcpy(rep.cmd.accept_ack.ballot, msg->lballot, sizeof(p_uid_t) * node->groups->groups_count);
         for(xid_t *grp = msg->msg.destgrps; grp < msg->msg.destgrps + msg->msg.destgrps_count; grp++) {
             send_to_peer(node, &rep, msg->lballot[*grp].id);
+            //send_to_peer(node, &rep, msg->lballot[cmd->grp].id);
             node->amcast->sent++;
         }
+//START OF SEMI-COORDINATED MESS
+/*
+        send_to_peer(node, &rep, msg->lballot[msg->msg.destgrps[0]].id);
+        node->amcast->sent++;
+*/
+//END OF SEMI-COORDINATED MESS
     }
     }
 }
@@ -250,6 +257,10 @@ static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
                     break;
                 case 0:
                     break;
+		    /*
+                case 1:
+                    break;
+		    */
                 default:
                     return;
             }
@@ -281,6 +292,34 @@ static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
                 node->amcast->gts_last_delivered[sid] = cmd->gts_last_delivered;
         if(msg->accept_ack_totalcount != msg->msg.destgrps_count)
             return;
+//START OF SEMI-COORDINATED MESS
+/*
+	struct enveloppe rep = {
+		.sid = node->id,
+		.cmd_type = COMMIT,
+		.cmd.commit = {
+			.mid = msg->msg.mid,
+		},
+	};
+        for(xid_t *grp = msg->msg.destgrps; grp < msg->msg.destgrps + msg->msg.destgrps_count; grp++) {
+            rep.cmd.commit.ballot = msg->lballot[*grp];
+            send_to_peer(node, &rep, msg->lballot[*grp].id);
+            node->amcast->sent++;
+	}
+    }
+}
+
+static void handle_commit(struct node *node, xid_t sid, commit_t *cmd) {
+    //printf("[%u] {%u,%d} We got COMMIT command from %u!\n", node->id, cmd->mid.time, cmd->mid.id, sid);
+    if (node->amcast->status == LEADER
+		    && paircmp(&cmd->ballot, &node->amcast->ballot) == 0) {
+        struct amcast_msg *msg = NULL;
+        if((msg = htable_lookup(node->amcast->h_msgs, &cmd->mid)) == NULL) {
+            //TODO a bit unsafe, must check whether the message is already delivered
+            return;
+        }
+*/
+//END OF SEMI-COORDINATED MESS
         if(msg->phase < COMMITTED) {
             //USEFUL IF NOT WAITING FOR LEADERS
             //  Use gts from last received AACK
@@ -722,6 +761,9 @@ void dispatch_amcast_command(struct node *node, struct enveloppe *env) {
             break;
         case ACCEPT_ACK:
             handle_accept_ack(node, env->sid, &(env->cmd.accept_ack));
+            break;
+        case COMMIT:
+            //handle_commit(node, env->sid, &(env->cmd.commit));
             break;
         case DELIVER:
             handle_deliver(node, env->sid, &(env->cmd.deliver));
