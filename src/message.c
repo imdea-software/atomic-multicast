@@ -25,17 +25,17 @@ void write_enveloppe(struct bufferevent *bev, struct enveloppe *env) {
 }
 
 void send_to_peer(struct node *node, struct enveloppe *env, xid_t peer_id) {
-    if(!node->comm->bevs[peer_id]) {
-        //printf("[%u] WRITE ERROR: %u already left\n", node->id, peer_id);
-        return;
-    }
-    write_enveloppe(node->comm->bevs[peer_id], env);
+    struct bufferevent *bev;
+    if( peer_id < node->comm->cluster_size && (bev = node->comm->bevs[peer_id]) != NULL
+            && (bufferevent_get_enabled(bev) & EV_WRITE))
+        write_enveloppe(bev, env);
 }
 
 void send_to_client(struct node *node, struct enveloppe *env, xid_t client_id) {
     xid_t peer_id = node->comm->cluster_size * 2 + client_id;
     struct bufferevent *bev;
-    if( peer_id < node->comm->bevs_size && (bev = node->comm->bevs[peer_id]) != NULL )
+    if( peer_id < node->comm->bevs_size && (bev = node->comm->bevs[peer_id]) != NULL
+            && (bufferevent_get_enabled(bev) & EV_WRITE))
         write_enveloppe(bev, env);
 }
 
