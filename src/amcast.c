@@ -77,11 +77,15 @@ static void handle_multicast(struct node *node, xid_t sid, message_t *cmd) {
             msg = init_amcast_msg(node->groups, node->comm->cluster_size, cmd);
             msg->lballot[node->comm->groups[node->id]] = node->amcast->ballot;
             //Run msginit callback
+            /*
             if(node->amcast->msginit_cb)
                 node->amcast->msginit_cb(node, msg, node->amcast->ini_cb_arg);
+            */
             htable_insert(node->amcast->h_msgs, &msg->msg.mid, msg);
         }
         if(msg->phase == START) {
+            if(node->amcast->msginit_cb)
+                node->amcast->msginit_cb(node, msg, node->amcast->ini_cb_arg);
             msg->phase = PROPOSED;
             node->amcast->clock++;
             msg->lts[node->comm->groups[node->id]].time = node->amcast->clock;
@@ -114,8 +118,10 @@ static void handle_accept(struct node *node, xid_t sid, accept_t *cmd) {
         msg = init_amcast_msg(node->groups, node->comm->cluster_size, &cmd->msg);
         msg->lballot[node->comm->groups[node->id]] = node->amcast->ballot;
         //Run msginit callback
+        /*
         if(node->amcast->msginit_cb)
             node->amcast->msginit_cb(node, msg, node->amcast->ini_cb_arg);
+        */
         htable_insert(node->amcast->h_msgs, &msg->msg.mid, msg);
     }
     if ((node->amcast->status == LEADER || node->amcast->status == FOLLOWER)
