@@ -61,6 +61,8 @@ run_mcast_nodes() {
     GROUP_IDS=`seq 0 $((${GROUPS_COUNT} - 1))`
     TMUX_WINDOW_NAME_PREFIX=n_
 
+    PROTO=famcast
+
     for gid in ${GROUP_IDS} ; do
         for nid in `seq 0 2` ; do
             HOST_ID=$(( ( $gid * 3 ) + ${nid} ))
@@ -68,7 +70,7 @@ run_mcast_nodes() {
             tmux new-window -n ${TMUX_WINDOW_NAME_PREFIX}${gid}_$nid
             tmux send-keys " ssh node-$(( $HOST_ID + 1))" Enter
             tmux send-keys " export LD_LIBRARY_PATH=/usr/local/lib" Enter
-            tmux send-keys " /users/lefort_a/libmcast/build/sample/node-simple -n $nid -g $gid -c ${AMCAST_DIR}/bench/mcast_conf/mcast-6g3p.conf -s amcast -p ${AMCAST_DIR}/bench/mcast_conf/paxos-6g3p-group${gid}.conf" Enter
+            tmux send-keys " /users/lefort_a/libmcast/build/sample/node-simple -n $nid -g $gid -c ${AMCAST_DIR}/bench/mcast_conf/mcast-6g3p.conf -s $PROTO -p ${AMCAST_DIR}/bench/mcast_conf/paxos-6g3p-group${gid}.conf" Enter
         done
     done
 }
