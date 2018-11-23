@@ -83,22 +83,26 @@ run_nodes $AMCAST_BENCH_NUMBER_OF_NODES 0
 
 sleep 10
 
-#run_nodes $AMCAST_BENCH_NUMBER_OF_CLIENTS 1
-
-tmux new-window -n client_0
-tmux send-keys " ssh node-19" Enter
-tmux send-keys " export LD_LIBRARY_PATH=/usr/local/lib" Enter
-for i in `seq 1 $(( $AMCAST_BENCH_NUMBER_OF_CLIENTS / 2))` ; do
-    tmux send-keys " (${AMCAST_BIN} ${i} ${AMCAST_BENCH_NUMBER_OF_NODES} ${AMCAST_BENCH_NUMBER_OF_GROUPS} ${AMCAST_BENCH_NUMBER_OF_CLIENTS} 1 < $AMCAST_BENCH_CLUSTER_CONF)> /dev/null &" Enter
-    #tmux send-keys " (${AMCAST_BIN} ${i} ${AMCAST_BENCH_NUMBER_OF_NODES} ${AMCAST_BENCH_NUMBER_OF_GROUPS} ${AMCAST_BENCH_NUMBER_OF_CLIENTS} 1 < ${AMCAST_DIR}/bench/mcast_conf/alt_cluster.conf)> /dev/null &" Enter
+start_cid=0
+end_cid=0
+client_hosts=3
+#client_hosts=$AMCAST_BENCH_NUMBER_OF_GROUPS
+for gid in `seq 1 $client_hosts` ; do
+    chid=$(( $AMCAST_BENCH_NUMBER_OF_NODES + $gid ))
+    start_cid=$(( $end_cid + 1 ))
+    end_cid=$(( ( $AMCAST_BENCH_NUMBER_OF_CLIENTS * $gid + $client_hosts - 1 ) / $client_hosts ))
+    n_clients=$(( $end_cid - ( $start_cid - 1 ) ))
+    [ $n_clients -lt 1 ] && continue
+    [ $end_cid -gt $AMCAST_BENCH_NUMBER_OF_CLIENTS ] && break
+    tmux new-window -n client_$gid
+    tmux send-keys " ssh node-$chid" Enter
+    tmux send-keys " export LD_LIBRARY_PATH=/usr/local/lib" Enter
+    for i in `seq $start_cid $end_cid` ; do
+        tmux send-keys " ${AMCAST_BIN} ${i} ${AMCAST_BENCH_NUMBER_OF_NODES} ${AMCAST_BENCH_NUMBER_OF_GROUPS} ${AMCAST_BENCH_NUMBER_OF_CLIENTS} 1 < $AMCAST_BENCH_CLUSTER_CONF  &" Enter
+        #tmux send-keys " (${AMCAST_BIN} ${i} ${AMCAST_BENCH_NUMBER_OF_NODES} ${AMCAST_BENCH_NUMBER_OF_GROUPS} ${AMCAST_BENCH_NUMBER_OF_CLIENTS} 1 < ${AMCAST_DIR}/bench/mcast_conf/alt_cluster.conf)> /dev/null &" Enter
+    done
 done
 
-tmux new-window -n client_1
-tmux send-keys " ssh node-20" Enter
-tmux send-keys " export LD_LIBRARY_PATH=/usr/local/lib" Enter
-for i in `seq $(( ( $AMCAST_BENCH_NUMBER_OF_CLIENTS / 2 ) + 1 )) $(( $AMCAST_BENCH_NUMBER_OF_CLIENTS ))` ; do
-    tmux send-keys " (${AMCAST_BIN} ${i} ${AMCAST_BENCH_NUMBER_OF_NODES} ${AMCAST_BENCH_NUMBER_OF_GROUPS} ${AMCAST_BENCH_NUMBER_OF_CLIENTS} 1 < $AMCAST_BENCH_CLUSTER_CONF)> /dev/null &" Enter
-    #tmux send-keys " (${AMCAST_BIN} ${i} ${AMCAST_BENCH_NUMBER_OF_NODES} ${AMCAST_BENCH_NUMBER_OF_GROUPS} ${AMCAST_BENCH_NUMBER_OF_CLIENTS} 1 < ${AMCAST_DIR}/bench/mcast_conf/alt_cluster.conf)> /dev/null &" Enter
-done
+exit
 
 #tmux -2 attach-session -t $AMCAST_TMUX_SESSION
