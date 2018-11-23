@@ -25,7 +25,6 @@
 #define CONF_SEPARATOR "\t"
 #define LOG_SEPARATOR "\t"
 #define NUMBER_OF_MESSAGES 100000
-#define NUMBER_OF_TARGETS 2
 #define NODES_PER_GROUP 3
 #define INITIAL_LEADER_IN_GROUP 0
 #define MEASURE_RESOLUTION 1 //Only save stats for 1 message out of MEASURE_RESOLUTION
@@ -639,9 +638,10 @@ void *run_thread(void *ptr) {
 }
 
 int main(int argc, char *argv[]) {
-    if(argc != 6) {
+    if(argc != 7) {
         printf("USAGE: node-bench [node_id] [number_of_nodes]"
-                "[number_of_groups] [total_number_of_clients] [local_number_of_clients]\n");
+                "[number_of_groups] [total_number_of_clients]"
+                "[number_of_destgrps] [local_number_of_clients]\n");
         exit(EXIT_FAILURE);
     }
 
@@ -656,9 +656,9 @@ int main(int argc, char *argv[]) {
         return (EXIT_FAILURE);
 
     //Prepare stats->size
-    int destgrps = NUMBER_OF_TARGETS;
+    int destgrps = atoi(argv[5]);
     int total_client_count = atoi(argv[4]);
-    int local_client_count = atoi(argv[5]);
+    int local_client_count = atoi(argv[6]);
 
     //CLIENT NODE PATTERN
     if(local_client_count > 0) {

@@ -11,7 +11,8 @@ AMCAST_DEPLOY=""
 AMCAST_BENCH_CLUSTER_CONF="${AMCAST_DIR}/bench/cluster.conf"
 AMCAST_BENCH_NUMBER_OF_GROUPS=5
 AMCAST_BENCH_NUMBER_OF_NODES=15
-AMCAST_BENCH_NUMBER_OF_CLIENTS=2
+AMCAST_BENCH_NUMBER_OF_CLIENTS=$2
+AMCAST_BENCH_NUMBER_OF_DESTGROUPS=$1
 
 run_nodes() {
     NODES_COUNT=$1
@@ -33,7 +34,8 @@ run_nodes() {
             ${AMCAST_BENCH_NUMBER_OF_NODES} \
             ${AMCAST_BENCH_NUMBER_OF_GROUPS} \
             ${AMCAST_BENCH_NUMBER_OF_CLIENTS} \
-            $IS_CLIENT < ${AMCAST_BENCH_CLUSTER_CONF}" Enter
+            ${AMCAST_BENCH_NUMBER_OF_DESTGROUPS} \
+            $IS_CLIENT < ${AMCAST_BENCH_CLUSTER_CONF} " Enter
     done
 }
 
@@ -99,7 +101,7 @@ for gid in `seq 1 $client_hosts` ; do
     tmux new-window -n client_$gid
     tmux send-keys " ssh node-$chid" Enter
     tmux send-keys " export LD_LIBRARY_PATH=/usr/local/lib" Enter
-    tmux send-keys " ${AMCAST_BIN} $start_cid ${AMCAST_BENCH_NUMBER_OF_NODES} ${AMCAST_BENCH_NUMBER_OF_GROUPS} ${AMCAST_BENCH_NUMBER_OF_CLIENTS} $n_clients < $AMCAST_BENCH_CLUSTER_CONF" Enter
+    tmux send-keys " ${AMCAST_BIN} $start_cid ${AMCAST_BENCH_NUMBER_OF_NODES} ${AMCAST_BENCH_NUMBER_OF_GROUPS} ${AMCAST_BENCH_NUMBER_OF_CLIENTS} ${AMCAST_BENCH_NUMBER_OF_DESTGROUPS} $n_clients < $AMCAST_BENCH_CLUSTER_CONF" Enter
 done
 
 exit
