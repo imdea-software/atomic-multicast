@@ -78,7 +78,7 @@ run_mcast_nodes() {
             tmux new-window -n ${TMUX_WINDOW_NAME_PREFIX}${gid}_$nid
             tmux send-keys " ssh node-$(( $HOST_ID + 1))" Enter
             tmux send-keys " export LD_LIBRARY_PATH=/usr/local/lib" Enter
-            tmux send-keys " nice -n 20 /users/lefort_a/libmcast/build/sample/node-simple -n $nid -g $gid -c ${AMCAST_DIR}/bench/mcast_conf/mcast-6g3p.conf -s $PROTO_OPT -p ${AMCAST_DIR}/bench/mcast_conf/paxos-6g3p-group${gid}.conf" Enter
+            tmux send-keys " nice -n 20 /users/lefort_a/libmcast/build/sample/node-simple -n $nid -g $gid -c ${AMCAST_DIR}/bench/mcast_conf/mcast-6g3p.conf -s $PROTO_OPT -p ${AMCAST_DIR}/bench/mcast_conf/paxos-6g3p-group${gid}.conf && echo success > /tmp/node.${HOST_ID}.log " Enter
         done
     done
 }
