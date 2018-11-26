@@ -345,6 +345,8 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
         struct peer *p = (struct peer *) ptr;
         struct client *c = p->c;
 
+	//static int msg_rcvgrp_counter = 0;
+
         /* Do Some STUFFS */
         struct evbuffer *in_buf = bufferevent_get_input(bev);
         while (evbuffer_get_length(in_buf) >= sizeof(struct enveloppe)) {
@@ -368,6 +370,16 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
                         continue;
                     }
                     /* --> update deliver counts */
+		    /*
+		    if(p->received < c->sent) {
+                        //printf("[c-%u] {%u,%d} DELIVER from %d\n", c->id, env.cmd.deliver.mid.time, env.cmd.deliver.mid.id, p->id);
+                        p->received++;
+			msg_rcvgrp_counter += 1;
+		    }
+		    if(msg_rcvgrp_counter < c->dests_count)
+                        break;
+		    msg_rcvgrp_counter = 0;
+		    */
                     p->received++;
                     c->received++;
                     /* --> update stats struct */
