@@ -467,6 +467,10 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
         }
         else if (events & (BEV_EVENT_EOF|BEV_EVENT_ERROR)) {
             c->connected--;
+            /*
+            if(c->sent == 0)
+                event_add(p->reconnect_ev, &nodelay);
+            */
             if((!c->exit_on_delivery && c->received < c->stats->size)
 	            || (c->exit_on_delivery && c->received < c->sent)) {
                 printf("[c-%u] Server %i left before all messages were sent: %u sent\n", c->id, p->id, c->sent);
