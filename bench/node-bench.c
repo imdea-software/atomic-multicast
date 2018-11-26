@@ -284,12 +284,29 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
 
         c->sent++;
 
+	/*
+	struct timeval start, end;
+	static double max_diff = 0;
+	gettimeofday(&start, NULL);
+	*/
+
         /* Send it to current known leaders */
         for(int i=0; i<c->ref_value->cmd.multicast.destgrps_count; i++) {
             xid_t peer_id = get_leader_from_group(c->ref_value->cmd.multicast.destgrps[i]);
             if(bufferevent_write(c->bev[peer_id], c->ref_value, sizeof(*c->ref_value)) < 0)
                     printf("[c-%u] Something bad happened (submit)\n", c->id);
         }
+
+	/*
+	gettimeofday(&end, NULL);
+	double diff = (end.tv_usec - start.tv_usec) * 1e-6
+		+ end.tv_sec - start.tv_sec;
+	if(diff > max_diff) {
+            max_diff = diff;
+	    if(max_diff > 0.001)
+	    printf("[c-%u] NEW RECORD %f\n", c->id, max_diff);
+	}
+	*/
     }
     void alt_submit_cb(evutil_socket_t fd, short flags, void *ptr) {
         struct client *c = (struct client *) ptr;
