@@ -369,8 +369,10 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
         }
         if(c->connected == c->nodes_count) {
             printf("[c-%u] Connection established to all nodes\n", c->id);
-            if(c->sent == 0)
+            if(c->sent == 0) {
+                sleep(5);
                 submit_cb(0,0,c);
+            }
         }
     }
     void alt_event_cb(struct bufferevent *bev, short events, void *ptr) {
@@ -387,8 +389,10 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
         }
         if(c->connected == c->nodes_count) {
             printf("[c-%u] Connection established to all nodes\n", c->id);
-            if(c->sent == 0)
+            if(c->sent == 0) {
+                sleep(5);
                 alt_submit_cb(0,0,c);
+            }
         }
     }
     void interrupt_cb(evutil_socket_t fd, short flags, void *ptr) {
