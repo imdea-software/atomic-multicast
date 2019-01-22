@@ -5,11 +5,11 @@ AMCAST_DIR=`dirname ${SCRIPTPATH}`
 OUTFILE="${AMCAST_DIR}/bench/cluster.conf"
 TMPFILE="/tmp/orderedIP"
 
-TOPOMAP="/proj/RDMA-RCU/exp/McastIntercoDeploy/tbdata/topomap"
+TOPOMAP="/var/emulab/boot/topomap"
 TOPOMAP_NODE_ID_PREFIX="node-"
 
 NUMBER_OF_NODES_PER_GROUP=3
-CLIENT_ONLY_NODES=1
+CLIENT_ONLY_NODES=0
 
 cat $TOPOMAP | grep $TOPOMAP_NODE_ID_PREFIX | sort -V | cut -d ":" -f2 | head -n -${CLIENT_ONLY_NODES} > $TMPFILE
 
