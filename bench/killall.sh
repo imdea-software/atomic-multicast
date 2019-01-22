@@ -11,6 +11,8 @@ AMCAST_BENCH_NUMBER_OF_NODES=18
 AMCAST_BENCH_NUMBER_OF_CLIENTS_NODES=3
 AMCAST_STORE_HOST=$(( $AMCAST_BENCH_NUMBER_OF_NODES + $AMCAST_BENCH_NUMBER_OF_CLIENTS_NODES ))
 
+PIDS=()
+
 kill_nodes() {
     NODES_COUNT=$1
     IS_CLIENT=$2
@@ -25,10 +27,13 @@ kill_nodes() {
         #AMCAST_CMD=( ${AMCAST_DEPLOY} "killall -s 1 ${AMCAST_BIN}")
         #AMCAST_CMD=( ${AMCAST_DEPLOY} "mv /tmp/${FILENAME}.* /proj/RDMA-RCU/tmp/mcast/log/")
         AMCAST_CMD=( ${AMCAST_DEPLOY} "rsync -az /tmp/${FILENAME}.* node-$AMCAST_STORE_HOST:/mnt/log/ && rm /tmp/${FILENAME}.*")
-        "${AMCAST_CMD[@]}"
+        "${AMCAST_CMD[@]}" &
+        PIDS+=($!)
     done
 }
 
 kill_nodes $AMCAST_BENCH_NUMBER_OF_NODES 0
 
 kill_nodes $AMCAST_BENCH_NUMBER_OF_CLIENTS_NODES 1
+
+for pid in ${PIDS[*]}; do wait $pid ; done
