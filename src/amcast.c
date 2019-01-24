@@ -258,8 +258,14 @@ static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
         }
         if(msg->accept_ack_groupcount[cmd->grp] >=
                 node->groups->node_counts[cmd->grp]/2 + 1
+            //Do not wait for any special quorum
+            ) {
             //Also check if the ACCEPT_ACK from the grp leader was received
-            && msg->accept_ack_counts[cmd->ballot[cmd->grp].id] > 0) {
+            //&& msg->accept_ack_counts[cmd->ballot[cmd->grp].id] > 0) {
+            //Wait for a leader's own reply
+            //&& msg->accept_ack_counts[node->id] > 0) {
+            //Wait for a leader's own reply
+            //&& msg->phase >= ACCEPTED) {
             //TODO Check for the best time to reset this counter
             if(msg->accept_ack_groupready[cmd->grp]++ == 0)
                 msg->accept_ack_totalcount += 1;
@@ -272,6 +278,14 @@ static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
         if(msg->accept_ack_totalcount != msg->msg.destgrps_count)
             return;
         if(msg->phase < COMMITTED) {
+            //USEFUL IF NOT WAITING FOR LEADERS
+            //  Use gts from last received AACK
+            //if(!msg->accept_ack_counts[node->id]) {
+            if(msg->phase < ACCEPTED) {
+                msg->gts = cmd->gts;
+                if(node->amcast->clock < msg->gts.time)
+                    node->amcast->clock = msg->gts.time;
+            }
             msg->phase = COMMITTED;
             if(msg->delivered == TRUE) {
                 pqueue_push(node->amcast->delivered_gts, msg, &msg->gts);
