@@ -26,6 +26,7 @@
 #define LOG_SEPARATOR "\t"
 #define NUMBER_OF_MESSAGES 100000
 #define NODES_PER_GROUP 3
+#define N_WAN_REGIONS 3
 #define INITIAL_LEADER_IN_GROUP 0
 #define MEASURE_RESOLUTION 1 //Only save stats for 1 message out of MEASURE_RESOLUTION
 
@@ -204,16 +205,27 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
         struct client *c = (struct client *) ptr;
         c->exit_on_delivery = 1;
     }
+    int r_cur = 0;
+    int r_off = 0;
     void submit_cb(evutil_socket_t fd, short flags, void *ptr) {
         struct client *c = (struct client *) ptr;
         /* Do some magic with the mcast message */
         /* --> update mid.time */
         c->ref_value->cmd.multicast.mid.time = c->sent++;
         /* --> select circular destgrps */
-        xid_t g_dst_id = (c->id + c->sent) % c->groups_count;
-        for(int i=0; i<c->ref_value->cmd.multicast.destgrps_count; i++) {
-            c->ref_value->cmd.multicast.destgrps[i] = g_dst_id;
-            g_dst_id = (g_dst_id + 1) % c->groups_count;
+        int good_dst = 0;
+        xid_t g_dst_local_id = -1;
+        while(!good_dst) {
+            xid_t g_dst_id = (c->id + r_off) % c->groups_count;
+            for(int i=0; i<c->ref_value->cmd.multicast.destgrps_count; i++) {
+                c->ref_value->cmd.multicast.destgrps[i] = g_dst_id;
+                if(!good_dst && ((g_dst_id % N_WAN_REGIONS) == (gid % N_WAN_REGIONS))) {
+                    good_dst = 1;
+                    g_dst_local_id = g_dst_id;
+                }
+                g_dst_id = (g_dst_id + 1) % c->groups_count;
+            }
+            r_off++;
         }
         /* --> update stats struct */
         if( ((stats->delivered + 1) % MEASURE_RESOLUTION) == 0) {
@@ -231,22 +243,32 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
     void alt_submit_cb(evutil_socket_t fd, short flags, void *ptr) {
         struct client *c = (struct client *) ptr;
         /* Do some magic with the mcast message */
-        /* --> select starting group */
-        xid_t g_dst_id = (c->id + c->sent) % c->groups_count;
+        /* --> select circular destgrps */
+        int good_dst = 0;
+        xid_t g_dst_local_id = -1;
+        while(!good_dst) {
+            xid_t g_dst_id = (c->id + r_off) % c->groups_count;
+            for(int i=0; i<c->ref_msg->to_groups_len; i++) {
+                c->ref_msg->to_groups[i] = g_dst_id;
+                c->ref_value->cmd.multicast.destgrps[i] = g_dst_id;
+                if(!good_dst) {
+                    if((g_dst_id % N_WAN_REGIONS) == (gid % N_WAN_REGIONS)) {
+                        good_dst = 1;
+                        g_dst_local_id = g_dst_id;
+                    }
+                }
+                g_dst_id = (g_dst_id + 1) % c->groups_count;
+            }
+            r_off++;
+        }
         /* --> update origin group */
-        c->ref_msg->from_group = g_dst_id;
+        c->ref_msg->from_group = g_dst_local_id;
         c->ref_msg->from_node = INITIAL_LEADER_IN_GROUP;
         /* --> update msg uid */
         c->ref_msg->uid = generate_uid(c->ref_msg->from_group, c->ref_msg->from_node, c->sent);
         c->ref_value->cmd.multicast.mid.time = c->sent;
         /* --> embed client mid in payload */
         ((struct custom_payload *) c->ref_msg->value.mcast_value_val)->mid = c->ref_value->cmd.multicast.mid;
-        /* --> select circular destgrps */
-        for(int i=0; i<c->ref_msg->to_groups_len; i++) {
-            c->ref_msg->to_groups[i] = g_dst_id;
-            c->ref_value->cmd.multicast.destgrps[i] = g_dst_id;
-            g_dst_id = (g_dst_id + 1) % c->groups_count;
-        }
         /* --> update stats struct */
         if( ((stats->delivered + 1) % MEASURE_RESOLUTION) == 0) {
             stats->msg[c->ref_value->cmd.multicast.mid.time] = c->ref_value->cmd.multicast;
