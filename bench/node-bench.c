@@ -380,6 +380,10 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
                     if(c->last_gts && paircmp(&env.cmd.deliver.gts, c->last_gts) <= 0) {
                         continue;
                     }
+                    /*
+                    if(env.cmd.deliver.mid.time != c->received)
+                        continue;
+                    */
                     if(stats->tv_dev[env.cmd.deliver.mid.time].tv_sec != 0
                             && stats->tv_dev[env.cmd.deliver.mid.time].tv_nsec != 0) {
                         printf("[c-%u] FAILURE: received deliver ack with wrong s-mid %u instead of %u from %d\n",
@@ -442,6 +446,10 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
             if(c->last_gts && msg.timestamp <= c->last_gts->time) {
 	        continue;
             }
+            /*
+            if(mid.time != c->received)
+	        continue;
+            */
             if(stats->tv_dev[mid.time].tv_sec != 0 && stats->tv_dev[mid.time].tv_nsec != 0) {
                 printf("[c-%u] FAILURE: received deliver ack with wrong s-mid %u instead of %u from %d\n",
                     c->id, mid.time, c->ref_value->cmd.multicast.mid.time, p->id);
