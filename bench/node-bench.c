@@ -29,6 +29,9 @@
 #define INITIAL_LEADER_IN_GROUP 0
 #define MEASURE_RESOLUTION 1 //Only save stats for 1 message out of MEASURE_RESOLUTION
 
+typedef enum { AMCAST, BASECAST, FAMCAST } proto_t;
+proto_t proto;
+
 xid_t gid;
 
 struct stats {
@@ -443,9 +446,13 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
             bufferevent_free(*bev);
         }
         *bev = bufferevent_socket_new(c->base, -1, BEV_OPT_CLOSE_ON_FREE);
-        //TODO CHANGETHIS: Have to edit those 2 lines to switch back to libevamcast
-        bufferevent_setcb(*bev, read_cb, NULL, event_cb, p);
-        bufferevent_setwatermark(*bev, EV_READ, sizeof(struct enveloppe), 0);
+        if(proto == AMCAST) {
+            bufferevent_setcb(*bev, read_cb, NULL, event_cb, p);
+            bufferevent_setwatermark(*bev, EV_READ, sizeof(struct enveloppe), 0);
+        } else {
+            bufferevent_setcb(*bev, alt_read_cb, NULL, alt_event_cb, p);
+            //bufferevent_setwatermark(*bev, EV_READ, sizeof(struct enveloppe), 0);
+        }
         bufferevent_enable(*bev, EV_READ|EV_WRITE);
         struct sockaddr_in addr = {
             .sin_family = AF_INET,
@@ -640,7 +647,7 @@ void *run_thread(void *ptr) {
 }
 
 int main(int argc, char *argv[]) {
-    if(argc != 8) {
+    if(argc != 9) {
         printf("USAGE: node-bench [node_id] [group_id] [number_of_nodes]"
                 "[number_of_groups] [total_number_of_clients]"
                 "[number_of_destgrps] [local_number_of_clients]\n");
@@ -662,6 +669,17 @@ int main(int argc, char *argv[]) {
     int destgrps = atoi(argv[6]);
     int total_client_count = atoi(argv[5]);
     int local_client_count = atoi(argv[7]);
+
+    if(strcmp("amcast", argv[8]) == 0)
+        proto = AMCAST;
+    else if(strcmp("basecast", argv[8]) == 0)
+        proto = BASECAST;
+    else if(strcmp("famcast", argv[8]) == 0)
+        proto = FAMCAST;
+    else {
+        printf("ERROR: unsupported protocol\n");
+        return EXIT_FAILURE;
+    }
 
     //CLIENT NODE PATTERN
     if(local_client_count > 0) {

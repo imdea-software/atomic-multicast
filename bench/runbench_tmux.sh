@@ -13,6 +13,7 @@ AMCAST_BENCH_NUMBER_OF_GROUPS=5
 AMCAST_BENCH_NUMBER_OF_NODES=15
 AMCAST_BENCH_NUMBER_OF_CLIENTS=$2
 AMCAST_BENCH_NUMBER_OF_DESTGROUPS=$1
+PROTO=$3
 
 run_nodes() {
     NODES_COUNT=$1
@@ -37,7 +38,7 @@ run_nodes() {
             ${AMCAST_BENCH_NUMBER_OF_GROUPS} \
             ${AMCAST_BENCH_NUMBER_OF_CLIENTS} \
             ${AMCAST_BENCH_NUMBER_OF_DESTGROUPS} \
-            $IS_CLIENT < ${AMCAST_BENCH_CLUSTER_CONF} " Enter
+            $IS_CLIENT amcast < ${AMCAST_BENCH_CLUSTER_CONF}" Enter #&& echo success > /tmp/node.${id}.log" Enter
     done
 }
 
@@ -65,7 +66,8 @@ run_mcast_nodes() {
     GROUP_IDS=`seq 0 $((${GROUPS_COUNT} - 1))`
     TMUX_WINDOW_NAME_PREFIX=n_
 
-    PROTO=famcast
+    [ $PROTO = "basecast" ] && PROTO_OPT=amcast
+    [ $PROTO = "famcast" ] && PROTO_OPT=famcast
 
     for gid in ${GROUP_IDS} ; do
         for nid in `seq 0 2` ; do
@@ -74,18 +76,20 @@ run_mcast_nodes() {
             tmux new-window -n ${TMUX_WINDOW_NAME_PREFIX}${gid}_$nid
             tmux send-keys " ssh node-$(( $HOST_ID + 1))" Enter
             tmux send-keys " export LD_LIBRARY_PATH=/usr/local/lib" Enter
-            tmux send-keys " /users/lefort_a/libmcast/build/sample/node-simple -n $nid -g $gid -c ${AMCAST_DIR}/bench/mcast_conf/mcast-6g3p.conf -s $PROTO -p ${AMCAST_DIR}/bench/mcast_conf/paxos-6g3p-group${gid}.conf" Enter
+            tmux send-keys " /users/lefort_a/libmcast/build/sample/node-simple -n $nid -g $gid -c ${AMCAST_DIR}/bench/mcast_conf/mcast-6g3p.conf -s $PROTO_OPT -p ${AMCAST_DIR}/bench/mcast_conf/paxos-6g3p-group${gid}.conf" Enter
         done
     done
 }
 
 tmux -2 new-session -d -s $AMCAST_TMUX_SESSION
 
-run_nodes $AMCAST_BENCH_NUMBER_OF_NODES 0
-
-#run_px_nodes $AMCAST_BENCH_NUMBER_OF_GROUPS
-#sleep 10
-#run_mcast_nodes $AMCAST_BENCH_NUMBER_OF_GROUPS
+if [ $PROTO = "amcast" ] ; then
+    run_nodes $AMCAST_BENCH_NUMBER_OF_NODES 0
+elif [ $PROTO = "basecast" ] || [ $PROTO = "famcast" ] ; then
+    run_px_nodes $AMCAST_BENCH_NUMBER_OF_GROUPS
+    sleep 10
+    run_mcast_nodes $AMCAST_BENCH_NUMBER_OF_GROUPS
+fi
 
 sleep 10
 
@@ -103,7 +107,7 @@ for gid in `seq 1 $client_hosts` ; do
     tmux new-window -n client_$gid
     tmux send-keys " ssh node-$chid" Enter
     tmux send-keys " export LD_LIBRARY_PATH=/usr/local/lib" Enter
-    tmux send-keys " ${AMCAST_BIN} $start_cid $(( $gid - 1)) ${AMCAST_BENCH_NUMBER_OF_NODES} ${AMCAST_BENCH_NUMBER_OF_GROUPS} ${AMCAST_BENCH_NUMBER_OF_CLIENTS} ${AMCAST_BENCH_NUMBER_OF_DESTGROUPS} $n_clients < $AMCAST_BENCH_CLUSTER_CONF" Enter
+    tmux send-keys " ${AMCAST_BIN} $start_cid $(( $gid - 1)) ${AMCAST_BENCH_NUMBER_OF_NODES} ${AMCAST_BENCH_NUMBER_OF_GROUPS} ${AMCAST_BENCH_NUMBER_OF_CLIENTS} ${AMCAST_BENCH_NUMBER_OF_DESTGROUPS} $n_clients $PROTO < $AMCAST_BENCH_CLUSTER_CONF" Enter
 done
 
 exit
