@@ -29,6 +29,8 @@
 #define INITIAL_LEADER_IN_GROUP 0
 #define MEASURE_RESOLUTION 1 //Only save stats for 1 message out of MEASURE_RESOLUTION
 
+xid_t gid;
+
 struct stats {
     long delivered;
     long count;
@@ -638,8 +640,8 @@ void *run_thread(void *ptr) {
 }
 
 int main(int argc, char *argv[]) {
-    if(argc != 7) {
-        printf("USAGE: node-bench [node_id] [number_of_nodes]"
+    if(argc != 8) {
+        printf("USAGE: node-bench [node_id] [group_id] [number_of_nodes]"
                 "[number_of_groups] [total_number_of_clients]"
                 "[number_of_destgrps] [local_number_of_clients]\n");
         exit(EXIT_FAILURE);
@@ -648,7 +650,8 @@ int main(int argc, char *argv[]) {
     //Init node & cluster config
     struct cluster_config *config = malloc(sizeof(struct cluster_config));
     xid_t node_id = atoi(argv[1]);
-    init_cluster_config(config, atoi(argv[2]), atoi(argv[3]));
+    gid = atoi(argv[2]);
+    init_cluster_config(config, atoi(argv[3]), atoi(argv[4]));
     read_cluster_config_from_stdin(config);
 
     //IGNORE SIGPIPES (USEFUL FOR RECOVERY)
@@ -656,9 +659,9 @@ int main(int argc, char *argv[]) {
         return (EXIT_FAILURE);
 
     //Prepare stats->size
-    int destgrps = atoi(argv[5]);
-    int total_client_count = atoi(argv[4]);
-    int local_client_count = atoi(argv[6]);
+    int destgrps = atoi(argv[6]);
+    int total_client_count = atoi(argv[5]);
+    int local_client_count = atoi(argv[7]);
 
     //CLIENT NODE PATTERN
     if(local_client_count > 0) {
