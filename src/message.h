@@ -14,6 +14,7 @@ typedef enum cmd_type {
     INIT_CLIENT,
     INIT_NODE,
     //AMCAST COMMANDS
+    MSTART,
     MULTICAST,
     ACCEPT,
     ACCEPT_ACK,

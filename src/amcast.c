@@ -68,6 +68,14 @@ static struct amcast_msg *init_amcast_msg(struct groups *groups, unsigned int cl
 static void reset_accept_ack_counters(struct amcast_msg *msg, struct groups *groups, unsigned int cluster_size);
 static int free_amcast_msg(m_uid_t *mid, struct amcast_msg *msg, void *arg);
 
+static void handle_start(struct node *node, xid_t sid, message_t *cmd) {
+    //printf("[%u] {%u,%d} We got START command from %u!\n", node->id, cmd->mid.time, cmd->mid.id, sid);
+    struct enveloppe rep = { .sid = node->id, .cmd_type = MULTICAST, .cmd.multicast = *cmd };
+    for(xid_t *grp = cmd->destgrps; grp < cmd->destgrps + cmd->destgrps_count; grp++) {
+        send_to_peer(node, &rep, node->groups->members[*grp][0]);
+    }
+}
+
 static void handle_multicast(struct node *node, xid_t sid, message_t *cmd) {
     //printf("[%u] {%u,%d} We got MULTICAST command from %u!\n", node->id, cmd->mid.time, cmd->mid.id, sid);
     if (node->amcast->status == LEADER) {
@@ -712,6 +720,9 @@ static void handle_newleader_sync_ack(struct node *node, xid_t sid, newleader_sy
 
 void dispatch_amcast_command(struct node *node, struct enveloppe *env) {
     switch(env->cmd_type) {
+        case MSTART:
+            handle_start(node, env->sid, &(env->cmd.multicast));
+            break;
         case MULTICAST:
             handle_multicast(node, env->sid, &(env->cmd.multicast));
             break;
