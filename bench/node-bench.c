@@ -47,6 +47,7 @@ void write_report(struct stats *stats, FILE *stream) {
         message_t msg = stats->msg[i];
         struct timespec ts_start = stats->tv_ini[i];
         struct timespec ts_end = stats->tv_dev[i];
+        if(ts_end.tv_sec == 0 && ts_end.tv_nsec == 0) continue;
         g_uid_t gts = stats->gts[i];
         //Write to a string the destination groups
         char *destgrps = malloc(sizeof(char) * (1 + 1 + (12 + 1) * msg.destgrps_count) + 1);
