@@ -310,7 +310,7 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
                 exit(EXIT_FAILURE);
             }
             /* --> do not re-deliver messages */
-            if(c->last_gts && msg.timestamp <= c->last_gts.time)
+            if(c->last_gts && msg.timestamp <= c->last_gts->time)
                 continue;
             /* --> update deliver counts */
             p->received++;
