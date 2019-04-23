@@ -465,7 +465,7 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
 	            || (c->exit_on_delivery && c->received < c->sent)) {
                 printf("[c-%u] Server %i left before all messages were sent: %u sent\n", c->id, p->id, c->sent);
                 if(c->sent > 0) {
-                xid_t gid = p->id / NODES_PER_GROUP;
+                xid_t gid = c->config->group_membership[p->id];
                 if(p->id == get_leader_from_group(gid)) {
                     bufferevent_trigger(c->bev[p->id], EV_READ, 0);
                     //TODO Get real pattern to infer new leader
@@ -481,7 +481,11 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
                         printf("[c-%u] {%u,%d} RETRYING to %d after %d failure\n", c->id,
                                 c->ref_value->cmd.multicast.mid.time,
                                 c->ref_value->cmd.multicast.mid.id, c->leaders[gid], p->id);
+                        c->ref_value->cmd_type = MULTICAST;
                         write_enveloppe(c->bev[c->leaders[gid]], c->ref_value);
+                        //TODO Record initial proxy to avoid potential proxy change
+                        //c->ref_value->cmd_type = MSTART;
+                        //write_enveloppe(c->bev[c->leaders[c->ref_value->cmd.multicast.destgrps[0]]], c->ref_value);
                     }
                 }
                 }
