@@ -46,6 +46,13 @@ void send_to_group(struct node *node, struct enveloppe *env, xid_t group_id) {
         send_to_peer(node, env, *peer);
 }
 
+void send_to_group_except_me(struct node *node, struct enveloppe *env, xid_t group_id) {
+    for(xid_t *peer = node->groups->members[group_id];
+            peer < node->groups->members[group_id] + node->groups->node_counts[group_id]; peer++)
+        if(*peer != node->id)
+            send_to_peer(node, env, *peer);
+}
+
 void send_to_destgrps(struct node *node, struct enveloppe *env, xid_t *destgrps, unsigned int count) {
     for(xid_t *grp = destgrps; grp < destgrps+count; grp++)
         send_to_group(node, env, *grp);

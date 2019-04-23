@@ -571,7 +571,7 @@ static void handle_newleader_ack(struct node *node, xid_t sid, newleader_ack_t *
     }
     htable_foreach(node->amcast->h_msgs, (GHFunc) fill_rep, &rep);
     //TODO CHANGETHIS do not send this to itself (group except me)
-    send_to_group(node, &rep, node->comm->groups[node->id]);
+    send_to_group_except_me(node, &rep, node->comm->groups[node->id]);
 }
 
 static void handle_newleader_sync(struct node *node, xid_t sid, newleader_sync_t *cmd) {

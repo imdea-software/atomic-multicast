@@ -47,6 +47,7 @@ void read_enveloppe(struct bufferevent *bev, struct enveloppe *env);
 void write_enveloppe(struct bufferevent *bev, struct enveloppe *env);
 void send_to_destgrps(struct node *node, struct enveloppe *env, xid_t *destgrps, unsigned int count);
 void send_to_group(struct node *node, struct enveloppe *env, xid_t group_id);
+void send_to_group_except_me(struct node *node, struct enveloppe *env, xid_t group_id);
 void send_to_peer(struct node *node, struct enveloppe *env, xid_t peer_id);
 void send_to_client(struct node *node, struct enveloppe *env, xid_t client_id);
 
