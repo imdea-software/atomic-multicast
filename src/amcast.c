@@ -129,7 +129,7 @@ static void handle_accept(struct node *node, xid_t sid, accept_t *cmd) {
     }
     if(paircmp(&msg->accept_max_lts, &cmd->lts) < 0)
         msg->accept_max_lts = cmd->lts;
-    if(msg->phase <= ACCEPTED && paircmp(&cmd->lts, &msg->lts[cmd->grp]) < 0) {
+    if(msg->phase == ACCEPTED && paircmp(&cmd->lts, &msg->lts[cmd->grp]) < 0) {
         msg->accept_max_lts = default_pair;
         for(xid_t *grp = msg->msg.destgrps; grp < msg->msg.destgrps + msg->msg.destgrps_count; grp++)
             if(paircmp(&msg->lts[*grp], &msg->accept_max_lts) > 0)
