@@ -282,6 +282,7 @@ static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
             //  Use gts from last received AACK
             //if(!msg->accept_ack_counts[node->id]) {
             if(msg->phase < ACCEPTED) {
+                msg->collection = 1;
                 msg->gts = cmd->gts;
                 if(node->amcast->clock < msg->gts.time)
                     node->amcast->clock = msg->gts.time;
