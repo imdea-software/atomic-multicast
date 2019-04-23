@@ -43,7 +43,7 @@ struct enveloppe {
 };
 
 void dispatch_message(struct node *node, struct enveloppe *env);
-void read_enveloppe(struct bufferevent *bev, struct enveloppe *env);
+int read_enveloppe(struct bufferevent *bev, struct enveloppe *env);
 void write_enveloppe(struct bufferevent *bev, struct enveloppe *env);
 void send_to_destgrps(struct node *node, struct enveloppe *env, xid_t *destgrps, unsigned int count);
 void send_to_group(struct node *node, struct enveloppe *env, xid_t group_id);

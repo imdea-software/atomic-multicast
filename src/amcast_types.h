@@ -5,7 +5,6 @@
 
 #include "types.h"
 
-#define MAX_MSG_DIFF 100
 #define MAX_NUMBER_OF_GROUPS 10
 //#define MAX_PAYLOAD_LEN 156
 #define MAX_PAYLOAD_LEN 20
@@ -94,14 +93,14 @@ typedef struct newleader_ack {
     p_uid_t		aballot;
     clk_t 		clock;
     int 		msg_count;
-    msgstate_t messages[MAX_MSG_DIFF];
+    msgstate_t		*messages;
 } newleader_ack_t;
 
 typedef struct newleader_sync {
     p_uid_t 		ballot;
     clk_t 		clock;
     int 		msg_count;
-    msgstate_t messages[MAX_MSG_DIFF];
+    msgstate_t		*messages;
 } newleader_sync_t;
 
 typedef struct newleader_sync_ack {

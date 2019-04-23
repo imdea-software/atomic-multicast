@@ -1,4 +1,5 @@
 #include <event2/bufferevent.h>
+#include <event2/buffer.h>
 
 #include "node.h"
 #include "message.h"
@@ -15,13 +16,61 @@ void dispatch_message(struct node *node, struct enveloppe *env) {
 }
 
 //TODO Properly implement de-serialization of the enveloppe and its content
-void read_enveloppe(struct bufferevent *bev, struct enveloppe *env) {
-    bufferevent_read(bev, env, sizeof(struct enveloppe));
+int read_enveloppe(struct bufferevent *bev, struct enveloppe *env) {
+    struct evbuffer *ev_in = bufferevent_get_input(bev);
+    size_t msg_size = sizeof(struct enveloppe);
+
+    evbuffer_copyout(ev_in, env, msg_size);
+    switch(env->cmd_type) {
+        case NEWLEADER_ACK:
+            msg_size += env->cmd.newleader_ack.msg_count * sizeof(msgstate_t);
+            if(evbuffer_get_length(ev_in) < msg_size) {
+                bufferevent_setwatermark(bev, EV_READ, msg_size, 0);
+                return 0;
+            }
+            bufferevent_setwatermark(bev, EV_READ, sizeof(struct enveloppe), 0);
+            evbuffer_drain(ev_in, sizeof(struct enveloppe));
+            //TODO Avoid copying data out of in_evbuffer
+            //TODO memleak here, this is never freed
+            env->cmd.newleader_ack.messages = malloc(env->cmd.newleader_ack.msg_count * sizeof(msgstate_t));
+            evbuffer_remove(ev_in, env->cmd.newleader_ack.messages, env->cmd.newleader_ack.msg_count * sizeof(msgstate_t));
+            break;
+        case NEWLEADER_SYNC:
+            msg_size += env->cmd.newleader_sync.msg_count * sizeof(msgstate_t);
+            if(evbuffer_get_length(ev_in) < msg_size) {
+                bufferevent_setwatermark(bev, EV_READ, msg_size, 0);
+                return 0;
+            }
+            bufferevent_setwatermark(bev, EV_READ, sizeof(struct enveloppe), 0);
+            evbuffer_drain(ev_in, sizeof(struct enveloppe));
+            //TODO Avoid copying data out of in_evbuffer
+            //TODO memleak here, this is never freed
+            env->cmd.newleader_sync.messages = malloc(env->cmd.newleader_sync.msg_count * sizeof(msgstate_t));
+            evbuffer_remove(ev_in, env->cmd.newleader_sync.messages, env->cmd.newleader_sync.msg_count * sizeof(msgstate_t));
+            break;
+        default:
+            evbuffer_drain(ev_in, msg_size);
+            break;
+    }
+    return 1;
 }
 
 //TODO Properly implement serialization of the enveloppe and its content
 void write_enveloppe(struct bufferevent *bev, struct enveloppe *env) {
-    bufferevent_write(bev, env, sizeof(struct enveloppe));
+    struct evbuffer *ev_out = bufferevent_get_output(bev);
+    evbuffer_add(ev_out, env, sizeof(struct enveloppe));
+    switch(env->cmd_type) {
+        case NEWLEADER_ACK:
+            evbuffer_add_reference(ev_out, env->cmd.newleader_ack.messages,
+                    env->cmd.newleader_ack.msg_count * sizeof(msgstate_t), NULL, NULL);
+            break;
+        case NEWLEADER_SYNC:
+            evbuffer_add_reference(ev_out, env->cmd.newleader_sync.messages,
+                    env->cmd.newleader_sync.msg_count * sizeof(msgstate_t), NULL, NULL);
+            break;
+        default:
+            break;
+    }
 }
 
 void send_to_peer(struct node *node, struct enveloppe *env, xid_t peer_id) {
