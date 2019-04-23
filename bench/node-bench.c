@@ -498,7 +498,7 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
             */
             if((!c->exit_on_delivery && c->received < c->stats->size)
 	            || (c->exit_on_delivery && c->received < c->sent)) {
-                printf("[c-%u] Server %i left before all messages were sent: %u sent\n", c->id, p->id, c->sent);
+                //printf("[c-%u] Server %i left before all messages were sent: %u sent\n", c->id, p->id, c->sent);
                 if(c->sent > 0) {
                 xid_t gid = p->id / NODES_PER_GROUP;
                 if(p->id == get_leader_from_group(gid)) {
@@ -513,9 +513,9 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
                             is_in_destgrps = 1;
                     }
                     if(is_in_destgrps && c->received < c->sent) {
-                        printf("[c-%u] {%u,%d} RETRYING to %d after %d failure\n", c->id,
-                                c->ref_value->cmd.multicast.mid.time,
-                                c->ref_value->cmd.multicast.mid.id, c->leaders[gid], p->id);
+                        //printf("[c-%u] {%u,%d} RETRYING to %d after %d failure\n", c->id,
+                        //        c->ref_value->cmd.multicast.mid.time,
+                        //        c->ref_value->cmd.multicast.mid.id, c->leaders[gid], p->id);
                         write_enveloppe(c->bev[c->leaders[gid]], c->ref_value);
                     }
                 }
