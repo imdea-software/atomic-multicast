@@ -8,7 +8,7 @@ runall() {
 
 case $1 in
 killall)
-	runall sudo killall -s $2 node-bench node-simple proposer-acceptor
+	runall sudo killall -s $2 node-bench node-simple proposer-acceptor memcheck-amd64- gdb valgrind
 	;;
 rm)
 	runall rm -f /tmp/{node,client}.*.log
