@@ -56,6 +56,7 @@ struct timespec start, end;
 
 struct timeval nodelay = { .tv_sec = 0, .tv_usec = 0 };
 struct timeval five_seconds = { .tv_sec = 5, .tv_usec = 0 };
+struct timeval node_failure_timeout = { .tv_sec = 75, .tv_usec = 0 };
 struct timeval exit_node_timeout = { .tv_sec = 200, .tv_usec = 0 };
 struct timeval exit_client_timeout = { .tv_sec = 180, .tv_usec = 0 };
 
@@ -99,6 +100,10 @@ void write_report(struct stats *stats, FILE *stream) {
                         stats->pq_size[i]);
         free(destgrps);
     }
+}
+
+static void fail_on_timeout_cb(evutil_socket_t fd, short flags, void *ptr) {
+    kill(getpid(), SIGINT);
 }
 
 static void terminate_on_timeout_cb(evutil_socket_t fd, short flags, void *ptr) {
@@ -165,7 +170,12 @@ struct node *run_amcast_node(struct cluster_config *config, xid_t node_id, void 
     //TODO Do no configure the protocol manually like this
     n->amcast->status = (node_id % NODES_PER_GROUP == INITIAL_LEADER_IN_GROUP) ? LEADER : FOLLOWER;
     n->amcast->ballot.id = n->comm->groups[node_id] * NODES_PER_GROUP;
-    event_base_once(n->events->base, -1, EV_TIMEOUT, terminate_on_timeout_cb, NULL, &exit_node_timeout);
+    //Have the 9-th node fail for recovery experiments.
+    //TODO Handle this in an external recovery experiment script.
+    if(node_id == 9)
+        event_base_once(n->events->base, -1, EV_TIMEOUT, fail_on_timeout_cb, NULL, &node_failure_timeout);
+    else
+        event_base_once(n->events->base, -1, EV_TIMEOUT, terminate_on_timeout_cb, NULL, &exit_node_timeout);
     node_start(n);
     return(n);
 }
