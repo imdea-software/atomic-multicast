@@ -24,9 +24,9 @@
 
 #define CONF_SEPARATOR "\t"
 #define LOG_SEPARATOR "\t"
-#define NUMBER_OF_MESSAGES 10000000
+#define NUMBER_OF_MESSAGES 180000000
 #define NODES_PER_GROUP 3
-#define N_WAN_REGIONS 1
+#define N_WAN_REGIONS 3
 #define INITIAL_LEADER_IN_GROUP 0
 #define MEASURE_RESOLUTION 1 //Only save stats for 1 message out of MEASURE_RESOLUTION
 

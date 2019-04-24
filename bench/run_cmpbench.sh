@@ -23,7 +23,7 @@ esac
 
 exp_terminate() {
     pids=()
-    for i in `seq 31 40` ; do ssh node-$i killall node-bench & pids+=($!) ; done
+    for i in `seq 31 39` ; do ssh node-$i killall node-bench & pids+=($!) ; done
     for pid in ${pids[*]}; do wait $pid ; done
 
     pids=()
@@ -41,17 +41,17 @@ exp_run() {
     mkdir -p $destdir
     rm ${tmpdir}/{client,node}.*.log
 
-    /nfs/libamcast/bench/runbench_tmux.sh $destgrps $n_clients $protocol
+    /home/anatole/libamcast/bench/runbench_tmux.sh $destgrps $n_clients $protocol
 
     sleep $timeout
 
     exp_terminate
     sleep $terminate_wait
 
-    /nfs/libamcast/bench/killall.sh
+    /home/anatole/libamcast/bench/killall.sh
 
-    [ `ls ${tmpdir}/client.*.log | wc -l` -ne $n_clients ] && echo "ERROR: some clients have failed" && ret=1
-    [ `ls ${tmpdir}/node.*.log | wc -l` -ne 30 ] && echo "ERROR: some nodes have failed" && ls ${tmpdir}/node.*.log && ret=1
+    [ `ls ${tmpdir}/client.*.log | wc -l` -ne $(( $n_clients == 1 ? $n_clients : 9 )) ] && echo "ERROR: some clients have failed" && ret=1
+    #[ `ls ${tmpdir}/node.*.log | wc -l` -ne 30 ] && echo "ERROR: some nodes have failed" && ls ${tmpdir}/node.*.log && ret=1
 
     if [ $ret -eq 0 ] ; then
         cat ${tmpdir}/client.*.log > ${destdir}/all.clients.log

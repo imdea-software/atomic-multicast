@@ -2,7 +2,7 @@
 
 runall() {
     pids=()
-    for i in {1..40} ; do ssh node-$i $@ & pids+=($!) ; done
+    for i in {1..39} ; do ssh node-$i $@ & pids+=($!) ; done
     for pid in ${pids[*]}; do wait $pid ; done
 }
 
