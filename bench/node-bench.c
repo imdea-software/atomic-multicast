@@ -35,6 +35,10 @@ proto_t proto;
 
 xid_t gid;
 
+struct shared_cb_arg {
+    struct timespec tv_ini;
+};
+
 struct stats {
     long delivered;
     long count;
@@ -92,17 +96,21 @@ static void terminate_on_timeout_cb(evutil_socket_t fd, short flags, void *ptr) 
 
 //Record useful info regarding the initiated message
 void msginit_cb(struct node *node, struct amcast_msg *msg, void *cb_arg) {
-    struct timespec *tv_ini = malloc(sizeof(struct timespec));
-    clock_gettime(CLOCK_MONOTONIC, tv_ini);
-    msg->shared_cb_arg = tv_ini;
+    struct shared_cb_arg *shared_cb_arg = malloc(sizeof(struct shared_cb_arg));
+
+    clock_gettime(CLOCK_MONOTONIC, &shared_cb_arg->tv_ini);
+
+    msg->shared_cb_arg = shared_cb_arg;
 }
 
 //Record useful info regarding the delivered message
 void delivery_cb(struct node *node, struct amcast_msg *msg, void *cb_arg) {
     struct stats *stats = (struct stats *) cb_arg;
+    struct shared_cb_arg *shared_cb_arg = (struct shared_cb_arg *) msg->shared_cb_arg;
+
     if( ((stats->delivered + 1) % MEASURE_RESOLUTION) == 0) {
         clock_gettime(CLOCK_MONOTONIC, stats->tv_dev + stats->count);
-        stats->tv_ini[stats->count] = *((struct timespec *) msg->shared_cb_arg);
+        stats->tv_ini[stats->count] = shared_cb_arg->tv_ini;
         stats->gts[stats->count] = msg->gts;
         stats->msg[stats->count] = msg->msg;
         stats->count++;
