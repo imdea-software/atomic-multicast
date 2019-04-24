@@ -37,6 +37,7 @@ xid_t gid;
 
 struct shared_cb_arg {
     struct timespec tv_ini;
+    struct timespec tv_commit;
 };
 
 struct stats {
@@ -44,6 +45,7 @@ struct stats {
     long count;
     long size;
     struct timespec *tv_ini;
+    struct timespec *tv_commit;
     struct timespec *tv_dev;
     g_uid_t *gts;
     message_t *msg;
@@ -59,6 +61,7 @@ void write_report(struct stats *stats, FILE *stream) {
         //Retrieve measures & the message's context
         message_t msg = stats->msg[i];
         struct timespec ts_start = stats->tv_ini[i];
+        struct timespec ts_commit = stats->tv_commit[i];
         struct timespec ts_end = stats->tv_dev[i];
         if(ts_end.tv_sec == 0 && ts_end.tv_nsec == 0) continue;
         g_uid_t gts = stats->gts[i];
@@ -73,6 +76,7 @@ void write_report(struct stats *stats, FILE *stream) {
         fprintf(stream, "(%u,%d)" LOG_SEPARATOR
                         "%lld.%.9ld" LOG_SEPARATOR
                         "%lld.%.9ld" LOG_SEPARATOR
+                        "%lld.%.9ld" LOG_SEPARATOR
                         "(%u,%d)" LOG_SEPARATOR
                         "%u" LOG_SEPARATOR
                         "%s" LOG_SEPARATOR
@@ -81,6 +85,7 @@ void write_report(struct stats *stats, FILE *stream) {
                         msg.mid.time, msg.mid.id,
                         (long long)ts_start.tv_sec, ts_start.tv_nsec,
                         (long long)ts_end.tv_sec, ts_end.tv_nsec,
+                        (long long)ts_commit.tv_sec, ts_commit.tv_nsec,
                         gts.time, gts.id,
                         msg.destgrps_count,
                         destgrps,
@@ -99,8 +104,16 @@ void msginit_cb(struct node *node, struct amcast_msg *msg, void *cb_arg) {
     struct shared_cb_arg *shared_cb_arg = malloc(sizeof(struct shared_cb_arg));
 
     clock_gettime(CLOCK_MONOTONIC, &shared_cb_arg->tv_ini);
+    shared_cb_arg->tv_commit = shared_cb_arg->tv_ini;
 
     msg->shared_cb_arg = shared_cb_arg;
+}
+
+//Record useful info regarding the committed message
+void commit_cb(struct node *node, struct amcast_msg *msg, void *cb_arg) {
+    struct shared_cb_arg *shared_cb_arg = (struct shared_cb_arg *) msg->shared_cb_arg;
+
+    clock_gettime(CLOCK_MONOTONIC, &shared_cb_arg->tv_commit);
 }
 
 //Record useful info regarding the delivered message
@@ -111,6 +124,7 @@ void delivery_cb(struct node *node, struct amcast_msg *msg, void *cb_arg) {
     if( ((stats->delivered + 1) % MEASURE_RESOLUTION) == 0) {
         clock_gettime(CLOCK_MONOTONIC, stats->tv_dev + stats->count);
         stats->tv_ini[stats->count] = shared_cb_arg->tv_ini;
+        stats->tv_commit[stats->count] = shared_cb_arg->tv_commit;
         stats->gts[stats->count] = msg->gts;
         stats->msg[stats->count] = msg->msg;
         stats->count++;
@@ -124,7 +138,7 @@ void delivery_cb(struct node *node, struct amcast_msg *msg, void *cb_arg) {
 struct node *run_amcast_node(struct cluster_config *config, xid_t node_id, void *dev_cb_arg) {
     struct node *n = node_init(config, node_id,
 		               &msginit_cb, NULL,
-			       NULL, NULL,
+			       &commit_cb, NULL,
 			       NULL, NULL,
 			       NULL, NULL,
 			       &delivery_cb, dev_cb_arg);
@@ -336,6 +350,7 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
                     /* --> update stats struct */
                     if( ((stats->delivered + 1) % MEASURE_RESOLUTION) == 0) {
                         clock_gettime(CLOCK_MONOTONIC, stats->tv_dev + env.cmd.deliver.mid.time);
+                        stats->tv_commit[env.cmd.deliver.mid.time] = stats->tv_dev[env.cmd.deliver.mid.time];
                         stats->gts[env.cmd.deliver.mid.time] = env.cmd.deliver.gts;
                         c->last_gts = stats->gts + env.cmd.deliver.mid.time;
                         stats->count++;
@@ -386,6 +401,7 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
             /* --> update stats struct */
             if( ((stats->delivered + 1) % MEASURE_RESOLUTION) == 0) {
                 clock_gettime(CLOCK_MONOTONIC, stats->tv_dev + mid.time);
+                stats->tv_commit[mid.time] = stats->tv_dev[mid.time];
                 stats->gts[mid.time].time = msg.timestamp;
                 stats->gts[mid.time].id = get_leader_from_group(msg.from_group);
                 c->last_gts = stats->gts + mid.time;
@@ -628,12 +644,14 @@ void init_stats(struct stats *stats, long size) {
     stats->delivered = 0;
     stats->count = 0;
     stats->tv_ini = calloc(stats->size, sizeof(struct timespec));
+    stats->tv_commit = calloc(stats->size, sizeof(struct timespec));
     stats->tv_dev = calloc(stats->size, sizeof(struct timespec));
     stats->gts = calloc(stats->size, sizeof(g_uid_t));
     stats->msg = calloc(stats->size, sizeof(message_t));
 }
 void free_stats(struct stats *stats) {
     free(stats->tv_ini);
+    free(stats->tv_commit);
     free(stats->tv_dev);
     free(stats->gts);
     free(stats->msg);
