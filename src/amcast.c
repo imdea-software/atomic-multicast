@@ -444,6 +444,8 @@ static void handle_newleader(struct node *node, xid_t sid, newleader_t *cmd) {
     void fill_rep(m_uid_t *mid, struct amcast_msg *msg, struct enveloppe *rep) {
         if(msg->delivered == TRUE)
             return;
+        if(msg->phase < ACCEPTED)
+            return;
 	if(paircmp(&msg->gts, &node->amcast->gts_linf_delivered) <= 0)
             return;
         int *acc = &rep->cmd.newleader_ack.msg_count;
