@@ -54,12 +54,22 @@ struct amcast {
     g_uid_t gts_ginf_delivered;
     g_uid_t gts_linf_delivered;
     msginit_cb_fun msginit_cb;
+    commit_cb_fun commit_cb;
     delivery_cb_fun delivery_cb;
+    leader_failure_cb_fun leader_failure_cb;
+    recovery_cb_fun recovery_cb;
     void *dev_cb_arg;
     void *ini_cb_arg;
+    void *commit_cb_arg;
+    void *leader_failure_cb_arg;
+    void *recovery_cb_arg;
 };
 
-struct amcast *amcast_init(msginit_cb_fun msginit_cb, void *ini_cb_arg, delivery_cb_fun delivery_cb, void *dev_cb_arg);
+struct amcast *amcast_init(msginit_cb_fun msginit_cb, void *ini_cb_arg,
+		           commit_cb_fun commit_cb, void *commit_cb_arg,
+		           leader_failure_cb_fun leader_failure_cb, void *leader_failure_cb_arg,
+		           recovery_cb_fun recovery_cb, void *recovery_cb_arg,
+			   delivery_cb_fun delivery_cb, void *dev_cb_arg);
 int amcast_free(struct amcast *amcast);
 void dispatch_amcast_command(struct node *node, struct enveloppe *env);
 void amcast_recover(struct node *node, xid_t peer_id);

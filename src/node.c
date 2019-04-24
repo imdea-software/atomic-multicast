@@ -143,13 +143,13 @@ static int free_node_events(struct node_events *events) {
     return 0;
 }
 
-struct node *node_init(struct cluster_config *conf, xid_t id, msginit_cb_fun msginit_cb, void *ini_cb_arg, delivery_cb_fun delivery_cb, void *dev_cb_arg) {
+struct node *node_init(struct cluster_config *conf, xid_t id, msginit_cb_fun msginit_cb, void *ini_cb_arg, commit_cb_fun commit_cb, void *commit_cb_arg, leader_failure_cb_fun leader_failure_cb, void *leader_failure_cb_arg, recovery_cb_fun recovery_cb, void *recovery_cb_arg, delivery_cb_fun delivery_cb, void *dev_cb_arg) {
     struct node *node = malloc(sizeof(struct node));
     node->id = id;
     node->groups = init_groups(conf);
     node->comm = init_node_comm(conf);
     node->events = init_node_events(node->comm, id);
-    node->amcast = amcast_init(msginit_cb, ini_cb_arg, delivery_cb, dev_cb_arg);
+    node->amcast = amcast_init(msginit_cb, ini_cb_arg, commit_cb, commit_cb_arg, leader_failure_cb, leader_failure_cb_arg, recovery_cb, recovery_cb_arg, delivery_cb, dev_cb_arg);
     //TODO CHANGETHIS init this amcast field here
     node->amcast->gts_last_delivered = calloc(node->comm->cluster_size, sizeof(g_uid_t));
     node->amcast->newleader_ack_groupcount = 0;

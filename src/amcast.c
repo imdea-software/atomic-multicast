@@ -296,6 +296,9 @@ static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
                     printf("[%u] {%u,%d} Failed to push into committed_gts\n", node->id, msg->msg.mid.time, msg->msg.mid.id);
                     exit(EXIT_FAILURE);
                 }
+                //COMMITTED LATENCY
+                if(node->amcast->commit_cb)
+                    node->amcast->commit_cb(node, msg, node->amcast->commit_cb_arg);
             }
         }
         //Compute infimum of gts_last_delivered for my group
@@ -610,6 +613,9 @@ static void handle_newleader_sync(struct node *node, xid_t sid, newleader_sync_t
         }
     };
     send_to_peer(node, &rep, sid);
+    //Run recovery completion callback
+    if(node->amcast->recovery_cb)
+        node->amcast->recovery_cb(node, NULL, node->amcast->recovery_cb_arg);
     resume_globals(node);
 }
 
@@ -625,6 +631,9 @@ static void handle_newleader_sync_ack(struct node *node, xid_t sid, newleader_sy
     if(node->amcast->newleader_sync_ack_groupcount < node->groups->node_counts[node->comm->groups[node->id]]/2 + 1)
         return;
     node->amcast->status = LEADER;
+    //Run recovery completion callback
+    if(node->amcast->recovery_cb)
+        node->amcast->recovery_cb(node, NULL, node->amcast->recovery_cb_arg);
     //TODO CHANGETHIS : have the new leader choose safe lts for futur proposals
     // instead of this manual clockbump
     node->amcast->clock += 10000;
@@ -766,6 +775,9 @@ void amcast_recover(struct node *node, xid_t peer_id) {
     //printf("[%u] RECOVER after %d failure with %d current leader and watching %d\n",
     //        node->id, peer_id, node->amcast->ballot.id, *watch[node->id]);
     if(node->amcast->ballot.id == peer_id) {
+        //Run leader failure callback
+        if(node->amcast->leader_failure_cb)
+            node->amcast->leader_failure_cb(node, NULL, node->amcast->leader_failure_cb_arg);
         if(*watch[node->id] == magic) {
             struct enveloppe rep = {
                 .sid = node->id,
@@ -813,7 +825,7 @@ static struct amcast_msg *init_amcast_msg(struct groups *groups, unsigned int cl
     return msg;
 }
 
-struct amcast *amcast_init(msginit_cb_fun msginit_cb, void *ini_cb_arg, delivery_cb_fun delivery_cb, void *dev_cb_arg) {
+struct amcast *amcast_init(msginit_cb_fun msginit_cb, void *ini_cb_arg, commit_cb_fun commit_cb, void *commit_cb_arg, leader_failure_cb_fun leader_failure_cb, void *leader_failure_cb_arg, recovery_cb_fun recovery_cb, void* recovery_cb_arg, delivery_cb_fun delivery_cb, void *dev_cb_arg) {
     struct amcast *amcast = malloc(sizeof(struct amcast));
     amcast->status = INIT;
     amcast->ballot = default_pair;
@@ -827,9 +839,15 @@ struct amcast *amcast_init(msginit_cb_fun msginit_cb, void *ini_cb_arg, delivery
     amcast->gts_ginf_delivered = default_pair;
     amcast->gts_linf_delivered = default_pair;
     amcast->msginit_cb = msginit_cb;
+    amcast->commit_cb = commit_cb;
     amcast->delivery_cb = delivery_cb;
+    amcast->leader_failure_cb = leader_failure_cb;
+    amcast->recovery_cb = recovery_cb;
     amcast->ini_cb_arg = ini_cb_arg;
     amcast->dev_cb_arg = dev_cb_arg;
+    amcast->commit_cb_arg = commit_cb_arg;
+    amcast->leader_failure_cb_arg = leader_failure_cb_arg;
+    amcast->recovery_cb_arg = recovery_cb_arg;
     return amcast;
 }
 

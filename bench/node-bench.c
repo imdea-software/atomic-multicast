@@ -114,7 +114,12 @@ void delivery_cb(struct node *node, struct amcast_msg *msg, void *cb_arg) {
 }
 
 struct node *run_amcast_node(struct cluster_config *config, xid_t node_id, void *dev_cb_arg) {
-    struct node *n = node_init(config, node_id, msginit_cb, NULL, &delivery_cb, dev_cb_arg);
+    struct node *n = node_init(config, node_id,
+		               &msginit_cb, NULL,
+			       NULL, NULL,
+			       NULL, NULL,
+			       NULL, NULL,
+			       &delivery_cb, dev_cb_arg);
     //TODO Do no configure the protocol manually like this
     n->amcast->status = (node_id % NODES_PER_GROUP == INITIAL_LEADER_IN_GROUP) ? LEADER : FOLLOWER;
     n->amcast->ballot.id = n->comm->groups[node_id] * NODES_PER_GROUP;
