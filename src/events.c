@@ -197,17 +197,18 @@ void event_cb(struct bufferevent *bev, short events, void *ptr) {
         write_enveloppe(bev, &init);
     } else if (events & (BEV_EVENT_EOF|BEV_EVENT_ERROR)) {
         printf("[%u] Connection lost to node %u\n", node->id, peer_id);
-        if(fully_connected)
-            node->comm->connected_count--;
         bufferevent_disable(bev, EV_WRITE);
         close_connection(node, peer_id);
-        //Start recover routine
-        failure_cb(0, 0, ptr);
-        //event_base_once(node->events->base, -1, EV_TIMEOUT, failure_cb, ptr, &reconnect_timeout);
         //TODO Have nodes tell each other when they exit normally
         //     so we can have a smarter reconnect pattern
         if(!fully_connected)
             connect_to_node(node, peer_id);
+        else {
+            node->comm->connected_count--;
+            //Start recover routine
+            failure_cb(0, 0, ptr);
+            //event_base_once(node->events->base, -1, EV_TIMEOUT, failure_cb, ptr, &reconnect_timeout);
+        }
     } else {
         printf("[%u] Event %d not handled", node->id, events);
     }
