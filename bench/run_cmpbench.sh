@@ -54,11 +54,17 @@ exp_run() {
     #[ `ls ${tmpdir}/node.*.log | wc -l` -ne 30 ] && echo "ERROR: some nodes have failed" && ls ${tmpdir}/node.*.log && ret=1
 
     if [ $ret -eq 0 ] ; then
+        #cp ${tmpdir}/client.*.log ${destdir}/
         cat ${tmpdir}/client.*.log > ${destdir}/all.clients.log
-        cp ${tmpdir}/node.*.log ${destdir}/
+        #cp ${tmpdir}/node.*.log ${destdir}/
     fi
-    tmux kill-session -t AMCAST
 
+    #[ `du ${destdir}/all.clients.log | cut -f1` -lt `du ${destdir}/all.clients.log | cut -f1` ] && echo "ERROR: not enough message delivered" && ret=1
+    #if [ $ret -eq 0 ] ; then
+    #    mv ${destdir}/all.clients.log.new ${destdir}/all.clients.log
+    #fi
+
+    tmux kill-session -t AMCAST
     return $ret
 }
 
@@ -79,6 +85,7 @@ for destgrps in 1 2 4 6 8 10 ; do
             echo "running $protocol exp for $destgrps destination groups and $n_clients clients"
             exp_run $destgrps $n_clients
             [ $? -eq 0 ] && break;
+            #[ $? -ne 0 ] && break;
         done
         echo "done with exp for $destgrps destination groups and $n_clients clients"
     done
