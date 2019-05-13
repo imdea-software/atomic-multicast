@@ -46,4 +46,4 @@ sleep 1
 
 run_nodes $AMCAST_BENCH_NUMBER_OF_CLIENTS 1
 
-tmux -2 attach-session -t $AMCAST_TMUX_SESSION
+#tmux -2 attach-session -t $AMCAST_TMUX_SESSION
