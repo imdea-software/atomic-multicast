@@ -66,14 +66,14 @@ exp_run() {
 exp_terminate
 
 echo "Start of data gathering for cmp experiments"
-for destgrps in 1 2 3 4 6 8 10 ; do
-    [ $destgrps -eq 1 ] && min_clients=2000 && max_clients=24000 && inc_clients=2000
-    [ $destgrps -eq 2 ] && min_clients=1000 && max_clients=12000 && inc_clients=1000
-    [ $destgrps -eq 3 ] && min_clients=1000 && max_clients=8000 && inc_clients=1000
-    [ $destgrps -eq 4 ] && min_clients=1000 && max_clients=6000 && inc_clients=1000
-    [ $destgrps -eq 6 ] && min_clients=500 && max_clients=4000 && inc_clients=500
-    [ $destgrps -eq 8 ] && min_clients=500 && max_clients=4000 && inc_clients=500
-    [ $destgrps -eq 10 ] && min_clients=500 && max_clients=4000 && inc_clients=500
+for destgrps in 1 2 4 6 8 10 ; do
+    min_clients=16000 && max_clients=24000 && inc_clients=4000
+    [ $destgrps -eq 1 ] && min_clients=4000 && max_clients=32000 && inc_clients=4000
+    [ $destgrps -eq 2 ] && min_clients=4000 && max_clients=32000 && inc_clients=4000
+    [ $destgrps -eq 4 ] && min_clients=4000 && max_clients=16000 && inc_clients=4000
+    [ $destgrps -eq 6 ] && min_clients=20000 && max_clients=24000 && inc_clients=4000
+    [ $destgrps -eq 8 ] && min_clients=12000 && max_clients=16000 && inc_clients=4000
+    [ $destgrps -eq 10 ] && min_clients=4000 && max_clients=16000 && inc_clients=4000
     for n_clients in `echo 1 && seq $min_clients $inc_clients $max_clients` ; do
         while true ; do
             echo "running $protocol exp for $destgrps destination groups and $n_clients clients"
