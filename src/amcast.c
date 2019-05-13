@@ -437,6 +437,24 @@ static void handle_deliver(struct node *node, xid_t sid, deliver_t *cmd) {
         }
         if(node->amcast->delivery_cb)
             node->amcast->delivery_cb(node, msg, node->amcast->dev_cb_arg);
+        //REPLY BACK TO CLIENT
+        /*
+        if(msg->msg.destgrps[0] == node->comm->groups[node->id])
+        if(node->id == node->groups->members[node->comm->groups[node->id]][0]) {
+        struct enveloppe rep = {
+            .sid = node->id,
+            .cmd_type = DELIVER,
+            .cmd.deliver = {
+                .mid = msg->msg.mid,
+                .ballot = node->amcast->ballot,
+                .lts = msg->lts[node->comm->groups[node->id]],
+                .gts_inf_delivered = node->amcast->gts_inf_delivered,
+                .gts = msg->gts
+            },
+        };
+        send_to_client(node, &rep, rep.cmd.deliver.mid.id);
+        }
+        */
         //Free amcast_msg structs delivered by everyone in my group
         int try_next = 1;
         while(try_next && pqueue_size(node->amcast->delivered_gts) > 0) {
