@@ -8,7 +8,7 @@ runall() {
 
 case $1 in
 killall)
-	runall sudo killall -s $2 node-bench
+	runall sudo killall -s $2 node-bench node-simple proposer-acceptor
 	;;
 rm)
 	runall rm -f /tmp/{node,client}.*.log
