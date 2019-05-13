@@ -38,6 +38,7 @@ typedef struct message {
     m_uid_t 		mid;
     unsigned int 	destgrps_count;
     //TODO Change that fixed size array
+    xid_t		proxy;
     xid_t 		destgrps[MAX_NUMBER_OF_GROUPS];
     struct payload	value;
 } message_t;

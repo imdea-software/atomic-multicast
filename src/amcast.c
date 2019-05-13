@@ -353,7 +353,9 @@ static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
                 //Have the deciding group's leader notify the client
                 //if(rep.cmd.deliver.gts.id == node->comm->groups[node->id])
                 //Have the first leader of destgrps notify the client
-                if(i_msg->msg.destgrps[0] == node->comm->groups[node->id])
+                //if(i_msg->msg.destgrps[0] == node->comm->groups[node->id])
+                //Have a local group leader (proxy) notify the client
+                if(i_msg->msg.proxy == node->comm->groups[node->id])
                     send_to_client(node, &rep, rep.cmd.deliver.mid.id);
                 i_msg->delivered = TRUE;
             }
@@ -673,7 +675,9 @@ static void handle_newleader_sync_ack(struct node *node, xid_t sid, newleader_sy
             //Have the deciding group's leader notify the client
             //if(rep.cmd.deliver.gts.id == node->comm->groups[node->id])
             //Have the first leader of destgrps notify the client
-            if(i_msg->msg.destgrps[0] == node->comm->groups[node->id])
+            //if(i_msg->msg.destgrps[0] == node->comm->groups[node->id])
+            //Have a local group leader (proxy) notify the client
+            if(i_msg->msg.proxy == node->comm->groups[node->id])
                 send_to_client(node, &rep, rep.cmd.deliver.mid.id);
             i_msg->delivered = TRUE;
         }

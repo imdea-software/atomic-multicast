@@ -186,6 +186,7 @@ void run_client_node(struct cluster_config *config, xid_t client_id) {
 	    .cmd.multicast = {
 	        .mid = {-1, client_id},
             .destgrps_count = config->groups_count,
+            .proxy = -1,
             .value = {
                 .len = strlen("coucou"),
                 .val = "coucou"
@@ -270,6 +271,7 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
             }
             r_off++;
         }
+        c->ref_value->cmd.multicast.proxy = g_dst_local_id;
         /* --> update stats struct */
         if( ((stats->delivered + 1) % MEASURE_RESOLUTION) == 0) {
             stats->msg[c->ref_value->cmd.multicast.mid.time] = c->ref_value->cmd.multicast;
@@ -558,6 +560,7 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
         .cmd.multicast = {
             .mid = {-1, client_id},
             .destgrps_count = client.dests_count,
+            .proxy = -1,
             .value = {
                 .len = strlen("coucou"),
                 .val = "coucou"
