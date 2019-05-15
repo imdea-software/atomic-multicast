@@ -303,6 +303,10 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
         /* Send it to current known leaders */
         for(int i=0; i<c->ref_value->cmd.multicast.destgrps_count; i++) {
             xid_t peer_id = get_leader_from_group(c->ref_value->cmd.multicast.destgrps[i]);
+            if(!(c->bev[peer_id])) {
+                    printf("[c-%u] WTF are we doing here\n", c->id);
+                    exit(EXIT_FAILURE);
+            }
             if(bufferevent_write(c->bev[peer_id], c->ref_value, sizeof(*c->ref_value)) < 0)
                     printf("[c-%u] Something bad happened (submit)\n", c->id);
         }
@@ -356,6 +360,10 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
 
         /* Send MCAST_CLIENT to leader of first group in dest groups */
         xid_t peer_id = get_leader_from_group(c->ref_msg->from_group);
+        if(!(c->bev[peer_id])) {
+            printf("[c-%u] WTF are we doing here\n", c->id);
+            exit(EXIT_FAILURE);
+        }
         send_mcast_message(c->bev[peer_id], c->ref_msg);
 
         /* Send MCAST_START to all nodes in dest groups */
