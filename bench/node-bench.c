@@ -251,7 +251,7 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
         struct client *c = (struct client *) ptr;
         /* Do some magic with the mcast message */
         /* --> update mid.time */
-        c->ref_value->cmd.multicast.mid.time = c->sent++;
+        c->ref_value->cmd.multicast.mid.time = c->sent;
         /* --> select circular destgrps */
         int good_dst = 0;
         xid_t g_dst_local_id = -1;
@@ -270,8 +270,10 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
         /* --> update stats struct */
         if( ((stats->delivered + 1) % MEASURE_RESOLUTION) == 0) {
             stats->msg[c->ref_value->cmd.multicast.mid.time] = c->ref_value->cmd.multicast;
-            clock_gettime(CLOCK_MONOTONIC, stats->tv_ini + c->ref_value->cmd.multicast.mid.time);
+            clock_gettime(CLOCK_MONOTONIC, stats->tv_ini + c->sent);
         }
+
+        c->sent++;
 
         /* Send it to current known leaders */
         for(int i=0; i<c->ref_value->cmd.multicast.destgrps_count; i++) {
