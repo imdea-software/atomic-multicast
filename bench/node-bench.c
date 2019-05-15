@@ -534,7 +534,7 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
             }
         }
         if(c->connected == c->nodes_count) {
-            printf("[c-%u] Connection established to all nodes\n", c->id);
+            //printf("[c-%u] Connection established to all nodes\n", c->id);
             if(c->sent == 0) {
                 clock_gettime(CLOCK_MONOTONIC, &start);
                 evtimer_add(c->submit_ev, &five_seconds);
@@ -557,7 +557,7 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
             }
         }
         if(c->connected == c->nodes_count) {
-            printf("[c-%u] Connection established to all nodes\n", c->id);
+            //printf("[c-%u] Connection established to all nodes\n", c->id);
             if(c->sent == 0) {
                 clock_gettime(CLOCK_MONOTONIC, &start);
                 evtimer_add(c->submit_ev, &five_seconds);
