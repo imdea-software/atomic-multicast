@@ -508,7 +508,8 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
             */
             if((!c->exit_on_delivery && c->received < c->stats->size)
 	            || (c->exit_on_delivery && c->received < c->sent)) {
-                //printf("[c-%u] Server %i left before all messages were sent: %u sent\n", c->id, p->id, c->sent);
+                printf("[c-%u] Server %i left before all messages were sent: %u sent %u received\n",
+                                c->id, p->id, c->sent, c->received);
                 if(c->sent > 0) {
                 xid_t gid = p->id / NODES_PER_GROUP;
                 if(p->id == get_leader_from_group(gid)) {
@@ -550,7 +551,8 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
             c->connected--;
             if((!c->exit_on_delivery && c->received < c->stats->size)
 	            || (c->exit_on_delivery && c->received < c->sent)) {
-                printf("[c-%u] Server %i left before all messages were sent: %u sent\n", c->id, p->id, c->sent);
+                printf("[c-%u] Server %i left before all messages were sent: %u sent %u received\n",
+                                c->id, p->id, c->sent, c->received);
                 exit(EXIT_FAILURE);
             }
         }
