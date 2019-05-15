@@ -40,6 +40,8 @@ struct shared_cb_arg {
     struct timespec tv_commit;
 };
 
+int max_sim_msg = 0;
+
 struct stats {
     long delivered;
     long count;
@@ -284,6 +286,13 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
             if(bufferevent_write(c->bev[peer_id], c->ref_value, sizeof(*c->ref_value)) < 0)
                     printf("[c-%u] Something bad happened (submit)\n", c->id);
         }
+
+        if(c->sent - c->received < max_sim_msg) {
+            //Re-submit right away
+            submit_cb(0,0,c);
+            //Go through event queue before re-submitting
+            //event_active(c->submit_ev, EV_TIMEOUT, 0);
+        }
     }
     void alt_submit_cb(evutil_socket_t fd, short flags, void *ptr) {
         struct client *c = (struct client *) ptr;
@@ -325,6 +334,13 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
         xid_t peer_id = get_leader_from_group(c->ref_msg->from_group);
         send_mcast_message(c->bev[peer_id], c->ref_msg);
 
+        if(c->sent - c->received < max_sim_msg) {
+            //Re-submit right away
+            alt_submit_cb(0,0,c);
+            //Go through event queue before re-submitting
+            //event_active(c->submit_ev, EV_TIMEOUT, 0);
+        }
+
         /* Send MCAST_START to all nodes in dest groups */
         /*
         for(int i=0; i<c->ref_msg->to_groups_len; i++) {
@@ -352,9 +368,11 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
                         exit(EXIT_FAILURE);
                     }
                     /* --> do not re-deliver messages */
+                    /*
                     if(c->last_gts && paircmp(&env.cmd.deliver.gts, c->last_gts) <= 0) {
                         continue;
                     }
+                    */
                     if(stats->tv_dev[env.cmd.deliver.mid.time].tv_sec != 0
                             && stats->tv_dev[env.cmd.deliver.mid.time].tv_nsec != 0) {
                         printf("[c-%u] FAILURE: received deliver ack with wrong s-mid %u instead of %u from %d\n",
@@ -373,19 +391,19 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
                         stats->count++;
                     }
                     stats->delivered++;
-                    /* TIMEOUT termination */
-                    if(c->exit_on_delivery)
-                        event_base_loopexit(c->base, NULL);
-                    else {
-                    /* MCAST the next message */
-                    if(c->sent < c->stats->size)
-                        submit_cb(0,0,c);
                     if(c->received >= c->stats->size)
                         event_base_loopexit(c->base, NULL);
+                    else if (c->sent < c->stats->size && !c->exit_on_delivery)
+                        submit_cb(0,0,c);
                     break;
-                    }
                 default:
                     break;
+            }
+        }
+        /* TIMEOUT termination */
+        if(c->exit_on_delivery) {
+            if(c->sent == c->received) {
+                event_base_loopexit(c->base, NULL);
             }
         }
     }
@@ -404,9 +422,11 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
                 exit(EXIT_FAILURE);
             }
             /* --> do not re-deliver messages */
+            /*
             if(c->last_gts && msg.timestamp <= c->last_gts->time) {
 	        continue;
             }
+            */
             if(stats->tv_dev[mid.time].tv_sec != 0 && stats->tv_dev[mid.time].tv_nsec != 0) {
                 printf("[c-%u] FAILURE: received deliver ack with wrong s-mid %u instead of %u from %d\n",
                     c->id, mid.time, c->ref_value->cmd.multicast.mid.time, p->id);
@@ -426,14 +446,14 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
             }
             stats->delivered++;
             mcast_message_content_free(&msg);
-            /* TIMEOUT termination */
-            if(c->exit_on_delivery)
-                event_base_loopexit(c->base, NULL);
-            else {
-            /* MCAST the next message */
-            if(c->sent < c->stats->size)
-                alt_submit_cb(0,0,c);
             if(c->received >= c->stats->size)
+                event_base_loopexit(c->base, NULL);
+            else if (c->sent < c->stats->size && !c->exit_on_delivery)
+                alt_submit_cb(0,0,c);
+        }
+        /* TIMEOUT termination */
+        if(c->exit_on_delivery) {
+            if(c->sent == c->received) {
                 event_base_loopexit(c->base, NULL);
             }
         }
@@ -702,7 +722,7 @@ void init_thread_arg(struct thread_arg *arg, xid_t id,
     arg->stats = malloc(sizeof(struct stats));
     init_stats(arg->stats,
         ( NUMBER_OF_MESSAGES / MEASURE_RESOLUTION )
-	/ total_client_count);
+        / total_client_count);
 }
 void free_thread_arg(struct thread_arg *arg) {
     free(arg->stats);
@@ -738,10 +758,11 @@ int main(int argc, char *argv[]) {
     if(signal(SIGPIPE, SIG_IGN) == SIG_ERR)
         return (EXIT_FAILURE);
 
+    max_sim_msg = atoi(argv[7]);
     //Prepare stats->size
     int destgrps = atoi(argv[6]);
     int total_client_count = atoi(argv[5]);
-    int local_client_count = atoi(argv[7]);
+    int local_client_count = (max_sim_msg > 0) ? 1 : 0;
 
     if(strcmp("amcast", argv[8]) == 0)
         proto = AMCAST;
@@ -760,7 +781,7 @@ int main(int argc, char *argv[]) {
         struct thread_arg *args = calloc(local_client_count,
 			sizeof(struct thread_arg));
         for(int i=0; i<local_client_count; i++)
-            init_thread_arg(args+i, node_id+i, destgrps,
+            init_thread_arg(args+i, gid+i, destgrps,
                     total_client_count, config);
         for(int i=0; i<local_client_count; i++)
             pthread_create(pths+i, NULL, run_thread, args+i);

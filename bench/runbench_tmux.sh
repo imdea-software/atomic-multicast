@@ -109,7 +109,7 @@ for gid in `seq 1 $client_hosts` ; do
     tmux new-window -n client_$gid
     tmux send-keys " ssh node-$chid" Enter
     tmux send-keys " export LD_LIBRARY_PATH=/usr/local/lib" Enter
-    tmux send-keys " nice -n 20 ${AMCAST_BIN} $start_cid $(( $gid - 1)) ${AMCAST_BENCH_NUMBER_OF_NODES} ${AMCAST_BENCH_NUMBER_OF_GROUPS} ${AMCAST_BENCH_NUMBER_OF_CLIENTS} ${AMCAST_BENCH_NUMBER_OF_DESTGROUPS} $n_clients $PROTO < $AMCAST_BENCH_CLUSTER_CONF" Enter
+    tmux send-keys " nice -n 20 ${AMCAST_BIN} $start_cid $(( $gid - 1)) ${AMCAST_BENCH_NUMBER_OF_NODES} ${AMCAST_BENCH_NUMBER_OF_GROUPS} ${client_hosts} ${AMCAST_BENCH_NUMBER_OF_DESTGROUPS} $n_clients $PROTO < $AMCAST_BENCH_CLUSTER_CONF" Enter
 done
 
 exit
