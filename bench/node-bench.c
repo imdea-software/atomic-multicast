@@ -259,7 +259,8 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
             xid_t g_dst_id = (c->id + r_off) % c->groups_count;
             for(int i=0; i<c->ref_value->cmd.multicast.destgrps_count; i++) {
                 c->ref_value->cmd.multicast.destgrps[i] = g_dst_id;
-                if(!good_dst && ((g_dst_id % N_WAN_REGIONS) == (gid % N_WAN_REGIONS))) {
+                //if(!good_dst && ((g_dst_id % N_WAN_REGIONS) == (gid % N_WAN_REGIONS))) {
+                if(!good_dst && (g_dst_id == c->id)) {
                     good_dst = 1;
                     g_dst_local_id = g_dst_id;
                 }
@@ -293,11 +294,10 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
             for(int i=0; i<c->ref_msg->to_groups_len; i++) {
                 c->ref_msg->to_groups[i] = g_dst_id;
                 c->ref_value->cmd.multicast.destgrps[i] = g_dst_id;
-                if(!good_dst) {
-                    if((g_dst_id % N_WAN_REGIONS) == (gid % N_WAN_REGIONS)) {
-                        good_dst = 1;
-                        g_dst_local_id = g_dst_id;
-                    }
+                //if(!good_dst && ((g_dst_id % N_WAN_REGIONS) == (gid % N_WAN_REGIONS))) {
+                if(!good_dst && (g_dst_id == c->id)) {
+                    good_dst = 1;
+                    g_dst_local_id = g_dst_id;
                 }
                 g_dst_id = (g_dst_id + 1) % c->groups_count;
             }
