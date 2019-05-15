@@ -377,8 +377,10 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
         }
         else if (events & (BEV_EVENT_EOF|BEV_EVENT_ERROR)) {
             c->connected--;
-            if(c->received < c->stats->size) {
+            if((!c->exit_on_delivery && c->received < c->stats->size)
+	            || (c->exit_on_delivery && c->received < c->sent)) {
                 printf("[c-%u] Server %i left before all messages were sent: %u sent\n", c->id, p->id, c->sent);
+                if(c->sent > 0) {
                 xid_t gid = p->id / NODES_PER_GROUP;
                 if(p->id == get_leader_from_group(gid)) {
                     bufferevent_trigger(c->bev[p->id], EV_READ, 0);
@@ -398,6 +400,7 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
                         write_enveloppe(c->bev[c->leaders[gid]], c->ref_value);
                     }
                 }
+                }
             }
         }
         if(c->connected == c->nodes_count) {
@@ -416,8 +419,10 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
         }
         else if (events & (BEV_EVENT_EOF|BEV_EVENT_ERROR)) {
             c->connected--;
-            if(c->received < c->stats->size) {
+            if((!c->exit_on_delivery && c->received < c->stats->size)
+	            || (c->exit_on_delivery && c->received < c->sent)) {
                 printf("[c-%u] Server %i left before all messages were sent: %u sent\n", c->id, p->id, c->sent);
+                exit(EXIT_FAILURE);
             }
         }
         if(c->connected == c->nodes_count) {
