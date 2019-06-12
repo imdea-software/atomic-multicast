@@ -42,8 +42,20 @@ tmux -2 new-session -d -s $AMCAST_TMUX_SESSION
 
 run_nodes $AMCAST_BENCH_NUMBER_OF_NODES 0
 
-sleep 1
+sleep 10
 
-run_nodes $AMCAST_BENCH_NUMBER_OF_CLIENTS 1
+#run_nodes $AMCAST_BENCH_NUMBER_OF_CLIENTS 1
+
+tmux new-window -n client_0
+tmux send-keys " ssh node-19" Enter
+for i in `seq 1 $(( $AMCAST_BENCH_NUMBER_OF_CLIENTS / 2))` ; do
+    tmux send-keys " (${AMCAST_BIN} ${i} ${AMCAST_BENCH_NUMBER_OF_NODES} ${AMCAST_BENCH_NUMBER_OF_GROUPS} ${AMCAST_BENCH_NUMBER_OF_CLIENTS} 1 < $AMCAST_BENCH_CLUSTER_CONF)> /dev/null &" Enter
+done
+
+tmux new-window -n client_1
+tmux send-keys " ssh node-20" Enter
+for i in `seq $(( ( $AMCAST_BENCH_NUMBER_OF_CLIENTS / 2 ) + 1 )) $(( $AMCAST_BENCH_NUMBER_OF_CLIENTS ))` ; do
+    tmux send-keys " (${AMCAST_BIN} ${i} ${AMCAST_BENCH_NUMBER_OF_NODES} ${AMCAST_BENCH_NUMBER_OF_GROUPS} ${AMCAST_BENCH_NUMBER_OF_CLIENTS} 1 < $AMCAST_BENCH_CLUSTER_CONF)> /dev/null &" Enter
+done
 
 #tmux -2 attach-session -t $AMCAST_TMUX_SESSION
