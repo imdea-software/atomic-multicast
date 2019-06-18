@@ -33,7 +33,7 @@ $(BENCH_DIR)/node-microbench: $(BENCH_DIR)/node-microbench.o $(OBJS)
 	$(CC) $(VERBOSE) -o $@ $< $(OBJS) $(LDFLAGS) -lpthread
 
 $(BENCH_DIR)/node-bench: $(BENCH_DIR)/node-bench.o $(OBJS)
-	$(CC) $(VERBOSE) -o $@ $< $(OBJS) $(LDFLAGS)
+	$(CC) $(VERBOSE) -o $@ $< $(OBJS) $(LDFLAGS) -lpthread
 
 $(SRC_DIR)/%.o: %.c
 	$(CC) $(CFLAGS) -c $< $(VERBOSE)

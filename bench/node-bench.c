@@ -40,6 +40,10 @@ struct stats {
     message_t *msg;
 };
 
+struct timeval nodelay = { .tv_sec = 0, .tv_usec = 0 };
+struct timeval exit_node_timeout = { .tv_sec = 200, .tv_usec = 0 };
+struct timeval exit_client_timeout = { .tv_sec = 180, .tv_usec = 0 };
+
 //TODO write to file the execution log
 void write_report(struct stats *stats, FILE *stream) {
     for(int i=0; i<stats->count; i++) {
@@ -77,6 +81,10 @@ void write_report(struct stats *stats, FILE *stream) {
     }
 }
 
+static void terminate_on_timeout_cb(evutil_socket_t fd, short flags, void *ptr) {
+    kill(getpid(), SIGHUP);
+}
+
 //Record useful info regarding the initiated message
 void msginit_cb(struct node *node, struct amcast_msg *msg, void *cb_arg) {
     struct timespec *tv_ini = malloc(sizeof(struct timespec));
@@ -105,6 +113,7 @@ struct node *run_amcast_node(struct cluster_config *config, xid_t node_id, void 
     //TODO Do no configure the protocol manually like this
     n->amcast->status = (node_id % NODES_PER_GROUP == INITIAL_LEADER_IN_GROUP) ? LEADER : FOLLOWER;
     n->amcast->ballot.id = n->comm->groups[node_id] * NODES_PER_GROUP;
+    event_base_once(n->events->base, -1, EV_TIMEOUT, terminate_on_timeout_cb, NULL, &exit_node_timeout);
     node_start(n);
     return(n);
 }
@@ -153,10 +162,11 @@ void run_client_node(struct cluster_config *config, xid_t client_id) {
     }
 }
 
-void run_client_node_libevent(struct cluster_config *config, xid_t client_id, struct stats *stats) {
+void run_client_node_libevent(struct cluster_config *config, xid_t client_id, struct stats *stats, unsigned int destgrps) {
     struct peer {
         unsigned int id;
         unsigned int received;
+        struct event *reconnect_ev;
         struct client *c;
     };
     struct client {
@@ -167,10 +177,12 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
         unsigned int connected;
         unsigned int sent;
         unsigned int received;
+        unsigned int exit_on_delivery;
         g_uid_t *last_gts;
         xid_t *leaders;
         struct peer *peers;
         struct stats *stats;
+        struct cluster_config *config;
         struct event_base *base;
         struct bufferevent **bev;
         struct enveloppe *ref_value;
@@ -183,6 +195,10 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
     };
     xid_t get_leader_from_group(xid_t g_id) {
         return client.leaders[g_id];
+    }
+    void exit_on_timeout_cb(evutil_socket_t fd, short flags, void *ptr) {
+        struct client *c = (struct client *) ptr;
+        c->exit_on_delivery = 1;
     }
     void submit_cb(evutil_socket_t fd, short flags, void *ptr) {
         struct client *c = (struct client *) ptr;
@@ -286,12 +302,17 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
                         stats->count++;
                     }
                     stats->delivered++;
+                    /* TIMEOUT termination */
+                    if(c->exit_on_delivery)
+                        event_base_loopexit(c->base, NULL);
+                    else {
                     /* MCAST the next message */
                     if(c->sent < c->stats->size)
                         submit_cb(0,0,c);
                     if(c->received >= c->stats->size)
-                        kill(getpid(), SIGHUP);
+                        event_base_loopexit(c->base, NULL);
                     break;
+                    }
                 default:
                     break;
             }
@@ -333,11 +354,16 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
             }
             stats->delivered++;
             mcast_message_content_free(&msg);
+            /* TIMEOUT termination */
+            if(c->exit_on_delivery)
+                event_base_loopexit(c->base, NULL);
+            else {
             /* MCAST the next message */
             if(c->sent < c->stats->size)
                 alt_submit_cb(0,0,c);
             if(c->received >= c->stats->size)
-                kill(getpid(), SIGHUP);
+                event_base_loopexit(c->base, NULL);
+            }
         }
     }
     void event_cb(struct bufferevent *bev, short events, void *ptr) {
@@ -351,8 +377,10 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
         }
         else if (events & (BEV_EVENT_EOF|BEV_EVENT_ERROR)) {
             c->connected--;
-            if(c->received < c->stats->size) {
+            if((!c->exit_on_delivery && c->received < c->stats->size)
+	            || (c->exit_on_delivery && c->received < c->sent)) {
                 printf("[c-%u] Server %i left before all messages were sent: %u sent\n", c->id, p->id, c->sent);
+                if(c->sent > 0) {
                 xid_t gid = p->id / NODES_PER_GROUP;
                 if(p->id == get_leader_from_group(gid)) {
                     bufferevent_trigger(c->bev[p->id], EV_READ, 0);
@@ -372,6 +400,7 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
                         write_enveloppe(c->bev[c->leaders[gid]], c->ref_value);
                     }
                 }
+                }
             }
         }
         if(c->connected == c->nodes_count) {
@@ -390,8 +419,10 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
         }
         else if (events & (BEV_EVENT_EOF|BEV_EVENT_ERROR)) {
             c->connected--;
-            if(c->received < c->stats->size) {
+            if((!c->exit_on_delivery && c->received < c->stats->size)
+	            || (c->exit_on_delivery && c->received < c->sent)) {
                 printf("[c-%u] Server %i left before all messages were sent: %u sent\n", c->id, p->id, c->sent);
+                exit(EXIT_FAILURE);
             }
         }
         if(c->connected == c->nodes_count) {
@@ -402,19 +433,36 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
             }
         }
     }
-    void interrupt_cb(evutil_socket_t fd, short flags, void *ptr) {
-        struct event *interrupt_ev = (struct event *) ptr;
-        struct event_base *base = event_get_base(interrupt_ev);
-        event_del(interrupt_ev);
-        event_base_loopexit(base, NULL);
+    void reconnect_to_peer(evutil_socket_t fd, short flags, void *ptr) {
+        struct peer *p = (struct peer *) ptr;
+        struct client *c = p->c;
+        struct bufferevent **bev = c->bev + p->id;
+        if(bev && *bev) {
+            bufferevent_trigger(*bev, EV_READ, 0);
+            bufferevent_free(*bev);
+        }
+        *bev = bufferevent_socket_new(c->base, -1, BEV_OPT_CLOSE_ON_FREE);
+        //TODO CHANGETHIS: Have to edit those 2 lines to switch back to libevamcast
+        bufferevent_setcb(*bev, read_cb, NULL, event_cb, p);
+        bufferevent_setwatermark(*bev, EV_READ, sizeof(struct enveloppe), 0);
+        bufferevent_enable(*bev, EV_READ|EV_WRITE);
+        struct sockaddr_in addr = {
+            .sin_family = AF_INET,
+            .sin_port = htons(c->config->ports[p->id]),
+            .sin_addr.s_addr = inet_addr(c->config->addresses[p->id])
+        };
+        bufferevent_socket_connect(*bev, (struct sockaddr *) &addr, sizeof(addr));
+        int tcp_nodelay_flag = 1;
+        setsockopt(bufferevent_getfd(*bev), IPPROTO_TCP, TCP_NODELAY, &tcp_nodelay_flag, sizeof(int));
     }
     //SET-UP libevent
     memset(&client, 0, sizeof(struct client));
     client.id = client_id;
     client.nodes_count = config->size;
     client.groups_count = config->groups_count;
-    client.dests_count = NUMBER_OF_TARGETS;
+    client.dests_count = destgrps;
     client.stats = stats;
+    client.config = config;
     client.base = event_base_new();
     client.bev = calloc(config->size, sizeof(struct bufferevent *));
     client.leaders = malloc(config->groups_count * sizeof(xid_t));
@@ -423,21 +471,11 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
     client.peers = calloc(config->size, sizeof(struct peer));
     //Start a TCP connection to all nodes
     for(xid_t peer_id=0; peer_id<client.nodes_count; peer_id++) {
+        struct timeval custom_delay = { .tv_sec = 0, .tv_usec = 100 * client.id + 10 * peer_id };
         client.peers[peer_id].c = &client;
         client.peers[peer_id].id = peer_id;
-        client.bev[peer_id] = bufferevent_socket_new(client.base, -1, BEV_OPT_CLOSE_ON_FREE);
-        //TODO CHANGETHIS: Have to edit those 2 lines to switch back to libevamcast
-        bufferevent_setcb(client.bev[peer_id], alt_read_cb, NULL, alt_event_cb, client.peers+peer_id);
-        //bufferevent_setwatermark(client.bev[peer_id], EV_READ, sizeof(struct enveloppe), 0);
-        bufferevent_enable(client.bev[peer_id], EV_READ|EV_WRITE);
-        struct sockaddr_in addr = {
-            .sin_family = AF_INET,
-            .sin_port = htons(config->ports[peer_id]),
-            .sin_addr.s_addr = inet_addr(config->addresses[peer_id])
-        };
-        bufferevent_socket_connect(client.bev[peer_id], (struct sockaddr *) &addr, sizeof(addr));
-        int tcp_nodelay_flag = 1;
-        setsockopt(bufferevent_getfd(client.bev[peer_id]), IPPROTO_TCP, TCP_NODELAY, &tcp_nodelay_flag, sizeof(int));
+        client.peers[peer_id].reconnect_ev = evtimer_new(client.base, reconnect_to_peer, &client.peers[peer_id]);
+        event_add(client.peers[peer_id].reconnect_ev, &custom_delay);
     }
     //Prepare enveloppe template
     struct enveloppe env = {
@@ -464,9 +502,8 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
     msg.value.mcast_value_len = sizeof(struct custom_payload) - MAX_PAYLOAD_LEN + val.len;
     msg.value.mcast_value_val = (char *) &val;
     client.ref_msg = &msg;
-    //Set-up eventloop-exit
-    struct event *ev_exit = evsignal_new(client.base, SIGHUP, interrupt_cb, event_self_cbarg());
-    event_add(ev_exit, NULL);
+    //Set-up timeout-exit
+    event_base_once(client.base, -1, EV_TIMEOUT, exit_on_timeout_cb, &client, &exit_client_timeout);
     //Start client
     event_base_dispatch(client.base);
     //Leaving
@@ -478,7 +515,6 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
         if(client.bev[i])
             bufferevent_free(client.bev[i]);
     free(client.bev);
-    event_free(ev_exit);
     event_base_free(client.base);
     free(client.peers);
 }
@@ -543,15 +579,71 @@ int free_cluster_config(struct cluster_config *config) {
     return 0;
 }
 
+void init_stats(struct stats *stats, long size) {
+    memset(stats, 0, sizeof(struct stats));
+    stats->size = size;
+    stats->delivered = 0;
+    stats->count = 0;
+    stats->tv_ini = calloc(stats->size, sizeof(struct timespec));
+    stats->tv_dev = calloc(stats->size, sizeof(struct timespec));
+    stats->gts = calloc(stats->size, sizeof(g_uid_t));
+    stats->msg = calloc(stats->size, sizeof(message_t));
+}
+void free_stats(struct stats *stats) {
+    free(stats->tv_ini);
+    free(stats->tv_dev);
+    free(stats->gts);
+    free(stats->msg);
+    free(stats);
+}
+void log_to_file(struct stats *stats, char *filename) {
+    FILE *logfile;
+    if((logfile = fopen(filename, "w")) == NULL) {
+        puts("ERROR: Can not open logfile");
+        exit(EXIT_FAILURE);
+    }
+    write_report(stats, logfile);
+    fclose(logfile);
+}
+
+struct thread_arg {
+    xid_t    id;
+    unsigned int destgrps;
+    struct stats *stats;
+    struct cluster_config *config;
+};
+void init_thread_arg(struct thread_arg *arg, xid_t id,
+        unsigned int destgrps, unsigned total_client_count,
+        struct cluster_config *config) {
+    arg->id = id;
+    arg->destgrps = destgrps;
+    arg->config = config;
+    arg->stats = malloc(sizeof(struct stats));
+    init_stats(arg->stats,
+        ( NUMBER_OF_MESSAGES / MEASURE_RESOLUTION )
+	/ total_client_count);
+}
+void free_thread_arg(struct thread_arg *arg) {
+    free(arg->stats);
+}
+void *run_thread(void *ptr) {
+    struct thread_arg *arg = (struct thread_arg *) ptr;
+
+    run_client_node_libevent(arg->config, arg->id, arg->stats, arg->destgrps);
+
+    char filename[40];
+    sprintf(filename, "/tmp/client.%d.log", arg->id);
+    log_to_file(arg->stats, filename);
+
+    pthread_exit(NULL);
+}
+
 int main(int argc, char *argv[]) {
     if(argc != 6) {
         printf("USAGE: node-bench [node_id] [number_of_nodes]"
-                "[number_of_groups] [number_of_clients] [isClient?] \n");
+                "[number_of_groups] [total_number_of_clients] [local_number_of_clients]\n");
         exit(EXIT_FAILURE);
     }
-    FILE *logfile;
-    struct node *node;
-    struct stats *stats = malloc(sizeof(struct stats));
 
     //Init node & cluster config
     struct cluster_config *config = malloc(sizeof(struct cluster_config));
@@ -559,47 +651,49 @@ int main(int argc, char *argv[]) {
     init_cluster_config(config, atoi(argv[2]), atoi(argv[3]));
     read_cluster_config_from_stdin(config);
 
-    //Get client_count & init stats struct
-    int client_count = atoi(argv[4]);
-    int is_client = atoi(argv[5]);
-    stats->delivered = 0;
-    stats->count = 0;
-    if(is_client)
-        stats->size = ( NUMBER_OF_MESSAGES / MEASURE_RESOLUTION ) / client_count;
-    else
-        stats->size = ( NUMBER_OF_MESSAGES / MEASURE_RESOLUTION ) * NUMBER_OF_TARGETS / config->groups_count;
-    stats->tv_ini = calloc(stats->size, sizeof(struct timespec));
-    stats->tv_dev = calloc(stats->size, sizeof(struct timespec));
-    stats->gts = calloc(stats->size, sizeof(g_uid_t));
-    stats->msg = calloc(stats->size, sizeof(message_t));
     //IGNORE SIGPIPES (USEFUL FOR RECOVERY)
     if(signal(SIGPIPE, SIG_IGN) == SIG_ERR)
         return (EXIT_FAILURE);
-    //CLIENT NODE PATTERN
-    if(is_client) {
-        run_client_node_libevent(config, node_id, stats);
-    } else {
-        node = run_amcast_node(config, node_id, stats);
-    }
-    //Open logfile for editing
-    char filename[40];
-    sprintf(filename, "/tmp/%s.%d.log", (is_client ? "client" : "node"), node_id);
-    if((logfile = fopen(filename, "w")) == NULL) {
-        puts("ERROR: Can not open logfile");
-        exit(EXIT_FAILURE);
-    }
 
-    write_report(stats, logfile);
+    //Prepare stats->size
+    int destgrps = NUMBER_OF_TARGETS;
+    int total_client_count = atoi(argv[4]);
+    int local_client_count = atoi(argv[5]);
+
+    //CLIENT NODE PATTERN
+    if(local_client_count > 0) {
+        pthread_t *pths = calloc(local_client_count, sizeof(pthread_t));
+        struct thread_arg *args = calloc(local_client_count,
+			sizeof(struct thread_arg));
+        for(int i=0; i<local_client_count; i++)
+            init_thread_arg(args+i, node_id+i, destgrps,
+                    total_client_count, config);
+        for(int i=0; i<local_client_count; i++)
+            pthread_create(pths+i, NULL, run_thread, args+i);
+        for(int i=0; i<local_client_count; i++)
+            pthread_join(pths[i], NULL);
+        for(int i=0; i<local_client_count; i++)
+            free_thread_arg(args+i);
+	free(args);
+	free(pths);
+    //SERVER NODE PATTERN
+    } else {
+        struct stats *stats = malloc(sizeof(struct stats));
+        long messages_count = ( NUMBER_OF_MESSAGES / MEASURE_RESOLUTION )
+                * destgrps / config->groups_count;
+	init_stats(stats, messages_count);
+
+	struct node *node = run_amcast_node(config, node_id, stats);
+
+        char filename[40];
+        sprintf(filename, "/tmp/node.%d.log", node_id);
+        log_to_file(stats, filename);
+
+	 node_free(node);
+	 free_stats(stats);
+    }
 
     //Clean and exit
-    fclose(logfile);
-    if(!is_client)
-        node_free(node);
     free_cluster_config(config);
-    free(stats->tv_ini);
-    free(stats->tv_dev);
-    free(stats->gts);
-    free(stats->msg);
-    free(stats);
     return EXIT_SUCCESS;
 }
