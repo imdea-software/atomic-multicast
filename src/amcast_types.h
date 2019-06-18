@@ -65,7 +65,8 @@ typedef struct deliver {
     p_uid_t		ballot;
     g_uid_t		lts;
     g_uid_t		gts;
-    g_uid_t		gts_inf_delivered;
+    g_uid_t		gts_linf_delivered;
+    g_uid_t		gts_ginf_delivered;
 } deliver_t;
 
 typedef struct reaccept {

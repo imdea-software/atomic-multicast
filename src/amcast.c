@@ -129,7 +129,7 @@ static void handle_accept(struct node *node, xid_t sid, accept_t *cmd) {
     }
     if(paircmp(&msg->accept_max_lts, &cmd->lts) < 0)
         msg->accept_max_lts = cmd->lts;
-    if(msg->phase <= ACCEPTED && paircmp(&cmd->lts, &msg->lts[cmd->grp]) < 0) {
+    if(msg->phase == ACCEPTED && paircmp(&cmd->lts, &msg->lts[cmd->grp]) < 0) {
         msg->accept_max_lts = default_pair;
         for(xid_t *grp = msg->msg.destgrps; grp < msg->msg.destgrps + msg->msg.destgrps_count; grp++)
             if(paircmp(&msg->lts[*grp], &msg->accept_max_lts) > 0)
@@ -258,20 +258,34 @@ static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
         }
         if(msg->accept_ack_groupcount[cmd->grp] >=
                 node->groups->node_counts[cmd->grp]/2 + 1
+            //Do not wait for any special quorum
+            ) {
             //Also check if the ACCEPT_ACK from the grp leader was received
-            && msg->accept_ack_counts[cmd->ballot[cmd->grp].id] > 0) {
+            //&& msg->accept_ack_counts[cmd->ballot[cmd->grp].id] > 0) {
+            //Wait for a leader's own reply
+            //&& msg->accept_ack_counts[node->id] > 0) {
+            //Wait for a leader's own reply
+            //&& msg->phase >= ACCEPTED) {
             //TODO Check for the best time to reset this counter
             if(msg->accept_ack_groupready[cmd->grp]++ == 0)
                 msg->accept_ack_totalcount += 1;
         }
         //Update latest_gts delivered if sender is in my group
         //  TODO This should not be required: ACCEPT_ACK are not received in order
-        if(cmd->grp == node->comm->groups[node->id]
-           && paircmp(&node->amcast->gts_last_delivered[sid], &cmd->gts_last_delivered) < 0)
+        if(paircmp(&node->amcast->gts_last_delivered[sid], &cmd->gts_last_delivered) < 0)
                 node->amcast->gts_last_delivered[sid] = cmd->gts_last_delivered;
         if(msg->accept_ack_totalcount != msg->msg.destgrps_count)
             return;
         if(msg->phase < COMMITTED) {
+            //USEFUL IF NOT WAITING FOR LEADERS
+            //  Use gts from last received AACK
+            //if(!msg->accept_ack_counts[node->id]) {
+            if(msg->phase < ACCEPTED) {
+                msg->collection = 1;
+                msg->gts = cmd->gts;
+                if(node->amcast->clock < msg->gts.time)
+                    node->amcast->clock = msg->gts.time;
+            }
             msg->phase = COMMITTED;
             if(msg->delivered == TRUE) {
                 pqueue_push(node->amcast->delivered_gts, msg, &msg->gts);
@@ -285,14 +299,16 @@ static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
             }
         }
         //Compute infimum of gts_last_delivered for my group
-        node->amcast->gts_inf_delivered = node->amcast->gts_last_delivered[node->id];
-        for(xid_t *nid = node->groups->members[node->comm->groups[node->id]];
-                nid < node->groups->members[node->comm->groups[node->id]]
-                + node->groups->node_counts[node->comm->groups[node->id]];
-                nid++)
-            if(node->comm->bevs[*nid])
-            if(paircmp(node->amcast->gts_last_delivered+(*nid), &node->amcast->gts_inf_delivered) < 0)
-                node->amcast->gts_inf_delivered = node->amcast->gts_last_delivered[(*nid)];
+        node->amcast->gts_ginf_delivered = node->amcast->gts_last_delivered[node->id];
+        node->amcast->gts_linf_delivered = node->amcast->gts_last_delivered[node->id];
+        for(xid_t *nid = node->comm->ids; nid < node->comm->ids + node->comm->cluster_size; nid++)
+            if(node->comm->bevs[*nid]) {
+            if(paircmp(node->amcast->gts_last_delivered+(*nid), &node->amcast->gts_ginf_delivered) < 0)
+                node->amcast->gts_ginf_delivered = node->amcast->gts_last_delivered[(*nid)];
+            if(node->comm->groups[(*nid)] == node->comm->groups[node->id]
+                    && paircmp(node->amcast->gts_last_delivered+(*nid), &node->amcast->gts_linf_delivered) < 0)
+                node->amcast->gts_linf_delivered = node->amcast->gts_last_delivered[(*nid)];
+	    }
 	//TODO A lot of possible improvements in the delivery pattern
         int try_next = 1;
         while(try_next && pqueue_size(node->amcast->committed_gts) > 0) {
@@ -325,7 +341,8 @@ static void handle_accept_ack(struct node *node, xid_t sid, accept_ack_t *cmd) {
 	                .mid = i_msg->msg.mid,
 		        .ballot = node->amcast->ballot,
 		        .lts = i_msg->lts[node->comm->groups[node->id]],
-		        .gts_inf_delivered = node->amcast->gts_inf_delivered,
+		        .gts_ginf_delivered = node->amcast->gts_ginf_delivered,
+		        .gts_linf_delivered = node->amcast->gts_linf_delivered,
 		        .gts = i_msg->gts
 	            },
 	        };
@@ -358,7 +375,8 @@ static void handle_deliver(struct node *node, xid_t sid, deliver_t *cmd) {
         if(node->amcast->clock < msg->gts.time)
             node->amcast->clock = msg->gts.time;
         node->amcast->gts_last_delivered[node->id] = msg->gts;
-        node->amcast->gts_inf_delivered = cmd->gts_inf_delivered;
+        node->amcast->gts_ginf_delivered = cmd->gts_ginf_delivered;
+        node->amcast->gts_linf_delivered = cmd->gts_linf_delivered;
         if(pqueue_push(node->amcast->delivered_gts, msg, &msg->gts) < 0) {
                 printf("[%u] {%u,%d} Failed to push into delivered_gts\n", node->id, msg->msg.mid.time, msg->msg.mid.id);
                 exit(EXIT_FAILURE);
@@ -376,7 +394,7 @@ static void handle_deliver(struct node *node, xid_t sid, deliver_t *cmd) {
                 exit(EXIT_FAILURE);
                 return;
             }
-            if(paircmp(&(i_msg)->gts, &node->amcast->gts_inf_delivered) > 0
+            if(paircmp(&(i_msg)->gts, &node->amcast->gts_ginf_delivered) > 0
                 || !i_msg->collection)
                 continue;
             if((i_msg = pqueue_pop(node->amcast->delivered_gts)) == NULL) {
@@ -418,13 +436,17 @@ static void handle_newleader(struct node *node, xid_t sid, newleader_t *cmd) {
     };
     //Limitation due to bad way of sending state arrays
     if(htable_size(node->amcast->h_msgs) > MAX_MSG_DIFF) {
-        printf("[%u] ERROR: can not send %u messages in a single enveloppe %u,%d, %u to be collected\n", node->id, rep.cmd.newleader_ack.msg_count, node->amcast->gts_inf_delivered.time, node->amcast->gts_inf_delivered.id, pqueue_size(node->amcast->delivered_gts));
+        printf("[%u] ERROR: can not send %u messages in a single enveloppe %u,%d, %u to be collected\n", node->id, rep.cmd.newleader_ack.msg_count, node->amcast->gts_ginf_delivered.time, node->amcast->gts_ginf_delivered.id, pqueue_size(node->amcast->delivered_gts));
         return;
     }
     //TODO CHANGETHIS ugly a.f. Have a clean way to append arrays to enveloppe
     rep.cmd.newleader_ack.msg_count = 0;
     void fill_rep(m_uid_t *mid, struct amcast_msg *msg, struct enveloppe *rep) {
         if(msg->delivered == TRUE)
+            return;
+        if(msg->phase < ACCEPTED)
+            return;
+	if(paircmp(&msg->gts, &node->amcast->gts_linf_delivered) <= 0)
             return;
         int *acc = &rep->cmd.newleader_ack.msg_count;
         rep->cmd.newleader_ack.messages[*acc].msg = msg->msg;
@@ -503,7 +525,7 @@ static void handle_newleader_ack(struct node *node, xid_t sid, newleader_ack_t *
     };
     //Limitation due to bad way of sending state arrays
     if(htable_size(node->amcast->h_msgs) > MAX_MSG_DIFF) {
-        printf("[%u] ERROR: can not send %u messages in a single enveloppe %u,%d\n", node->id, rep.cmd.newleader_sync.msg_count, node->amcast->gts_inf_delivered.time, node->amcast->gts_inf_delivered.id);
+        printf("[%u] ERROR: can not send %u messages in a single enveloppe %u,%d\n", node->id, rep.cmd.newleader_sync.msg_count, node->amcast->gts_ginf_delivered.time, node->amcast->gts_ginf_delivered.id);
         return;
     }
     //TODO CHANGETHIS ugly a.f. Have a clean way to append arrays to enveloppe
@@ -534,6 +556,8 @@ static void handle_newleader_ack(struct node *node, xid_t sid, newleader_ack_t *
         }
         /* Do not propagate START & PROPOSED messages */
         if(msg->phase < ACCEPTED)
+            return;
+	if(paircmp(&msg->gts, &node->amcast->gts_linf_delivered) <= 0)
             return;
         rep->cmd.newleader_sync.messages[*acc].msg = msg->msg;
         rep->cmd.newleader_sync.messages[*acc].phase = msg->phase;
@@ -637,7 +661,8 @@ static void handle_newleader_sync_ack(struct node *node, xid_t sid, newleader_sy
 	                .mid = i_msg->msg.mid,
                     .ballot = node->amcast->ballot,
                     .lts = i_msg->lts[node->comm->groups[node->id]],
-                    .gts_inf_delivered = node->amcast->gts_inf_delivered,
+                    .gts_ginf_delivered = node->amcast->gts_ginf_delivered,
+                    .gts_linf_delivered = node->amcast->gts_linf_delivered,
                     .gts = i_msg->gts
 	            },
 	        };
@@ -799,7 +824,8 @@ struct amcast *amcast_init(msginit_cb_fun msginit_cb, void *ini_cb_arg, delivery
     amcast->delivered_gts = pqueue_init((pq_pricmp_fun) paircmp);
     amcast->committed_gts = pqueue_init((pq_pricmp_fun) paircmp);
     amcast->pending_lts = pqueue_init((pq_pricmp_fun) paircmp);
-    amcast->gts_inf_delivered = default_pair;
+    amcast->gts_ginf_delivered = default_pair;
+    amcast->gts_linf_delivered = default_pair;
     amcast->msginit_cb = msginit_cb;
     amcast->delivery_cb = delivery_cb;
     amcast->ini_cb_arg = ini_cb_arg;
