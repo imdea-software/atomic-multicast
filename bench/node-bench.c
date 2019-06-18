@@ -10,6 +10,7 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <semaphore.h>
+#include <netinet/tcp.h>
 
 #include <event2/buffer.h>
 
@@ -46,6 +47,7 @@ void write_report(struct stats *stats, FILE *stream) {
         message_t msg = stats->msg[i];
         struct timespec ts_start = stats->tv_ini[i];
         struct timespec ts_end = stats->tv_dev[i];
+        if(ts_end.tv_sec == 0 && ts_end.tv_nsec == 0) continue;
         g_uid_t gts = stats->gts[i];
         //Write to a string the destination groups
         char *destgrps = malloc(sizeof(char) * (1 + 1 + (12 + 1) * msg.destgrps_count) + 1);
@@ -310,8 +312,14 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
                 exit(EXIT_FAILURE);
             }
             /* --> do not re-deliver messages */
-            if(c->last_gts && msg.timestamp <= c->last_gts->time)
+            if(c->last_gts && msg.timestamp <= c->last_gts->time) {
+	        continue;
+            }
+            if(stats->tv_dev[mid.time].tv_sec != 0 && stats->tv_dev[mid.time].tv_nsec != 0) {
+                printf("[c-%u] FAILURE: received deliver ack with wrong s-mid %u instead of %u from %d\n",
+                    c->id, mid.time, c->ref_value->cmd.multicast.mid.time, p->id);
                 continue;
+            }
             /* --> update deliver counts */
             p->received++;
             c->received++;
@@ -368,8 +376,10 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
         }
         if(c->connected == c->nodes_count) {
             printf("[c-%u] Connection established to all nodes\n", c->id);
-            if(c->sent == 0)
+            if(c->sent == 0) {
+                sleep(5);
                 submit_cb(0,0,c);
+            }
         }
     }
     void alt_event_cb(struct bufferevent *bev, short events, void *ptr) {
@@ -386,8 +396,10 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
         }
         if(c->connected == c->nodes_count) {
             printf("[c-%u] Connection established to all nodes\n", c->id);
-            if(c->sent == 0)
+            if(c->sent == 0) {
+                sleep(5);
                 alt_submit_cb(0,0,c);
+            }
         }
     }
     void interrupt_cb(evutil_socket_t fd, short flags, void *ptr) {
@@ -424,6 +436,8 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
             .sin_addr.s_addr = inet_addr(config->addresses[peer_id])
         };
         bufferevent_socket_connect(client.bev[peer_id], (struct sockaddr *) &addr, sizeof(addr));
+        int tcp_nodelay_flag = 1;
+        setsockopt(bufferevent_getfd(client.bev[peer_id]), IPPROTO_TCP, TCP_NODELAY, &tcp_nodelay_flag, sizeof(int));
     }
     //Prepare enveloppe template
     struct enveloppe env = {
