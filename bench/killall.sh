@@ -8,7 +8,7 @@ AMCAST_BIN=${AMCAST_DIR}/bench/node-bench
 AMCAST_BENCH_CLUSTER_CONF=${AMCAST_DIR}/bench/cluster.conf
 AMCAST_BENCH_NUMBER_OF_GROUPS=4
 AMCAST_BENCH_NUMBER_OF_NODES=12
-AMCAST_BENCH_NUMBER_OF_CLIENTS=3
+AMCAST_BENCH_NUMBER_OF_CLIENTS_NODES=2
 
 kill_nodes() {
     NODES_COUNT=$1
@@ -20,11 +20,14 @@ kill_nodes() {
 	AMCAST_SSH_USER="lefort_a"
 	AMCAST_SSH_HOST=`sed -n $(( 3 + $id + ( $IS_CLIENT * $AMCAST_BENCH_NUMBER_OF_NODES )  ))p ${AMCAST_BENCH_CLUSTER_CONF} | cut -f3`
         AMCAST_DEPLOY="ssh ${AMCAST_SSH_USER}@${AMCAST_SSH_HOST}"
-        AMCAST_CMD=( ${AMCAST_DEPLOY} "killall ${AMCAST_BIN}")
+        [ $IS_CLIENT -eq 0 ] && FILENAME=node || FILENAME=client
+        #AMCAST_CMD=( ${AMCAST_DEPLOY} "killall -s 1 ${AMCAST_BIN}")
+        #AMCAST_CMD=( ${AMCAST_DEPLOY} "mv /tmp/${FILENAME}.* /proj/RDMA-RCU/tmp/mcast/log/")
+        AMCAST_CMD=( ${AMCAST_DEPLOY} "mv /tmp/${FILENAME}.* /proj/RDMA-RCU/tmp/amcast/log/")
         "${AMCAST_CMD[@]}"
     done
 }
 
 kill_nodes $AMCAST_BENCH_NUMBER_OF_NODES 0
 
-kill_nodes $AMCAST_BENCH_NUMBER_OF_CLIENTS 1
+kill_nodes $AMCAST_BENCH_NUMBER_OF_CLIENTS_NODES 1

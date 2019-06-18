@@ -9,9 +9,9 @@ TOPOMAP="/proj/RDMA-RCU/exp/McastIntercoDeploy/tbdata/topomap"
 TOPOMAP_NODE_ID_PREFIX="node-"
 
 NUMBER_OF_NODES_PER_GROUP=3
+CLIENT_ONLY_NODES=1
 
-
-cat $TOPOMAP | grep $TOPOMAP_NODE_ID_PREFIX | sort -V | cut -d ":" -f2 > $TMPFILE
+cat $TOPOMAP | grep $TOPOMAP_NODE_ID_PREFIX | sort -V | cut -d ":" -f2 | head -n -${CLIENT_ONLY_NODES} > $TMPFILE
 
 NUMBER_OF_NODES=$([ $# -eq 1 ] && echo "$1" || cat $TMPFILE | wc -l)
 N_ID=0
@@ -26,6 +26,11 @@ while read N_IP ; do
     [ $(( $N_ID % ${NUMBER_OF_NODES_PER_GROUP} )) -eq 0 ] && G_ID=$(( $G_ID + 1 ))
 done < $TMPFILE
 N_PORT=$(( $N_PORT + 1))
+done
+for N_IP in `cat $TOPOMAP | grep $TOPOMAP_NODE_ID_PREFIX | sort -V | cut -d ":" -f2 | tail -n ${CLIENT_ONLY_NODES}` ; do
+    echo -e "${N_ID}\t${G_ID}\t${N_IP}\t${N_PORT}" >> $OUTFILE
+    N_ID=$(( $N_ID + 1 ))
+    [ $(( $N_ID % ${NUMBER_OF_NODES_PER_GROUP} )) -eq 0 ] && G_ID=$(( $G_ID + 1 ))
 done
 
 rm $TMPFILE

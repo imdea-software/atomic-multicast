@@ -2,7 +2,7 @@
 
 SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
 
-AMCAST_SSH_USER=anatole
+AMCAST_SSH_USER=lefort_a
 AMCAST_SSH_HOST=localhost
 
 AMCAST_DIR=`dirname ${SCRIPTPATH}`
@@ -22,12 +22,13 @@ run_nodes() {
     for id in ${NODE_IDS} ; do
         N_LINE_IN_CONF=$(( 3 + $id + ( $IS_CLIENT * $AMCAST_BENCH_NUMBER_OF_NODES ) ))
 
-        AMCAST_SSH_HOST=`sed -n ${N_LINE_IN_CONF}p ${AMCAST_BENCH_CLUSTER_CONF} | cut -f3`
+        [ $IS_CLIENT -eq 0 ] && AMCAST_SSH_HOST=`sed -n ${N_LINE_IN_CONF}p ${AMCAST_BENCH_CLUSTER_CONF} | cut -f3`
         [ $IS_CLIENT -eq 1 ] && AMCAST_SSH_HOST=`tail -n 1 ${AMCAST_BENCH_CLUSTER_CONF} | cut -f3`
         AMCAST_DEPLOY="ssh ${AMCAST_SSH_USER}@${AMCAST_SSH_HOST}"
 
         AMCAST_CMD=( ${AMCAST_DEPLOY} "${AMCAST_BIN} ${id} ${AMCAST_BENCH_NUMBER_OF_NODES} ${AMCAST_BENCH_NUMBER_OF_GROUPS} ${AMCAST_BENCH_NUMBER_OF_CLIENTS} $IS_CLIENT < ${AMCAST_BENCH_CLUSTER_CONF}")
-        AMCAST_RETRIEVE_REPORT_CMD=( ${AMCAST_DEPLOY} "mkdir -p ~/log && mv -v /tmp/report\.${id}\.log ~/log/" )
+        AMCAST_LOG_DIR="/proj/RDMA-RCU/tmp/amcast/log"
+        AMCAST_RETRIEVE_REPORT_CMD=( ${AMCAST_DEPLOY} "mkdir -p $AMCAST_LOG_DIR && mv -v /tmp/report\.${id}\.log $AMCAST_LOG_DIR" )
         "${AMCAST_CMD[@]}" && [ $IS_CLIENT -eq 0 ] && "${AMCAST_RETRIEVE_REPORT_CMD[@]}" &
         AMCAST_FORKED_PIDS[${id}]=$!
     done
@@ -43,7 +44,7 @@ wait_for_termination() {
 
 run_nodes $AMCAST_BENCH_NUMBER_OF_NODES 0
 
-sleep 1
+sleep 3
 
 run_nodes $AMCAST_BENCH_NUMBER_OF_CLIENTS 1
 
