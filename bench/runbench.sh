@@ -2,7 +2,7 @@
 
 SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
 
-AMCAST_SSH_USER=lefort_a
+AMCAST_SSH_USER=anatole
 AMCAST_SSH_HOST=localhost
 
 AMCAST_DIR=`dirname ${SCRIPTPATH}`

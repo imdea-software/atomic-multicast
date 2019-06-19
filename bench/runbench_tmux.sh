@@ -26,7 +26,7 @@ run_nodes() {
         N_LINE_IN_CONF=$(( 3 + $id + ( $IS_CLIENT * $AMCAST_BENCH_NUMBER_OF_NODES ) ))
         gid=`sed -n ${N_LINE_IN_CONF}p ${AMCAST_BENCH_CLUSTER_CONF} | cut -f2`
 
-	AMCAST_SSH_USER="lefort_a"
+	AMCAST_SSH_USER="anatole"
         AMCAST_SSH_HOST=`sed -n ${N_LINE_IN_CONF}p ${AMCAST_BENCH_CLUSTER_CONF} | cut -f3`
         AMCAST_DEPLOY="ssh ${AMCAST_SSH_USER}@${AMCAST_SSH_HOST}"
 
@@ -57,7 +57,7 @@ run_px_nodes() {
             tmux new-window -n ${TMUX_WINDOW_NAME_PREFIX}${gid}_$nid
             tmux send-keys " ssh node-$(( $HOST_ID + 1))" Enter
             tmux send-keys " export LD_LIBRARY_PATH=/usr/local/lib" Enter
-            tmux send-keys " nice -n 20 /users/lefort_a/libmcast/build/sample/proposer-acceptor $nid ${AMCAST_DIR}/bench/mcast_conf/paxos-6g3p-group${gid}.conf > /tmp/px${gid}${nid}.log" Enter
+            tmux send-keys " nice -n 20 /home/anatole/libmcast/build/sample/proposer-acceptor $nid ${AMCAST_DIR}/bench/mcast_conf/paxos-6g3p-group${gid}.conf > /tmp/px${gid}${nid}.log" Enter
         done
     done
 }
@@ -78,7 +78,7 @@ run_mcast_nodes() {
             tmux new-window -n ${TMUX_WINDOW_NAME_PREFIX}${gid}_$nid
             tmux send-keys " ssh node-$(( $HOST_ID + 1))" Enter
             tmux send-keys " export LD_LIBRARY_PATH=/usr/local/lib" Enter
-            tmux send-keys " nice -n 20 /users/lefort_a/libmcast/build/sample/node-simple -n $nid -g $gid -c ${AMCAST_DIR}/bench/mcast_conf/mcast-6g3p.conf -s $PROTO_OPT -p ${AMCAST_DIR}/bench/mcast_conf/paxos-6g3p-group${gid}.conf && echo success > /tmp/node.${HOST_ID}.log " Enter
+            tmux send-keys " nice -n 20 /home/anatole/libmcast/build/sample/node-simple -n $nid -g $gid -c ${AMCAST_DIR}/bench/mcast_conf/mcast-6g3p.conf -s $PROTO_OPT -p ${AMCAST_DIR}/bench/mcast_conf/paxos-6g3p-group${gid}.conf && echo success > /tmp/node.${HOST_ID}.log " Enter
         done
     done
 }
@@ -97,8 +97,8 @@ sleep 10
 
 start_cid=0
 end_cid=0
-#client_hosts=1
-client_hosts=$AMCAST_BENCH_NUMBER_OF_GROUPS
+client_hosts=9
+#client_hosts=$AMCAST_BENCH_NUMBER_OF_GROUPS
 for gid in `seq 1 $client_hosts` ; do
     chid=$(( $AMCAST_BENCH_NUMBER_OF_NODES + $gid ))
     start_cid=$(( $end_cid + 1 ))

@@ -23,7 +23,7 @@ esac
 
 exp_terminate() {
     pids=()
-    for i in `seq 31 40` ; do ssh node-$i killall node-bench & pids+=($!) ; done
+    for i in `seq 31 39` ; do ssh node-$i killall node-bench & pids+=($!) ; done
     for pid in ${pids[*]}; do wait $pid ; done
 
     pids=()
@@ -41,24 +41,30 @@ exp_run() {
     mkdir -p $destdir
     rm ${tmpdir}/{client,node}.*.log
 
-    /nfs/libamcast/bench/runbench_tmux.sh $destgrps $n_clients $protocol
+    /home/anatole/libamcast/bench/runbench_tmux.sh $destgrps $n_clients $protocol
 
     sleep $timeout
 
     exp_terminate
     sleep $terminate_wait
 
-    /nfs/libamcast/bench/killall.sh
+    /home/anatole/libamcast/bench/killall.sh
 
-    [ `ls ${tmpdir}/client.*.log | wc -l` -ne $n_clients ] && echo "ERROR: some clients have failed" && ret=1
-    [ `ls ${tmpdir}/node.*.log | wc -l` -ne 30 ] && echo "ERROR: some nodes have failed" && ls ${tmpdir}/node.*.log && ret=1
+    [ `ls ${tmpdir}/client.*.log | wc -l` -ne $(( $n_clients == 1 ? $n_clients : 9 )) ] && echo "ERROR: some clients have failed" && ret=1
+    #[ `ls ${tmpdir}/node.*.log | wc -l` -ne 30 ] && echo "ERROR: some nodes have failed" && ls ${tmpdir}/node.*.log && ret=1
 
     if [ $ret -eq 0 ] ; then
+        #cp ${tmpdir}/client.*.log ${destdir}/
         cat ${tmpdir}/client.*.log > ${destdir}/all.clients.log
-        cp ${tmpdir}/node.*.log ${destdir}/
+        #cp ${tmpdir}/node.*.log ${destdir}/
     fi
-    tmux kill-session -t AMCAST
 
+    #[ `du ${destdir}/all.clients.log | cut -f1` -lt `du ${destdir}/all.clients.log | cut -f1` ] && echo "ERROR: not enough message delivered" && ret=1
+    #if [ $ret -eq 0 ] ; then
+    #    mv ${destdir}/all.clients.log.new ${destdir}/all.clients.log
+    #fi
+
+    tmux kill-session -t AMCAST
     return $ret
 }
 
@@ -66,19 +72,20 @@ exp_run() {
 exp_terminate
 
 echo "Start of data gathering for cmp experiments"
-for destgrps in 1 2 3 4 6 8 10 ; do
-    [ $destgrps -eq 1 ] && min_clients=2000 && max_clients=24000 && inc_clients=2000
-    [ $destgrps -eq 2 ] && min_clients=1000 && max_clients=12000 && inc_clients=1000
-    [ $destgrps -eq 3 ] && min_clients=1000 && max_clients=8000 && inc_clients=1000
-    [ $destgrps -eq 4 ] && min_clients=1000 && max_clients=6000 && inc_clients=1000
-    [ $destgrps -eq 6 ] && min_clients=500 && max_clients=4000 && inc_clients=500
-    [ $destgrps -eq 8 ] && min_clients=500 && max_clients=4000 && inc_clients=500
-    [ $destgrps -eq 10 ] && min_clients=500 && max_clients=4000 && inc_clients=500
+for destgrps in 1 2 4 6 8 10 ; do
+    min_clients=16000 && max_clients=24000 && inc_clients=4000
+    [ $destgrps -eq 1 ] && min_clients=4000 && max_clients=32000 && inc_clients=4000
+    [ $destgrps -eq 2 ] && min_clients=4000 && max_clients=32000 && inc_clients=4000
+    [ $destgrps -eq 4 ] && min_clients=4000 && max_clients=16000 && inc_clients=4000
+    [ $destgrps -eq 6 ] && min_clients=20000 && max_clients=24000 && inc_clients=4000
+    [ $destgrps -eq 8 ] && min_clients=12000 && max_clients=16000 && inc_clients=4000
+    [ $destgrps -eq 10 ] && min_clients=4000 && max_clients=16000 && inc_clients=4000
     for n_clients in `echo 1 && seq $min_clients $inc_clients $max_clients` ; do
         while true ; do
             echo "running $protocol exp for $destgrps destination groups and $n_clients clients"
             exp_run $destgrps $n_clients
             [ $? -eq 0 ] && break;
+            #[ $? -ne 0 ] && break;
         done
         echo "done with exp for $destgrps destination groups and $n_clients clients"
     done
