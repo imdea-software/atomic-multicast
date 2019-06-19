@@ -51,9 +51,14 @@ struct node {
 };
 
 typedef void (*delivery_cb_fun)(struct node *node, struct amcast_msg *msg, void *arg);
-typedef delivery_cb_fun msginit_cb_fun;
+typedef delivery_cb_fun msginit_cb_fun, commit_cb_fun, leader_failure_cb_fun, recovery_cb_fun;
 
-struct 	node 	*node_init  (struct cluster_config *conf, xid_t id, msginit_cb_fun msginit_cb, void *ini_cb_arg, delivery_cb_fun delivery_cb, void *dev_cb_arg);
+struct 	node 	*node_init  (struct cluster_config *conf, xid_t id,
+		             msginit_cb_fun msginit_cb, void *ini_cb_arg,
+			     commit_cb_fun commit_cb, void *commit_cb_arg,
+			     leader_failure_cb_fun leader_failure_cb, void *leader_failure_cb_arg,
+			     recovery_cb_fun recovery_cb, void *recovery_cb_arg,
+			     delivery_cb_fun delivery_cb, void *dev_cb_arg);
 int 		node_free	(struct node *node);
 void		node_start	(struct node *node);
 void		node_stop	(struct node *node);
