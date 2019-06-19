@@ -24,11 +24,16 @@
 
 #define CONF_SEPARATOR "\t"
 #define LOG_SEPARATOR "\t"
-#define NUMBER_OF_MESSAGES 100000
-#define NUMBER_OF_TARGETS 2
+#define NUMBER_OF_MESSAGES 10000000
 #define NODES_PER_GROUP 3
+#define N_WAN_REGIONS 1
 #define INITIAL_LEADER_IN_GROUP 0
 #define MEASURE_RESOLUTION 1 //Only save stats for 1 message out of MEASURE_RESOLUTION
+
+typedef enum { AMCAST, BASECAST, FAMCAST } proto_t;
+proto_t proto;
+
+xid_t gid;
 
 struct stats {
     long delivered;
@@ -200,16 +205,27 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
         struct client *c = (struct client *) ptr;
         c->exit_on_delivery = 1;
     }
+    int r_cur = 0;
+    int r_off = 0;
     void submit_cb(evutil_socket_t fd, short flags, void *ptr) {
         struct client *c = (struct client *) ptr;
         /* Do some magic with the mcast message */
         /* --> update mid.time */
         c->ref_value->cmd.multicast.mid.time = c->sent++;
         /* --> select circular destgrps */
-        xid_t g_dst_id = (c->id + c->sent) % c->groups_count;
-        for(int i=0; i<c->ref_value->cmd.multicast.destgrps_count; i++) {
-            c->ref_value->cmd.multicast.destgrps[i] = g_dst_id;
-            g_dst_id = (g_dst_id + 1) % c->groups_count;
+        int good_dst = 0;
+        xid_t g_dst_local_id = -1;
+        while(!good_dst) {
+            xid_t g_dst_id = (c->id + r_off) % c->groups_count;
+            for(int i=0; i<c->ref_value->cmd.multicast.destgrps_count; i++) {
+                c->ref_value->cmd.multicast.destgrps[i] = g_dst_id;
+                if(!good_dst && ((g_dst_id % N_WAN_REGIONS) == (gid % N_WAN_REGIONS))) {
+                    good_dst = 1;
+                    g_dst_local_id = g_dst_id;
+                }
+                g_dst_id = (g_dst_id + 1) % c->groups_count;
+            }
+            r_off++;
         }
         /* --> update stats struct */
         if( ((stats->delivered + 1) % MEASURE_RESOLUTION) == 0) {
@@ -227,22 +243,32 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
     void alt_submit_cb(evutil_socket_t fd, short flags, void *ptr) {
         struct client *c = (struct client *) ptr;
         /* Do some magic with the mcast message */
-        /* --> select starting group */
-        xid_t g_dst_id = (c->id + c->sent) % c->groups_count;
+        /* --> select circular destgrps */
+        int good_dst = 0;
+        xid_t g_dst_local_id = -1;
+        while(!good_dst) {
+            xid_t g_dst_id = (c->id + r_off) % c->groups_count;
+            for(int i=0; i<c->ref_msg->to_groups_len; i++) {
+                c->ref_msg->to_groups[i] = g_dst_id;
+                c->ref_value->cmd.multicast.destgrps[i] = g_dst_id;
+                if(!good_dst) {
+                    if((g_dst_id % N_WAN_REGIONS) == (gid % N_WAN_REGIONS)) {
+                        good_dst = 1;
+                        g_dst_local_id = g_dst_id;
+                    }
+                }
+                g_dst_id = (g_dst_id + 1) % c->groups_count;
+            }
+            r_off++;
+        }
         /* --> update origin group */
-        c->ref_msg->from_group = g_dst_id;
+        c->ref_msg->from_group = g_dst_local_id;
         c->ref_msg->from_node = INITIAL_LEADER_IN_GROUP;
         /* --> update msg uid */
         c->ref_msg->uid = generate_uid(c->ref_msg->from_group, c->ref_msg->from_node, c->sent);
         c->ref_value->cmd.multicast.mid.time = c->sent;
         /* --> embed client mid in payload */
         ((struct custom_payload *) c->ref_msg->value.mcast_value_val)->mid = c->ref_value->cmd.multicast.mid;
-        /* --> select circular destgrps */
-        for(int i=0; i<c->ref_msg->to_groups_len; i++) {
-            c->ref_msg->to_groups[i] = g_dst_id;
-            c->ref_value->cmd.multicast.destgrps[i] = g_dst_id;
-            g_dst_id = (g_dst_id + 1) % c->groups_count;
-        }
         /* --> update stats struct */
         if( ((stats->delivered + 1) % MEASURE_RESOLUTION) == 0) {
             stats->msg[c->ref_value->cmd.multicast.mid.time] = c->ref_value->cmd.multicast;
@@ -442,9 +468,13 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
             bufferevent_free(*bev);
         }
         *bev = bufferevent_socket_new(c->base, -1, BEV_OPT_CLOSE_ON_FREE);
-        //TODO CHANGETHIS: Have to edit those 2 lines to switch back to libevamcast
-        bufferevent_setcb(*bev, read_cb, NULL, event_cb, p);
-        bufferevent_setwatermark(*bev, EV_READ, sizeof(struct enveloppe), 0);
+        if(proto == AMCAST) {
+            bufferevent_setcb(*bev, read_cb, NULL, event_cb, p);
+            bufferevent_setwatermark(*bev, EV_READ, sizeof(struct enveloppe), 0);
+        } else {
+            bufferevent_setcb(*bev, alt_read_cb, NULL, alt_event_cb, p);
+            //bufferevent_setwatermark(*bev, EV_READ, sizeof(struct enveloppe), 0);
+        }
         bufferevent_enable(*bev, EV_READ|EV_WRITE);
         struct sockaddr_in addr = {
             .sin_family = AF_INET,
@@ -639,16 +669,18 @@ void *run_thread(void *ptr) {
 }
 
 int main(int argc, char *argv[]) {
-    if(argc != 6) {
-        printf("USAGE: node-bench [node_id] [number_of_nodes]"
-                "[number_of_groups] [total_number_of_clients] [local_number_of_clients]\n");
+    if(argc != 9) {
+        printf("USAGE: node-bench [node_id] [group_id] [number_of_nodes]"
+                "[number_of_groups] [total_number_of_clients]"
+                "[number_of_destgrps] [local_number_of_clients]\n");
         exit(EXIT_FAILURE);
     }
 
     //Init node & cluster config
     struct cluster_config *config = malloc(sizeof(struct cluster_config));
     xid_t node_id = atoi(argv[1]);
-    init_cluster_config(config, atoi(argv[2]), atoi(argv[3]));
+    gid = atoi(argv[2]);
+    init_cluster_config(config, atoi(argv[3]), atoi(argv[4]));
     read_cluster_config_from_stdin(config);
 
     //IGNORE SIGPIPES (USEFUL FOR RECOVERY)
@@ -656,9 +688,20 @@ int main(int argc, char *argv[]) {
         return (EXIT_FAILURE);
 
     //Prepare stats->size
-    int destgrps = NUMBER_OF_TARGETS;
-    int total_client_count = atoi(argv[4]);
-    int local_client_count = atoi(argv[5]);
+    int destgrps = atoi(argv[6]);
+    int total_client_count = atoi(argv[5]);
+    int local_client_count = atoi(argv[7]);
+
+    if(strcmp("amcast", argv[8]) == 0)
+        proto = AMCAST;
+    else if(strcmp("basecast", argv[8]) == 0)
+        proto = BASECAST;
+    else if(strcmp("famcast", argv[8]) == 0)
+        proto = FAMCAST;
+    else {
+        printf("ERROR: unsupported protocol\n");
+        return EXIT_FAILURE;
+    }
 
     //CLIENT NODE PATTERN
     if(local_client_count > 0) {

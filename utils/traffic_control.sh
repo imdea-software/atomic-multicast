@@ -28,8 +28,8 @@ start() {
     tc qdisc add dev $interface root handle 1: prio
 
     tc qdisc add dev $interface parent 1:1 handle 2: netem delay 0ms
-    tc qdisc add dev $interface parent 1:2 handle 3: netem delay 35ms 3ms distribution normal
-    tc qdisc add dev $interface parent 1:3 handle 4: netem delay 70ms 5ms distribution normal
+    tc qdisc add dev $interface parent 1:2 handle 3: netem delay 0ms
+    tc qdisc add dev $interface parent 1:3 handle 4: netem delay 75ms 5ms 25% distribution normal
 
     for ip in $nodes_ip ; do
         pid=$(( `echo $ip | cut -d '.' -f4` - 2 ))

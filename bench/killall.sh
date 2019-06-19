@@ -6,9 +6,12 @@ AMCAST_DIR=`dirname ${SCRIPTPATH}`
 AMCAST_BIN=${AMCAST_DIR}/bench/node-bench
 
 AMCAST_BENCH_CLUSTER_CONF=${AMCAST_DIR}/bench/cluster.conf
-AMCAST_BENCH_NUMBER_OF_GROUPS=4
-AMCAST_BENCH_NUMBER_OF_NODES=12
-AMCAST_BENCH_NUMBER_OF_CLIENTS_NODES=2
+AMCAST_BENCH_NUMBER_OF_GROUPS=10
+AMCAST_BENCH_NUMBER_OF_NODES=30
+AMCAST_BENCH_NUMBER_OF_CLIENTS_NODES=10
+AMCAST_STORE_HOST=$(( $AMCAST_BENCH_NUMBER_OF_NODES + $AMCAST_BENCH_NUMBER_OF_CLIENTS_NODES ))
+
+PIDS=()
 
 kill_nodes() {
     NODES_COUNT=$1
@@ -23,11 +26,14 @@ kill_nodes() {
         [ $IS_CLIENT -eq 0 ] && FILENAME=node || FILENAME=client
         #AMCAST_CMD=( ${AMCAST_DEPLOY} "killall -s 1 ${AMCAST_BIN}")
         #AMCAST_CMD=( ${AMCAST_DEPLOY} "mv /tmp/${FILENAME}.* /proj/RDMA-RCU/tmp/mcast/log/")
-        AMCAST_CMD=( ${AMCAST_DEPLOY} "mv /tmp/${FILENAME}.* /proj/RDMA-RCU/tmp/amcast/log/")
-        "${AMCAST_CMD[@]}"
+        AMCAST_CMD=( ${AMCAST_DEPLOY} "rsync -az /tmp/${FILENAME}.* node-$AMCAST_STORE_HOST:/mnt/log/ && rm /tmp/${FILENAME}.*")
+        "${AMCAST_CMD[@]}" &
+        PIDS+=($!)
     done
 }
 
 kill_nodes $AMCAST_BENCH_NUMBER_OF_NODES 0
 
 kill_nodes $AMCAST_BENCH_NUMBER_OF_CLIENTS_NODES 1
+
+for pid in ${PIDS[*]}; do wait $pid ; done
