@@ -171,13 +171,14 @@ void accept_error_cb(struct evconnlistener *lev, void *ptr) {
 void read_cb(struct bufferevent *bev, void *ptr) {
     struct node *node = NULL; xid_t peer_id;
     retrieve_cb_arg(&peer_id, &node, (struct cb_arg *) ptr);
-    //TODO Change read_enveloppe() implem so that looping over it
-    //     doesn't cause bufferevent_read() to be called several times
+
     struct evbuffer *in_buf = bufferevent_get_input(bev);
     evbuffer_pullup(in_buf, evbuffer_get_length(in_buf));
     while (evbuffer_get_length(in_buf) >= sizeof(struct enveloppe)) {
         struct enveloppe env;
-        read_enveloppe(bev, &env);
+        if(read_enveloppe(bev, &env) <= 0) {
+            return;
+        }
         switch(env.cmd_type) {
             case TESTREPLY:
                 write_enveloppe(bev, &env);

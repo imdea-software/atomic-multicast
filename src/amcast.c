@@ -437,11 +437,7 @@ static void handle_newleader(struct node *node, xid_t sid, newleader_t *cmd) {
             .msg_count = htable_size(node->amcast->h_msgs),
         }
     };
-    //Limitation due to bad way of sending state arrays
-    if(htable_size(node->amcast->h_msgs) > MAX_MSG_DIFF) {
-        printf("[%u] ERROR: can not send %u messages in a single enveloppe %u,%d, %u to be collected\n", node->id, rep.cmd.newleader_ack.msg_count, node->amcast->gts_ginf_delivered.time, node->amcast->gts_ginf_delivered.id, pqueue_size(node->amcast->delivered_gts));
-        return;
-    }
+    rep.cmd.newleader_ack.messages = malloc(rep.cmd.newleader_ack.msg_count * sizeof(msgstate_t));
     //TODO CHANGETHIS ugly a.f. Have a clean way to append arrays to enveloppe
     rep.cmd.newleader_ack.msg_count = 0;
     void fill_rep(m_uid_t *mid, struct amcast_msg *msg, struct enveloppe *rep) {
@@ -460,6 +456,7 @@ static void handle_newleader(struct node *node, xid_t sid, newleader_t *cmd) {
         *acc += 1;
     }
     htable_foreach(node->amcast->h_msgs, (GHFunc) fill_rep, &rep);
+    rep.cmd.newleader_ack.messages = realloc(rep.cmd.newleader_ack.messages, rep.cmd.newleader_ack.msg_count * sizeof(msgstate_t));
     send_to_peer(node, &rep, sid);
 }
 
@@ -526,11 +523,7 @@ static void handle_newleader_ack(struct node *node, xid_t sid, newleader_ack_t *
             .msg_count = htable_size(node->amcast->h_msgs),
         }
     };
-    //Limitation due to bad way of sending state arrays
-    if(htable_size(node->amcast->h_msgs) > MAX_MSG_DIFF) {
-        printf("[%u] ERROR: can not send %u messages in a single enveloppe %u,%d\n", node->id, rep.cmd.newleader_sync.msg_count, node->amcast->gts_ginf_delivered.time, node->amcast->gts_ginf_delivered.id);
-        return;
-    }
+    rep.cmd.newleader_sync.messages = malloc(rep.cmd.newleader_sync.msg_count * sizeof(msgstate_t));
     //TODO CHANGETHIS ugly a.f. Have a clean way to append arrays to enveloppe
     rep.cmd.newleader_sync.msg_count = 0;
     void fill_rep(m_uid_t *mid, struct amcast_msg *msg, struct enveloppe *rep) {
@@ -571,7 +564,8 @@ static void handle_newleader_ack(struct node *node, xid_t sid, newleader_ack_t *
     }
     htable_foreach(node->amcast->h_msgs, (GHFunc) fill_rep, &rep);
     //TODO CHANGETHIS do not send this to itself (group except me)
-    send_to_group(node, &rep, node->comm->groups[node->id]);
+    rep.cmd.newleader_sync.messages = realloc(rep.cmd.newleader_sync.messages, rep.cmd.newleader_sync.msg_count * sizeof(msgstate_t));
+    send_to_group_except_me(node, &rep, node->comm->groups[node->id]);
 }
 
 static void handle_newleader_sync(struct node *node, xid_t sid, newleader_sync_t *cmd) {

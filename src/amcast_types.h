@@ -5,7 +5,6 @@
 
 #include "types.h"
 
-#define MAX_MSG_DIFF 100
 #define MAX_NUMBER_OF_GROUPS 10
 //#define MAX_PAYLOAD_LEN 156
 #define MAX_PAYLOAD_LEN 20
@@ -42,6 +41,14 @@ typedef struct message {
     xid_t 		destgrps[MAX_NUMBER_OF_GROUPS];
     struct payload	value;
 } message_t;
+
+typedef struct msgstate {
+    phase_t    phase;
+    p_uid_t    lballot[MAX_NUMBER_OF_GROUPS];
+    g_uid_t    lts[MAX_NUMBER_OF_GROUPS];
+    g_uid_t    gts;
+    message_t  msg;
+} msgstate_t;
 
 //NODE_CMD_TYPES
 typedef struct accept {
@@ -86,26 +93,14 @@ typedef struct newleader_ack {
     p_uid_t		aballot;
     clk_t 		clock;
     int 		msg_count;
-    struct {
-        phase_t 	phase;
-        p_uid_t 	lballot[MAX_NUMBER_OF_GROUPS];
-        g_uid_t 	lts[MAX_NUMBER_OF_GROUPS];
-        g_uid_t 	gts;
-        message_t 	msg;
-    } messages[MAX_MSG_DIFF];
+    msgstate_t		*messages;
 } newleader_ack_t;
 
 typedef struct newleader_sync {
     p_uid_t 		ballot;
     clk_t 		clock;
     int 		msg_count;
-    struct {
-        phase_t 	phase;
-        p_uid_t 	lballot[MAX_NUMBER_OF_GROUPS];
-        g_uid_t 	lts[MAX_NUMBER_OF_GROUPS];
-        g_uid_t 	gts;
-        message_t 	msg;
-    } messages[MAX_MSG_DIFF];
+    msgstate_t		*messages;
 } newleader_sync_t;
 
 typedef struct newleader_sync_ack {
