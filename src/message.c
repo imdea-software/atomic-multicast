@@ -55,6 +55,10 @@ int read_enveloppe(struct bufferevent *bev, struct enveloppe *env) {
     return 1;
 }
 
+static void cleanup(const void *data, size_t len, void *arg) {
+    free((void *) data);
+}
+
 //TODO Properly implement serialization of the enveloppe and its content
 void write_enveloppe(struct bufferevent *bev, struct enveloppe *env) {
     struct evbuffer *ev_out = bufferevent_get_output(bev);
@@ -62,11 +66,11 @@ void write_enveloppe(struct bufferevent *bev, struct enveloppe *env) {
     switch(env->cmd_type) {
         case NEWLEADER_ACK:
             evbuffer_add_reference(ev_out, env->cmd.newleader_ack.messages,
-                    env->cmd.newleader_ack.msg_count * sizeof(msgstate_t), NULL, NULL);
+                    env->cmd.newleader_ack.msg_count * sizeof(msgstate_t), cleanup, NULL);
             break;
         case NEWLEADER_SYNC:
             evbuffer_add_reference(ev_out, env->cmd.newleader_sync.messages,
-                    env->cmd.newleader_sync.msg_count * sizeof(msgstate_t), NULL, NULL);
+                    env->cmd.newleader_sync.msg_count * sizeof(msgstate_t), cleanup, NULL);
             break;
         default:
             break;
