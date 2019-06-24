@@ -52,6 +52,7 @@ struct stats {
 };
 
 struct timeval nodelay = { .tv_sec = 0, .tv_usec = 0 };
+struct timeval five_seconds = { .tv_sec = 5, .tv_usec = 0 };
 struct timeval exit_node_timeout = { .tv_sec = 200, .tv_usec = 0 };
 struct timeval exit_client_timeout = { .tv_sec = 180, .tv_usec = 0 };
 
@@ -231,6 +232,7 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
         struct event_base *base;
         struct bufferevent **bev;
         struct enveloppe *ref_value;
+        struct event *submit_ev;
         mcast_message *ref_msg;
     } client;
     struct custom_payload {
@@ -476,8 +478,7 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
         if(c->connected == c->nodes_count) {
             printf("[c-%u] Connection established to all nodes\n", c->id);
             if(c->sent == 0) {
-                sleep(5);
-                submit_cb(0,0,c);
+                evtimer_add(c->submit_ev, &five_seconds);
             }
         }
     }
@@ -498,8 +499,7 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
         if(c->connected == c->nodes_count) {
             printf("[c-%u] Connection established to all nodes\n", c->id);
             if(c->sent == 0) {
-                sleep(5);
-                alt_submit_cb(0,0,c);
+                evtimer_add(c->submit_ev, &five_seconds);
             }
         }
     }
@@ -576,6 +576,11 @@ void run_client_node_libevent(struct cluster_config *config, xid_t client_id, st
     msg.value.mcast_value_len = sizeof(struct custom_payload) - MAX_PAYLOAD_LEN + val.len;
     msg.value.mcast_value_val = (char *) &val;
     client.ref_msg = &msg;
+    //Set-up submit event
+    if(proto == AMCAST)
+        client.submit_ev = evtimer_new(client.base, submit_cb, &client);
+    else
+        client.submit_ev = evtimer_new(client.base, alt_submit_cb, &client);
     //Set-up timeout-exit
     event_base_once(client.base, -1, EV_TIMEOUT, exit_on_timeout_cb, &client, &exit_client_timeout);
     //Start client
